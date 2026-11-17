@@ -1340,10 +1340,10 @@ def plate_records(srcs):
 
 def local_records():
     """uk/local/art.bin, git-ignored: the owner's pictures made from stock art (the uk title logo,
-    PRESS START, the game-over picture). Same records as art.bin; they go into the pack as they are. None if it is missing."""
+    PRESS START, Now Loading, the title background, the game-over picture). Same records as art.bin; they go into the pack as they are. None if it is missing."""
     p = os.path.join(UK, "local", "art.bin")
     if not os.path.isfile(p):
-        print("art: no uk/local/art.bin: the title logo, PRESS START and the game-over picture stay English")
+        print("art: no uk/local/art.bin: the title logo, PRESS START, Now Loading, the title background and the game-over picture stay stock")
         return []
     data = open(p, "rb").read()
     if data[:8] != b"SOTNART1":
