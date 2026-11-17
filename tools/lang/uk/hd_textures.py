@@ -24,6 +24,19 @@ PICTURES = [
     # low-res picture was cut
     ("go_uk_hires.png", (0, 0, 1254, 1176), (1024, 960),
      "gameover_uk__640_0_128x240_8_0a671fce.png"),
+    # the artist's redraws, already at the HD size (4x, PRESS START 8x)
+    ("hd/title_logo__768_0_256x136_8_00000000.png", None, None,
+     "title_logo__768_0_256x136_8_3b5d70e2.png"),
+    ("hd/press_start__544_432_32x48_4_00000000.png", None, None,
+     "press_start__544_432_32x48_4_96f550ed.png"),
+    ("hd/gameover_letters__512_0_64x128_4_00000000.png", None, None,
+     "gameover_letters__512_0_64x128_4_763c876e.png"),
+    # «Загрузка» and its logo; the game also draws an older picture in the
+    # same place while the screen is black (03bdc4c5, bcc31dc5): no file
+    ("hd/loading_text__672_488_32x24_4_00000000.png", None, None,
+     "loading_text__672_488_32x24_4_871f1858.png"),
+    ("hd/loading_logo__832_384_64x64_8_00000000.png", None, None,
+     "loading_logo__832_384_64x64_8_9adaf1ae.png"),
 ]
 
 
