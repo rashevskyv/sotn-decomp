@@ -225,6 +225,17 @@ void LoadCrashSummonResouces(s32 crashId) {
 void MarLoadGraphics(void) {
     func_psp_091040A0(hud_img);
     func_psp_091040A0(items_img);
+#if TARGET != TARGET_PSP
+    // Out of PSP, her animals sit in the band y=256..511 that the game loads
+    // F_GAME2 into after MARIA_Load (game_handlers.c: file 5, then file 13).
+    // Load them again here, after F_GAME2, as for the HUD.
+    func_psp_091040A0(wpn_owl_img);
+    func_psp_091040A0(wpn_turtle_img);
+    func_psp_091040A0(wpn_cat_img);
+    func_psp_091040A0(wpn_cardinal_img);
+    func_psp_091040A0(wpn_dragon_img);
+    func_psp_091040A0(wpn_doll_img);
+#endif
 }
 
 extern PlayerOvl MARIA_player;
