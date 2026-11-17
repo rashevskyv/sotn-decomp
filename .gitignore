@@ -46,3 +46,8 @@ recordings/
 /config/saturn/*.gen.txt
 /config/saturn/weapon/*.ld
 /config/saturn/weapon/*.gen.txt
+
+# build.py: your disc images and the build result (build/auto/ is under build/)
+/games/*
+!/games/README.txt
+/out/

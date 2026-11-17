@@ -1,0 +1,5 @@
+# build.bat runs in cmd.exe; the shell scripts and build.py run in WSL,
+# also from a clone made by Git for Windows
+*.bat text eol=crlf
+*.sh text eol=lf
+*.py text eol=lf

@@ -10,6 +10,56 @@ The port adds content from the Sega Saturn and PSP versions and a Ukrainian tran
 **No game data is in this repository.** You need your own, legally obtained discs.
 The build reads them from your disk and makes the game files on your machine.
 
+## Quick start
+
+1. Get the source. Clone it in Linux or in WSL 2 (see "Windows" below):
+
+   ```sh
+   git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-native.git
+   ```
+
+2. Put your disc images into the folder `games/` of the clone. The file names do not matter.
+   The build finds each disc by its content.
+3. Start the build:
+   - Windows: double-click `build.bat`. It runs the build in WSL and opens `out\` at the end.
+   - Linux or WSL: `python3 build.py`.
+
+| Image in `games/` | Files | Adds |
+|---|---|---|
+| PlayStation, USA (SLUS-00067) | `.bin` (and `.cue`) | The game. Required. |
+| PSP, Castlevania: The Dracula X Chronicles, Europe (ULES-00841) | `.iso` or `.cso` | Maria as a player, her voice, the PSP familiar names. |
+| Sega Saturn, Japan (T-9527G) | `.bin` (and `.cue`) | The Saturn stages, the character select art. |
+| `ps1vram_uk.bin` of the Ukrainian Xbox 360 mod | The file | Ten Ukrainian labels: file select, name plate, HUD. Optional. |
+
+The build makes two folders:
+
+| Folder | What to do with it |
+|---|---|
+| `out/sd/` | Copy its contents to the root of the SD card. It holds `switch/sotn-native/` with `sotn.nro` and the game data. |
+| `out/pc/` | The PC build. Start `out/pc/run.sh` (Linux) or `out\pc\run.bat` (Windows). |
+
+More about the build:
+
+- A missing tool stops the build. The build prints the command that installs it.
+  `python3 build.py --install-deps` runs these commands with `sudo` (apt and devkitPro pacman).
+- Options: `--pc-only`, `--switch-only`, `--clean` (start again from nothing).
+- A second run skips the steps that are done.
+- The log is `out/build.log`. On an error the build names the step that failed.
+- The first build downloads Go modules, Rust crates and the devkitPro fork of SDL. It needs the network.
+- The build makes the Ukrainian pack from this repository and the US disc.
+  Ten labels also need `ps1vram_uk.bin` (see "Ukrainian language"). Without it they stay in English.
+- `out/sd/` has no `sotn.ini`. The game writes it at the first start. A copied file would replace your settings.
+- The game files in `out/` are hard links to the files in `build/auto/`. They use the disk space only once.
+
+### Windows
+
+There is no native Windows build. The PC build is a Linux program. It runs in WSL 2, and WSLg shows its window.
+`build.bat` needs WSL 2 with Ubuntu. If it is missing, `build.bat` prints the install command (`wsl --install -d Ubuntu-24.04`).
+
+Clone the repository inside WSL, for example in `\\wsl.localhost\Ubuntu-24.04\home\<user>\`.
+A clone on a Windows drive (`C:\`, `D:\`) also works, but the build is much slower there.
+If you clone with Git for Windows, switch off the line end change: `git clone -c core.autocrlf=false ...`.
+
 ## What works
 
 | Part | State |
@@ -22,7 +72,7 @@ The build reads them from your disk and makes the game files on your machine.
 | Maria as a player (from the PSP version) | Experimental. |
 | PSP familiar names, the two JP familiar cards | Works (the cards are an option). |
 | Voice sets (Japanese and PSP English) | Works, but see "Voice sets" below: the pack cannot be made from this repository alone yet. |
-| Ukrainian language | Works in our builds, but see "Ukrainian language" below: the pack cannot be made from this repository alone yet. |
+| Ukrainian language | Works. Without `ps1vram_uk.bin` ten labels stay in English (see "Ukrainian language" below). |
 | Cheats, teleport map, tile editor page (port 8080, no password) | Test tools. |
 
 All tests are manual. Expect bugs.
@@ -46,7 +96,7 @@ The build checks only that the files it needs exist. Other releases of the discs
 - The upstream packages: `sudo apt install $(cat tools/requirements-debian.txt)`.
 - CMake 3.28 or later, Ninja, a C and C++ compiler (GCC or Clang).
 - Rust (`rustup`, stable `cargo`). Every build needs it.
-- Go 1.24 or later. The Saturn stages and Maria need it.
+- Go 1.24 or later. Every build needs it (the disc and asset tools are in Go).
 - `xxd` (Maria's voice), `7z` (PSP), `bchunk` (Saturn), `ffmpeg` with the ATRAC3plus decoder (voice sets).
 - Python 3 with Pillow (with FreeType and libraqm), PyYAML and numpy:
   `sudo apt install python3-pil python3-yaml python3-numpy libraqm0`.
@@ -86,7 +136,9 @@ flowchart LR
     NRO -->|copy to the SD card| SD[/switch/sotn-native/]
 ```
 
-## Build, step by step
+## Manual build
+
+These are the steps that `build.py` does for you.
 
 ### 1. Get the source
 
@@ -110,6 +162,7 @@ make extract_disk VERSION=pspeu         # PSP -> disks/pspeu (optional)
 make extract-disk VERSION=saturn        # Saturn -> disks/saturn (optional)
 make python-dependencies                # Python tools of sotn-decomp, in .venv
 make extract                            # PS1 assets -> assets/
+make build_assets                       # assets -> src/**/gen/ (C files, not in git)
 ```
 
 The PSP step needs only these files from the image:
@@ -204,12 +257,12 @@ Without them the game uses the PS1 voices.
 
 ## Ukrainian language
 
-The text, fonts and the drawn labels are in `tools/lang/` (see `tools/lang/FORMAT.md`).
-The pack is made at build time. It also needs three local inputs:
-`SOTN_LANG_XBLA` (the translation workspace), `SOTN_LANG_PICORIPI` (the
-`castlevania_sotn_xbla` plugin folder of [Picoripi](https://github.com/rashevskyv/Picoripi))
-and `SOTN_LANG_MEDIA` (the files of the Ukrainian Xbox 360 mod).
-The workspace and the mod files are not public yet. Without them the build has English only.
+The text, fonts and drawn labels are in `tools/lang/uk/` (see `tools/lang/FORMAT.md`).
+The build makes the pack from these files and the US disc.
+Ten labels keep pixels of the stock pictures: the five file select titles, the name plate and the HUD plates.
+These ten labels are not in git. They come from `ps1vram_uk.bin` of the Ukrainian Xbox 360 mod.
+Put that file into `games/`, and the build adds them. Without it these labels stay in English.
+The mod files are not public yet.
 
 ## Credits
 

@@ -22,16 +22,23 @@ Git holds only the Ukrainian side, in `tools/lang/uk/`:
 | `font8_map.json` | Character to cell code, and the Latin twins. |
 | `bios_glyphs_uk.h` | Six 12x16 letters for `g_SjisPages` / `g_CustomGlyphs`. |
 | `art_map.json` | Where each VRAM art record goes, and if that is proven. |
-| `labels/*.png` | The owner's label art (128 px wide palette images). Labels that keep stock pixels (`STOCK_PIXELS` in sotn_lang.py) are not in git; the pack takes every label from `ps1vram_uk.bin`. |
+| `labels/*.png` | The owner's label art (128 px wide palette images). Labels that keep stock pixels (`STOCK_PIXELS` in sotn_lang.py) are not in git; pack takes them from `ps1vram_uk.bin` when `SOTN_LANG_MEDIA` names its folder, else leaves them out. |
+| `places.json` | Where each translated line sits in the US data: table, place, FNV-1a of the stock text (no text). Dialogue lines: the yaml box key. `code`: the file-select messages by the FNV-1a of their Shift-JIS literal. |
+| `glyphs.json` | The character order of `dfont.png` and `bios12.png`. |
+| `dfont.png` | The owner's dialogue font, 8x11 cells, 16 a row. |
+| `bios12.png` | The owner's 12x16 letters (16 x 15 cells): the serif Cyrillic table, then the private letters. |
+| `art/*.png` | The changed texels of the font sheets (index 16: keep the stock texel of the US disc). |
 
 `tools/lang/serif_latin.py` holds the Latin letters, digits, marks and stat arrows of the serif menu
 font (mfont.bin). Both languages use it, so it is not in `uk/`.
 
-The English text and every stock byte come from local data at pack time.
-Set these variables: `SOTN_DATA_ROOT` (tree with `assets/`, `disks/us/`, `tools/psyz`),
-`SOTN_LANG_XBLA` (`lines_game.json`, `lines_psp.json`),
-`SOTN_LANG_PICORIPI` (plugin folder with `bios_glyphs_uk.bin`, `labels/`),
-`SOTN_LANG_MEDIA` (mod folder with `ps1vram_uk.bin`).
+The English text and every stock byte come from the extracted US disc at pack time:
+`SOTN_DATA_ROOT` (tree with `assets/`, `disks/us/`, `tools/psyz`; default: this repository).
+One pack input is optional: `SOTN_LANG_MEDIA` (mod folder with `ps1vram_uk.bin`).
+The owner's tools (`extract`, `glyphs`, `join`, `width`, `art`, `vendor`, `guard`) also read
+`SOTN_LANG_XBLA` (`lines_game.json`, `lines_psp.json`) and
+`SOTN_LANG_PICORIPI` (plugin folder with `dialogue_serif.py`, `bios_glyphs_uk.bin`, `ps1_code.py`, `labels/`).
+After a change there, `sotn_lang.py vendor` writes `places.json`, `glyphs.json`, `dfont.png`, `bios12.png` and `art/`.
 
 ### Dialogue markup
 
@@ -105,7 +112,7 @@ after `F_GAME.BIN` or `F_GAME2.BIN` loads. The file select keeps a copy of the s
 
 ## dfont.bin
 
-The owner's dialogue font (`dialogue_serif.py` DESIGN in the Picoripi plugin): 8x11 cells,
+The owner's dialogue font (`uk/dfont.png`, from `dialogue_serif.py` in the Picoripi plugin): 8x11 cells,
 baseline row 9, descender row 10. Letters `ORDER` are bytes 0x80 + i, the punctuation `PUNCT` 0xC7 + j.
 
 ```
@@ -195,4 +202,4 @@ char magic[8] = "SOTNPACK"; u32 count;
 struct { char name[16]; u32 offset, length; } file[count];   // offsets from the array start, 4-aligned
 ```
 
-With the Xbox, Picoripi or MEDIA folder missing, the array is empty (size 0).
+Without `ps1vram_uk.bin` the array has every file, but `art.bin` has no `STOCK_PIXELS` labels.

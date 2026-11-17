@@ -13,11 +13,15 @@ Subcommands (see tools/lang/FORMAT.md):
   width    flag lines too wide for their native box
   art      prove where the 28 VRAM art records go natively -> tools/lang/uk/art_map.json
   pack     write the runtime pack (text.bin, dialogue*.bin, font8.bin, bios.bin, art.bin)
+  vendor   the owner's sources -> tools/lang/uk/places.json, glyphs.json, dfont.png, bios12.png, art/
   guard    fail if a staged file holds English/Japanese game text or Xbox script addresses
 
-Inputs come from environment variables: SOTN_DATA_ROOT (a tree with assets/, disks/us/ and
-tools/psyz checked out; default: this repo), SOTN_LANG_XBLA (lines_game.json, lines_psp.json),
-SOTN_LANG_PICORIPI (the castlevania_sotn_xbla plugin folder), SOTN_LANG_MEDIA (the mod MEDIA folder).
+pack reads only this repo and the extracted US disc: SOTN_DATA_ROOT (a tree with assets/, disks/us/
+and tools/psyz checked out; default: this repo). One input is optional: SOTN_LANG_MEDIA, a folder
+with the Xbox 360 mod's ps1vram_uk.bin. Only it has the labels that keep stock pixels (STOCK_PIXELS);
+without it those labels stay English.
+The owner's tools (extract, glyphs, join, width, art, vendor, guard) also read SOTN_LANG_XBLA
+(lines_game.json, lines_psp.json) and SOTN_LANG_PICORIPI (the castlevania_sotn_xbla plugin folder).
 """
 import difflib
 import glob
@@ -40,6 +44,9 @@ XBLA = os.environ.get("SOTN_LANG_XBLA", "")
 PICO = os.environ.get("SOTN_LANG_PICORIPI", "")
 MEDIA = os.environ.get("SOTN_LANG_MEDIA", "")
 OUT = os.environ.get("SOTN_LANG_OUT") or os.path.join(REPO, "build", "lang", "uk")
+PLACES = os.path.join(UK, "places.json")  # join_sources() without the English text (cmd_vendor)
+GLYPHS = os.path.join(UK, "glyphs.json")  # the char order of dfont.png and bios12.png
+KEEP = 16  # art/<name>.png: the palette index "keep the stock texel"
 
 # ---------------------------------------------------------------- shared tables
 
@@ -448,7 +455,7 @@ def xbox_ops(s):
     return [t[1] for t in xbox_tokens(s) if t[0] == "op" and t[1] not in FLOW and t[1] not in XBOX_ONLY_OPS]
 
 
-def join():
+def join_sources():
     """Match every translated Xbox unit to a native string or dialogue box."""
     global TABLE, TABLE_INDEX
     TABLE, TABLE_INDEX = rust_table()
@@ -551,6 +558,29 @@ def join():
     return lines, stats, unmatched, boxes, units, ua
 
 
+def join():
+    """join_sources() as pack needs it, from uk/places.json: each line names its native string by
+    table, place and the FNV-1a of its text, so the text itself comes from the US data."""
+    global TABLE, TABLE_INDEX
+    TABLE, TABLE_INDEX = rust_table()
+    ua = load_json(os.path.join(UK, "ua.json"))
+    native = {}
+    for t, font, text, where in native_strings():
+        native.setdefault((t, where, fnv(text.encode("utf-8"))), (font, text))
+    boxes = native_boxes()
+    lines, miss = [], []
+    for p in load_json(PLACES)["lines"]:
+        hit = boxes.get(p["key"]) if p["kind"] == "script" else native.get((p["table"], p["where"], p["stock"]))
+        if hit is None:
+            miss.append(p["id"])
+        elif p["kind"] == "script":
+            lines.append(dict(p))
+        else:
+            lines.append(dict(p, font=hit[0], stock=hit[1]))
+    print(f"places.json: {len(lines)} lines found in the US data, {len(miss)} not: {miss[:8]}")
+    return lines, None, None, boxes, None, ua
+
+
 # The native yaml table -> the Xbox block in the same row order (join).
 ROW_BLOCKS = {"ENEMY": "enemy names", "EQUIP_NAME": "item names", "EQUIP_DESC": "item descriptions",
               "ACC_NAME": "equip names", "ACC_DESC": "equip descriptions"}
@@ -580,7 +610,7 @@ def locate_scripts(unmatched, units):
 
 
 def cmd_join(_args):
-    lines, stats, unmatched, boxes, units, ua = join()
+    lines, stats, unmatched, boxes, units, ua = join_sources()
     print(f"{'category':22} units exact norm elsewh fuzzy unmatched eu_copy")
     for cat, s in sorted(stats.items()):
         print(f"{cat:22} {s['units']:5} {s['exact']:5} {s['normalized']:4} {s['elsewhere']:6} {s['fuzzy']:5} "
@@ -672,18 +702,48 @@ def enc_bios(s):
 DFONT = None
 
 
+def dialogue_serif():
+    """The owner's source of the dialogue font: the Picoripi plugin's dialogue_serif.py (read as data,
+    never imported) -> ORDER, PUNCT, {char: 11 rows of 8 bools}. cmd_vendor writes it to dfont.png."""
+    import ast
+    src = open(need(os.path.join(PICO, "dialogue_serif.py"), "dialogue_serif.py"), encoding="utf-8").read()
+    val = {n.targets[0].id: ast.literal_eval(n.value) for n in ast.parse(src).body
+           if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") in ("ORDER", "PUNCT", "DESIGN")}
+    return val["ORDER"], val["PUNCT"], {ch: [[p == "#" for p in r] for r in d] for ch, d in val["DESIGN"].items()}
+
+
+def png_cells(name, cw, ch, n):
+    """n cells of cw x ch from uk/<name> (16 cells a row) as rows of bools (palette index != 0)."""
+    from PIL import Image
+    im = Image.open(os.path.join(UK, name))
+    w, px = im.size[0], list(im.getdata())
+    return [[[px[((k // 16) * ch + y) * w + (k % 16) * cw + x] != 0 for x in range(cw)] for y in range(ch)]
+            for k in range(n)]
+
+
+def save_cells(name, cells, cw, ch):
+    """The inverse of png_cells: a 1-bit palette PNG, 16 cells a row."""
+    from PIL import Image
+    im = Image.new("P", (16 * cw, -(-len(cells) // 16) * ch))
+    im.putpalette([0, 0, 0, 255, 255, 255] + [0] * 762)
+    for k, cell in enumerate(cells):
+        for y, row in enumerate(cell):
+            for x, on in enumerate(row):
+                im.putpixel(((k % 16) * cw + x, (k // 16) * ch + y), 1 if on else 0)
+    im.save(os.path.join(UK, name))
+
+
 def dialogue_font():
-    """The dialogue font the owner chose (2026-11-14): the Picoripi plugin's dialogue_serif.py, 8x11 cells.
-    It is read as data, never imported. Returns {char: byte}, {byte: 11 rows of 8 bools}."""
+    """The dialogue font the owner chose (2026-11-14), 8x11 cells: uk/dfont.png in the order of
+    glyphs.json (cmd_vendor). Returns {char: byte}, {byte: 11 rows of 8 bools}."""
     global DFONT
     if DFONT is None:
-        import ast
-        src = open(need(os.path.join(PICO, "dialogue_serif.py"), "dialogue_serif.py"), encoding="utf-8").read()
-        val = {n.targets[0].id: ast.literal_eval(n.value) for n in ast.parse(src).body
-               if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") in ("ORDER", "PUNCT", "DESIGN")}
-        codes = {ch: 0x80 + i for i, ch in enumerate(val["ORDER"])}
-        codes.update({ch: 0xC7 + i for i, ch in enumerate(val["PUNCT"])})
-        DFONT = (codes, {c: [[p == "#" for p in r] for r in val["DESIGN"][ch]] for ch, c in codes.items()})
+        g = load_json(GLYPHS)["dfont"]
+        chars = g["order"] + g["punct"]
+        codes = {ch: 0x80 + i for i, ch in enumerate(g["order"])}
+        codes.update({ch: 0xC7 + i for i, ch in enumerate(g["punct"])})
+        cells = png_cells("dfont.png", 8, 11, len(chars))
+        DFONT = (codes, {codes[ch]: cell for ch, cell in zip(chars, cells)})
     return DFONT
 
 
@@ -794,10 +854,28 @@ def advance(rows16):
 
 
 SERIF = {}
+BIOS = None
 
 
 def bios_glyphs():
-    """(private cells {char: 15 rows}, serif table {sjis: 15 rows}) from bios_glyphs_uk.bin."""
+    """(private cells {char: 15 rows}, serif table {sjis: 15 rows}) from uk/bios12.png (cmd_vendor):
+    16 x 15 cells, the serif letters of glyphs.json, then the private ones. A row: MSB = left pixel."""
+    global BIOS
+    if BIOS is None:
+        g = load_json(GLYPHS)["bios12"]
+        cells = png_cells("bios12.png", 16, 15, len(g["serif"]) + len(g["private"]))
+        rows = [[sum(1 << (15 - x) for x, on in enumerate(r) if on) for r in c] for c in cells]
+        serif = {struct.unpack(">H", ch.encode("cp932"))[0]: r for ch, r in zip(g["serif"], rows)}
+        private = dict(zip(g["private"], rows[len(g["serif"]):]))
+        # enc_bios writes І і as the ASCII I i, drawn as the full-width 0x8268 0x8289:
+        # under uk they take the designed letters, not the stock BIOS ones
+        serif[0x8268], serif[0x8289] = private["І"], private["і"]
+        BIOS = (private, serif)
+    return BIOS
+
+
+def bios_glyphs_sources():
+    """bios_glyphs() from the Picoripi plugin's bios_glyphs_uk.bin (cmd_vendor writes bios12.png)."""
     data = open(need(os.path.join(PICO, "bios_glyphs_uk.bin"), "bios_glyphs_uk.bin"), "rb").read()
     if len(data) != 66 * 30 + 8 * 36:
         sys.exit(f"bios_glyphs_uk.bin: {len(data)} bytes")
@@ -811,9 +889,6 @@ def bios_glyphs():
     for k, ch in enumerate(PRIVATE):
         rows = struct.unpack_from(">18H", data, 66 * 30 + k * 36)
         private[ch] = list(rows[3:18])
-    # enc_bios writes І і as the ASCII I i, drawn as the full-width 0x8268 0x8289:
-    # under uk they take the designed letters, not the stock BIOS ones
-    serif[0x8268], serif[0x8289] = private["І"], private["і"]
     return private, serif
 
 
@@ -865,7 +940,7 @@ def relic_name_cuts():
 
 
 def width_check():
-    lines, _, _, boxes, units, ua = join()
+    lines, _, _, boxes, units, ua = join_sources()
     over, checked, counts = [], 0, {}
     widest = {}  # the longest stock string of each 8x8 table: the column the stock screen was laid out for
     for t, f, s, _w in native_strings():
@@ -921,7 +996,8 @@ def width_check():
 
 # ---------------------------------------------------------------- glyphs
 
-def vram_records():
+def mod_records():
+    """The 28 records of the Xbox 360 mod's ps1vram_uk.bin (SOTN_LANG_MEDIA)."""
     data = open(need(os.path.join(MEDIA, "ps1vram_uk.bin"), "ps1vram_uk.bin"), "rb").read()
     if data[:8] != b"SOTNPS1V" or struct.unpack_from("<I", data, 8)[0] != 1:
         sys.exit("ps1vram_uk.bin: not a version 1 SOTNPS1V file")
@@ -939,6 +1015,44 @@ def vram_records():
     for r, name in zip(out, names):
         r["name"] = name
     return out
+
+
+def texels_be(rows):
+    """be_texels backwards: rows of texels -> big-endian halfwords."""
+    return b"".join(struct.pack(">H", t[i] | t[i + 1] << 4 | t[i + 2] << 8 | t[i + 3] << 12)
+                    for t in rows for i in range(0, len(t), 4))
+
+
+def art_records(srcs):
+    """The art.bin pictures in art_map.json order, as mod_records() has them ({name, x, y, w, h, body}),
+    and the names it could not make. labels/<name>.png: the owner's whole picture (a 128-row label is
+    the VRAM page from y 256). art/<name>.png: the changed texels over the stock rect of the US disc
+    (index KEEP keeps the stock texel). STOCK_PIXELS: only from ps1vram_uk.bin, if SOTN_LANG_MEDIA has it."""
+    from PIL import Image
+    have_mod = bool(MEDIA) and os.path.isfile(os.path.join(MEDIA, "ps1vram_uk.bin"))
+    mod = {r["name"]: r for r in mod_records()} if have_mod else {}
+    out, missing = [], []
+    for a in load_json(os.path.join(UK, "art_map.json")):
+        name, (x, y, w, h) = a["name"], a["rect"]
+        body = None
+        if name in STOCK_PIXELS:
+            body = mod[name]["body"] if name in mod else None
+        elif os.path.isfile(os.path.join(UK, "labels", name + ".png")):
+            im = Image.open(os.path.join(UK, "labels", name + ".png"))
+            px, pw = list(im.getdata()), im.size[0]
+            top = y - 256 if im.size[1] == 128 else 0
+            body = texels_be([px[(top + r) * pw:(top + r + 1) * pw] for r in range(h)])
+        else:
+            rows = a["native"] and srcs.get(a["native"][0]) and vram_rect(srcs[a["native"][0]], x, y, w, h)
+            if rows:
+                d = list(Image.open(os.path.join(UK, "art", name + ".png")).getdata())
+                body = texels_be([[s if d[r * 4 * w + c] == KEEP else d[r * 4 * w + c]
+                                   for c, s in enumerate(t)] for r, t in enumerate(le_texels(rows))])
+        if body is None:
+            missing.append(name)
+        else:
+            out.append({"name": name, "x": x, "y": y, "w": w, "h": h, "body": body})
+    return out, missing
 
 
 def be_texels(body, w):
@@ -1011,7 +1125,7 @@ def fgame_sheet():
 
 
 def cmd_glyphs(_args):
-    recs = {r["name"]: r for r in vram_records()}
+    recs = {r["name"]: r for r in mod_records()}
     s0, s1 = be_texels(recs["sheet0"]["body"], 32), be_texels(recs["sheet256"]["body"], 32)
     if s0 != s1:
         print("warning: the two sheet copies differ")
@@ -1225,7 +1339,7 @@ def plate_records(srcs):
 
 
 def cmd_art(_args):
-    recs = vram_records()
+    recs = mod_records()
     srcs = art_sources()
     amap, labels_out = [], os.path.join(UK, "labels")
     os.makedirs(labels_out, exist_ok=True)
@@ -1392,8 +1506,8 @@ def write_scripts(path, recs):
     return info
 
 
-def code_lines():
-    """File-select messages (ua_code.json) -> [(native stock, ua)]: Xbox English (ps1_code.py comments)
+def code_lines_sources():
+    """File-select messages (ua_code.json) -> [(key, native stock, ua)]: Xbox English (ps1_code.py comments)
     matched to the sel string literals. Returns (pairs, misses)."""
     ua = load_json(os.path.join(UK, "ua_code.json"))
     src = open(need(os.path.join(PICO, "ps1_code.py"), "ps1_code.py"), encoding="utf-8").read()
@@ -1414,7 +1528,29 @@ def code_lines():
         if hit is None:
             misses.append((key, en[key]))
         else:
-            pairs.append((hit, text))
+            pairs.append((key, hit, text))
+    return pairs, misses
+
+
+def sel_hash(s):
+    try:
+        return fnv(sjis(s))
+    except UnicodeEncodeError:
+        return None
+
+
+def code_lines():
+    """File-select messages: [(FNV-1a of the sel literal's Shift-JIS, ua)] by places.json "code"
+    (cmd_vendor), each checked against the sel literals. Returns (pairs, misses)."""
+    ua = load_json(os.path.join(UK, "ua_code.json"))
+    sel = us_branch(open(os.path.join(REPO, "src", "st", "sel", "select.c"), encoding="utf-8").read())
+    have = {sel_hash(c_unescape(m.group(1))) for m in re.finditer(r"(?<!_S\()(?<!_S2\()" + CSTR, sel)}
+    pairs, misses = [], []
+    for key, h in load_json(PLACES)["code"]:
+        if h in have and key in ua:
+            pairs.append((h, ua[key]))
+        else:
+            misses.append(key)
     return pairs, misses
 
 
@@ -1469,11 +1605,11 @@ def cmd_pack(_args):
         entries[key] = (FONT[l["font"]], flags, old[2] if old else data)
     # File-select messages: matched to the sel literals by the Xbox English
     sel_pairs, sel_miss = code_lines()
-    for stock, text in sel_pairs:
+    for h, text in sel_pairs:
         data, bad = enc_bios(text)
         for ch in bad:
             bad_chars[ch] = bad_chars.get(ch, 0) + 1
-        entries.setdefault((TABLES.index("OTHER_SJIS"), fnv(sjis(stock)), NO_INDEX), (FONT["sjis"], 0, data))
+        entries.setdefault((TABLES.index("OTHER_SJIS"), h, NO_INDEX), (FONT["sjis"], 0, data))
     print(f"file select: {len(sel_pairs)} lines matched, {len(sel_miss)} not:", sel_miss)
     # Two words of ps1_text.py (cmd_extract puts them in ua_code.json by their Xbox address).
     code = load_json(os.path.join(UK, "ua_code.json"))
@@ -1624,7 +1760,12 @@ def cmd_pack(_args):
     # art.bin
     amap = {a["name"]: a for a in load_json(os.path.join(UK, "art_map.json"))}
     srcs = dict(art_sources())
-    recs = vram_records()
+    recs, art_missing = art_records(srcs)
+    if art_missing:
+        print(f"art: {len(art_missing)} pictures left out (they stay English): {art_missing}")
+        if any(n in STOCK_PIXELS for n in art_missing):
+            print("     the labels with stock pixels come from the Xbox 360 mod's ps1vram_uk.bin:"
+                  " put it in games/ (build.py) or set SOTN_LANG_MEDIA to its folder")
     plates = plate_records(srcs)
     with open(os.path.join(OUT, "art.bin"), "wb") as f:
         f.write(b"SOTNART1" + struct.pack("<I", len(recs) + len(plates)))
@@ -1646,6 +1787,57 @@ def cmd_pack(_args):
     print("chars with no glyph:", bad_chars or "none")
     for n in sorted(os.listdir(OUT)):
         print(f"  {n} {os.path.getsize(os.path.join(OUT, n))}")
+
+
+# ---------------------------------------------------------------- vendor
+
+def cmd_vendor(_args):
+    """The owner's sources -> the files pack reads in git: places.json (where each translated line sits
+    in the US data, no English text), glyphs.json + dfont.png + bios12.png (the owner's fonts) and
+    art/<name>.png (the changed texels of each picture that has a stock rect and no label)."""
+    from PIL import Image
+    lines = join_sources()[0]
+    keep = []
+    for l in lines:
+        if l["kind"] == "script":
+            keep.append({"id": l["id"], "kind": "script", "key": l["key"], "ops_ok": l["ops_ok"]})
+            continue
+        p = {"id": l["id"], "kind": l["kind"], "table": l["table"], "where": l["where"],
+             "stock": fnv(l["stock"].encode("utf-8"))}
+        if "index" in l:
+            p["index"] = l["index"]
+        keep.append(p)
+    triples, misses = code_lines_sources()
+    code = [[key, fnv(sjis(stock))] for key, stock, _text in triples]
+    with open(PLACES, "w", encoding="utf-8", newline="\n") as f:
+        f.write('{"lines": [\n' + ",\n".join(json.dumps(p, ensure_ascii=False, sort_keys=True) for p in keep)
+                + '\n],\n"code": [\n' + ",\n".join(json.dumps(c) for c in code) + "\n]}\n")
+    order, punct, design = dialogue_serif()
+    save_cells("dfont.png", [design[ch] for ch in order + punct], 8, 11)
+    private, serif = bios_glyphs_sources()
+    serif_chars = "".join(bytes.fromhex(f"{c:04X}").decode("cp932") for c in sorted(serif)
+                          if c not in (0x8268, 0x8289))
+    cells = [serif[struct.unpack(">H", ch.encode("cp932"))[0]] for ch in serif_chars] + [private[ch] for ch in PRIVATE]
+    save_cells("bios12.png", [[[bool(v >> (15 - x) & 1) for x in range(16)] for v in c] for c in cells], 16, 15)
+    save_json(GLYPHS, {"dfont": {"order": order, "punct": punct},
+                       "bios12": {"serif": serif_chars, "private": PRIVATE}})
+    srcs = dict(art_sources())
+    os.makedirs(os.path.join(UK, "art"), exist_ok=True)
+    mod = {r["name"]: r for r in mod_records()}
+    deltas = []
+    for a in load_json(os.path.join(UK, "art_map.json")):
+        name, (x, y, w, h) = a["name"], a["rect"]
+        if name in STOCK_PIXELS or os.path.isfile(os.path.join(UK, "labels", name + ".png")) or not a["native"]:
+            continue
+        stock = le_texels(vram_rect(srcs[a["native"][0]], x, y, w, h))
+        new = be_texels(mod[name]["body"], w)
+        im = Image.new("P", (4 * w, h))
+        im.putpalette([v for n in range(16) for v in (n * 17,) * 3] + [255, 0, 255] + [0] * (768 - 51))
+        im.putdata([n if n != s else KEEP for rn, rs in zip(new, stock) for n, s in zip(rn, rs)])
+        im.save(os.path.join(UK, "art", name + ".png"))
+        deltas.append(name)
+    print(f"places.json: {len(keep)} lines, {len(code)} file-select lines ({len(misses)} not matched); "
+          f"dfont.png {len(order + punct)} cells; bios12.png {len(cells)} cells; art/: {deltas}")
 
 
 # ---------------------------------------------------------------- guard
@@ -1712,14 +1904,10 @@ def cmd_selftest(_args):
 
 def main():
     cmds = {"extract": cmd_extract, "glyphs": cmd_glyphs, "join": cmd_join, "width": cmd_width,
-            "art": cmd_art, "pack": cmd_pack, "guard": cmd_guard, "selftest": cmd_selftest}
+            "art": cmd_art, "pack": cmd_pack, "vendor": cmd_vendor, "guard": cmd_guard, "selftest": cmd_selftest}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         sys.exit(__doc__)
     c_out = sys.argv[sys.argv.index("--c") + 1] if "--c" in sys.argv else None
-    if c_out and sys.argv[1] == "pack" and not all(p and os.path.isdir(p) for p in (XBLA, PICO, MEDIA)):
-        print("lang pack: SOTN_LANG_XBLA, SOTN_LANG_PICORIPI or SOTN_LANG_MEDIA missing; empty pack, uk falls back to en")
-        write_c(c_out, None)
-        return
     global TABLE, TABLE_INDEX
     TABLE, TABLE_INDEX = rust_table()
     cmds[sys.argv[1]]({})

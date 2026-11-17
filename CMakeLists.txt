@@ -2261,7 +2261,7 @@ SET(SOURCE_FILES_BOSS_BO0
     src/boss/bo0/gen/e_laydef.c
     src/boss/bo0/gen/e_layout.c
     src/boss/bo0/gen/rooms.c
-    src/boss/bo0/gen/sprites.c
+    src/boss/bo0/gen/us/sprites.c
 )
 
 SET(SOURCE_FILES_BOSS_RBO8
@@ -2803,6 +2803,12 @@ if(NINTENDO_SWITCH)
     set_source_files_properties(src/pc/switch.c PROPERTIES
         COMPILE_DEFINITIONS "SWITCH_DIR=\"${SOTN_SWITCH_DIR}\"")
 endif()
+# build.py sets "data": the PC program then reads data/ from the folder it
+# runs in, so out/pc can move. Empty: the absolute <build>/data.
+set(SOTN_PC_DATA_DIR "" CACHE STRING "Data folder compiled into the PC program")
+if(SOTN_PC_DATA_DIR AND NOT NINTENDO_SWITCH)
+    set(SOTN_RUNTIME_DATA_DIR "${SOTN_PC_DATA_DIR}")
+endif()
 
 add_executable(${PROJECT_NAME}
     ${SOURCE_FILES_PC}
@@ -2882,20 +2888,20 @@ add_custom_command(
     DEPENDS tools/editor/bake_apron.py tools/editor/index.html
     VERBATIM)
 # The Ukrainian runtime pack (tools/lang, formats in tools/lang/FORMAT.md).
-# It is made from the owner's Xbox 360 mod and the Picoripi plugin, so it is
-# built into the build dir and into the program, never into git. With an
-# input missing the pack is empty and language = uk falls back to English.
-set(SOTN_LANG_XBLA "$ENV{SOTN_LANG_XBLA}" CACHE PATH "sotn_xbla folder of the Xbox 360 translation")
-set(SOTN_LANG_PICORIPI "$ENV{SOTN_LANG_PICORIPI}" CACHE PATH "Picoripi castlevania_sotn_xbla plugin folder")
-set(SOTN_LANG_MEDIA "$ENV{SOTN_LANG_MEDIA}" CACHE PATH "MEDIA folder of the Xbox 360 uk mod")
-file(GLOB SOTN_LANG_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/tools/lang/uk/*"
+# It is made from tools/lang/uk/ and the extracted US disc into the build dir
+# and the program. Optional: SOTN_LANG_MEDIA, the folder with ps1vram_uk.bin
+# of the Xbox 360 uk mod. Only it has the labels that keep stock pixels;
+# without it those labels stay English.
+set(SOTN_LANG_MEDIA "$ENV{SOTN_LANG_MEDIA}" CACHE PATH "Folder with ps1vram_uk.bin of the Xbox 360 uk mod (optional)")
+file(GLOB_RECURSE SOTN_LANG_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/tools/lang/uk/*"
     "${CMAKE_SOURCE_DIR}/tools/lang/fonts/*")
+if(SOTN_LANG_MEDIA AND EXISTS "${SOTN_LANG_MEDIA}/ps1vram_uk.bin")
+    list(APPEND SOTN_LANG_FILES "${SOTN_LANG_MEDIA}/ps1vram_uk.bin")
+endif()
 add_custom_command(
     OUTPUT "${SOTN_GEN_DIR}/lang_pack_uk.c"
     COMMAND "${CMAKE_COMMAND}" -E env
         "SOTN_DATA_ROOT=${CMAKE_SOURCE_DIR}"
-        "SOTN_LANG_XBLA=${SOTN_LANG_XBLA}"
-        "SOTN_LANG_PICORIPI=${SOTN_LANG_PICORIPI}"
         "SOTN_LANG_MEDIA=${SOTN_LANG_MEDIA}"
         "SOTN_LANG_OUT=${CMAKE_BINARY_DIR}/lang/uk"
         "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/lang/sotn_lang.py" pack
@@ -3218,7 +3224,8 @@ if(ENABLE_SATURN_STAGES)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_SATURN_STAGES)
     # Switch: no host path in the NRO. The six stitched F_*.BIN replace the
     # retail files in sdmc:/switch/sotn-native/data/ST/<STAGE>/ on deploy.
-    if(NOT NINTENDO_SWITCH)
+    # The same for a PC program with SOTN_PC_DATA_DIR (build.py copies them).
+    if(NOT NINTENDO_SWITCH AND NOT SOTN_PC_DATA_DIR)
         target_compile_definitions(${PROJECT_NAME} PRIVATE
             PC_ASSET_OVERRIDE_DIR="${SATURN_STITCH_DIR}/disks/us")
     endif()
