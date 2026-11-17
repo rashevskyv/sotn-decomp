@@ -646,6 +646,7 @@ static const struct {
 
 static TILE tiles[2][MAX_TILES];
 static int tile_buf;
+static int tz = 1; // Text zoom: the overlay over a title or menu frame
 static int tile_count, tile_peak;
 static OT_TYPE* menu_ot;
 
@@ -688,7 +689,7 @@ static int Mark(int x, int y, int b) {
 static void Text(int x, int y, const char* s, u8 r, u8 g, u8 b) {
     int i, row, col, run;
     const char* rows;
-    for (; *s; s++, x += CELL_W) {
+    for (; *s; s++, x += CELL_W * tz) {
         if ((u8)*s <= BUTTON_MARKS) {
             x += Mark(x, y, *s - 1) + 1 - CELL_W;
             continue;
@@ -708,7 +709,7 @@ static void Text(int x, int y, const char* s, u8 r, u8 g, u8 b) {
                      run++) {
                 }
                 if (run) {
-                    Rect(x + col, y + row, run, 1, r, g, b);
+                    Rect(x + col * tz, y + row * tz, run * tz, tz, r, g, b);
                 }
             }
         }
@@ -1272,7 +1273,9 @@ static void CountFps(void) {
     }
 }
 
-// Top right corner of the view; the HUD is top left.
+// Top right corner of the view; the HUD is top left. Over a title or menu
+// frame: the corner of the screen, the text zoomed to its stage size.
+int Wide_Canvas(int* x0, int* y0, int* x1, int* y1);
 static void DrawOverlay(void) {
     char lines[4][40];
     u8 col[4][3];
@@ -1311,16 +1314,21 @@ static void DrawOverlay(void) {
     if (!n) {
         return;
     }
-    ViewRect(&x0, &y0, &x1, &y1);
+    tz = Wide_Canvas(&x0, &y0, &x1, &y1);
+    if (!tz) {
+        ViewRect(&x0, &y0, &x1, &y1);
+        tz = 1;
+    }
     // text first: drawn on top (LIFO); 9 px lines, right aligned
     for (i = 0; i < n; i++) {
         len = strlen(lines[i]);
         maxlen = len > maxlen ? len : maxlen;
-        Text(x1 - 1 - len * CELL_W, y0 + 3 + i * 9, lines[i], col[i][0],
-             col[i][1], col[i][2]);
+        Text(x1 - (1 + len * CELL_W) * tz, y0 + (3 + i * 9) * tz, lines[i],
+             col[i][0], col[i][1], col[i][2]);
     }
-    Rect(x1 - 4 - maxlen * CELL_W, y0 + 1, maxlen * CELL_W + 4, n * 9 + 2, 8,
-         8, 24);
+    Rect(x1 - (4 + maxlen * CELL_W) * tz, y0 + tz, (maxlen * CELL_W + 4) * tz,
+         (n * 9 + 2) * tz, 8, 8, 24);
+    tz = 1;
 }
 
 // Called at the end of RenderPrimitives with the frame's ordering table.

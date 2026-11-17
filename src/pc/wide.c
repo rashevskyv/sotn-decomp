@@ -347,6 +347,19 @@ void Wide_BandClip(int y0, int y1) {
     }
 }
 
+// A title or menu frame: the part of the canvas the screen shows, in the
+// frame's pixels, and the zoom that draws the overlay text about as large
+// as on a stage. zoom 0: a stage, or no wide view.
+static int canvas[4], canvas_zoom;
+
+int Wide_Canvas(int* x0, int* y0, int* x1, int* y1) {
+    *x0 = canvas[0];
+    *y0 = canvas[1];
+    *x1 = canvas[2];
+    *y1 = canvas[3];
+    return cfg_scale ? canvas_zoom : 0;
+}
+
 // Called on every vsync. Follows dock changes and display mode changes.
 void Wide_OnFrame(void) {
     PsyzSize d, req;
@@ -396,6 +409,15 @@ void Wide_OnFrame(void) {
             // reach past the frame (RELIC_WIN_X in src/dra/menu.c)
             req = d;
         }
+    }
+    canvas_zoom = 0;
+    if (fbw != DISP_STAGE_W || fbh != DISP_STAGE_H) {
+        int mx = (req.w / s - fbw) / 2, my = (req.h / s - fbh) / 2;
+        canvas[0] = -mx;
+        canvas[1] = -my;
+        canvas[2] = fbw + mx;
+        canvas[3] = fbh + my;
+        canvas_zoom = MAX((k + s / 2) / s, 1);
     }
     StageClip();
     Psyz_VideoSetScale(s);
