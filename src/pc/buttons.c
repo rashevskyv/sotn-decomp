@@ -8,14 +8,63 @@
 // The face buttons go by position, as sdl3_common.h maps them: Square west,
 // Circle east, Cross south, Triangle north.
 #include <game.h>
+#include <psyz/input.h>
+#include <stdio.h>
 #include <string.h>
 
-#ifdef __SWITCH__
-int g_ButtonSet = BUTTONS_SWITCH;
-#else
-int g_ButtonSet = BUTTONS_XBOX;
-#endif
+int g_ButtonSet = BUTTONS_PSX;
+int g_ButtonPick = -1;
 const char* const g_ButtonSetNames[BUTTON_SETS] = {"switch", "xbox", "psx"};
+
+// The set of the marks: the pick, or under auto the family of the gamepad
+// in use (keyboard only: the last one, at first PlayStation; the Switch:
+// Nintendo). The letters of the stock pause menu font (g_ChButtons, the en
+// menus) follow it. Called at boot and on every frame.
+void Buttons_Update(void) {
+    extern u8 g_ChButtons[8], g_ChButtons2[4];
+    static const char first[BUTTON_SETS][9] = {"YABXZLRZ", "XBAYRLRL", ""};
+    static const char second[BUTTON_SETS][5] = {"R  L", "TBBT", ""};
+    static u8 stock[12];
+    static int auto_set = BUTTONS_PSX, shown = -1;
+    int set = g_ButtonPick, i;
+#ifdef __SWITCH__
+    auto_set = BUTTONS_SWITCH;
+#else
+    switch (Psyz_PadsFamily()) {
+    case PSYZ_PAD_FAMILY_PLAYSTATION:
+        auto_set = BUTTONS_PSX;
+        break;
+    case PSYZ_PAD_FAMILY_XBOX:
+        auto_set = BUTTONS_XBOX;
+        break;
+    case PSYZ_PAD_FAMILY_NINTENDO:
+        auto_set = BUTTONS_SWITCH;
+        break;
+    default:
+        break;
+    }
+#endif
+    if (set < 0 || set >= BUTTON_SETS) {
+        set = auto_set;
+    }
+    g_ButtonSet = set;
+    if (set == shown) {
+        return;
+    }
+    if (shown < 0) {
+        memcpy(stock, g_ChButtons, 8);
+        memcpy(stock + 8, g_ChButtons2, 4);
+    }
+    shown = set;
+    for (i = 0; i < 8; i++) {
+        g_ChButtons[i] = first[set][0] ? CH(first[set][i]) : stock[i];
+    }
+    for (i = 0; i < 4; i++) {
+        g_ChButtons2[i] = second[set][0] ? CH(second[set][i]) : stock[8 + i];
+    }
+    fprintf(stderr, "[buttons] marks %s%s\n", g_ButtonSetNames[set],
+            g_ButtonPick < 0 ? " (auto)" : "");
+}
 
 enum { DISC, TAB_L, TAB_R, PILL, DPAD };
 

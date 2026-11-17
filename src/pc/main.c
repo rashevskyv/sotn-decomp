@@ -178,29 +178,6 @@ static bool parseArgs(
     return true;
 }
 
-// The button names of the pause menus (Button config, the ATT and DEF
-// marks of Equip) as the Switch shows them: the face buttons by position
-// (sdl3_common.h: Square = west = Y, Circle = east = A, Cross = south = B,
-// Triangle = north = X), R2 = ZR, L1 = L, R1 = R, L2 = ZL. On the Switch
-// always; on PC with SOTN_SWITCH_MARKS=1, for screenshots.
-static void SwitchMarks(void) {
-    extern u8 g_ChButtons[8], g_ChButtons2[4];
-    static const char first[] = "YABXZLRZ", second[] = "R  L";
-    int i;
-#ifndef __SWITCH__
-    const char* env = getenv("SOTN_SWITCH_MARKS");
-    if (!env || strcmp(env, "1")) {
-        return;
-    }
-#endif
-    for (i = 0; i < 8; i++) {
-        g_ChButtons[i] = CH(first[i]);
-    }
-    for (i = 0; i < 4; i++) {
-        g_ChButtons2[i] = CH(second[i]);
-    }
-}
-
 int Main(int argc, char* argv[]) {
     struct InitGameParams params;
 #ifdef __SWITCH__
@@ -243,7 +220,7 @@ int Main(int argc, char* argv[]) {
         return -1;
     }
     Lang_Init();
-    SwitchMarks();
+    Buttons_Update();
     MainGame();
     ResetGame();
     if (params.replayPath && Replay_DidDrift()) {

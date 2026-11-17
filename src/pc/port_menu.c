@@ -9,8 +9,10 @@
 // apply at once (a voice set at the next spoken line) and are saved in
 // sotn.ini by Wide_SaveIni.
 //
-// Pages: MAIN -> CHEATS -> MAP (teleport) -> CHOOSE (a cell with more than
-// one room). The map draws one rect per room from g_CastleRooms. Input on
+// Pages: MAIN -> CONTROLS (the key and gamepad button of each PS button:
+// Cross on a line, then a key or gamepad button sets it; RESET restores the
+// defaults), MAIN -> CHEATS -> MAP (teleport) -> CHOOSE (a cell with more
+// than one room). The map draws one rect per room from g_CastleRooms. Input on
 // the map: D-pad moves the cell cursor, L1/L2 zoom out, R1/R2 zoom in,
 // Square switches normal / inverted castle, Cross teleports, Circle or
 // Triangle goes back. Pointer (PC mouse, Switch touch): tap teleports, drag
@@ -21,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <psyz/input.h>
 #ifdef __SWITCH__
 #include <unistd.h>
 #include <SDL3/SDL.h>
@@ -28,7 +31,7 @@
 #include <psyz/overlay_sdl3.h>
 #endif
 
-enum { PAGE_MAIN, PAGE_CHEATS, PAGE_MAP, PAGE_CHOOSE };
+enum { PAGE_MAIN, PAGE_CHEATS, PAGE_MAP, PAGE_CHOOSE, PAGE_CONTROLS };
 enum {
     ITEM_SCALE,
     ITEM_VOICE,
@@ -37,6 +40,7 @@ enum {
     ITEM_OVERLAY,
     ITEM_FPS,
     ITEM_EDITOR, // the HTTP editor server; its address shows in the next line
+    ITEM_CONTROLS,
     ITEM_CHEATS,
     ITEM_EXIT, // quit to hbmenu (PC: end the process); press twice
     ITEM_CLOSE,
@@ -86,6 +90,32 @@ static int n_owners;
 static char msg[48];
 static int msg_timer;
 static int exit_armed; // EXIT was pressed once: the next press quits
+
+// the Controls page: one line per PS button (bit of the pad word), then
+// RESET and BACK; the list scrolls under a header line
+static const struct {
+    u8 bit;
+    s16 word;
+    const char* en;
+} ctl_rows[] = {
+    {6, 201, "CROSS"}, {5, 202, "CIRCLE"}, {7, 203, "SQUARE"},
+    {4, 204, "TRIANGLE"}, {2, -1, "L1"}, {3, -1, "R1"}, {0, -1, "L2"},
+    {1, -1, "R2"}, {11, -1, "START"}, {8, -1, "SELECT"}, {12, 205, "UP"},
+    {14, 206, "DOWN"}, {15, 207, "LEFT"}, {13, 208, "RIGHT"}, {9, -1, "L3"},
+    {10, -1, "R3"},
+};
+#define N_CTL_BUTTONS 16
+enum { CTL_RESET = N_CTL_BUTTONS, CTL_BACK, N_CTL };
+#define CTL_LINES 12     // list lines on screen
+#define CAPTURE_TIME 600 // frames a capture waits
+static int ctl_top;      // the first list line on screen
+static int capture;      // > 0: frames left to wait for a key or button
+static int capture_armed; // every input was up since the capture began
+#ifdef __SWITCH__
+#define CTL_KEYS 0 // no keyboard column
+#else
+#define CTL_KEYS 1
+#endif
 
 // the confirm and back buttons, and their marks in the hints: a byte 1 + b
 // of a Text string is the mark of PS button b in the set of BUTTONS
@@ -272,10 +302,18 @@ static void Tap(int x, int y) {
         }
         return;
     }
-    i = page == PAGE_MAIN     ? MainLines()
-        : page == PAGE_CHEATS ? N_CHEATS
-                              : n_owners;
+    i = page == PAGE_MAIN       ? MainLines()
+        : page == PAGE_CHEATS   ? N_CHEATS
+        : page == PAGE_CONTROLS ? CTL_LINES + 1
+                                : n_owners;
     i = BoxLineAt(y, i);
+    if (page == PAGE_CONTROLS) {
+        if (i > 0 && !capture) { // line 0 is the header
+            sel = ctl_top + i - 1;
+            Activate();
+        }
+        return;
+    }
     if (i >= 0 && page == PAGE_MAIN) {
         i = MainItemAt(i);
         if (i < 0) {
@@ -374,6 +412,9 @@ static void OnSdlEvent(const SDL_Event* e) {
 
 static void Change(int dir) {
     int scale, lo, hi, *flag;
+    if (page == PAGE_CONTROLS) {
+        return;
+    }
     if (page == PAGE_CHEATS) {
         flag = sel == CH_REFILL       ? &g_Cheat.refill
                : sel == CH_INVINCIBLE ? &g_Cheat.invincible
@@ -417,9 +458,17 @@ static void Change(int dir) {
                 g_LangNext ? "uk" : "en");
         Wide_SaveIni();
     } else if (sel == ITEM_BUTTONS) {
-        g_ButtonSet = (g_ButtonSet + dir + BUTTON_SETS) % BUTTON_SETS;
+        // AUTO, PLAYSTATION, XBOX, NINTENDO
+        static const int order[] = {-1, BUTTONS_PSX, BUTTONS_XBOX,
+                                    BUTTONS_SWITCH};
+        int i = 0;
+        while (i < 3 && order[i] != g_ButtonPick) {
+            i++;
+        }
+        g_ButtonPick = order[(i + dir + 4) % 4];
+        Buttons_Update();
         fprintf(stderr, "[buttons] menu: buttons %s\n",
-                g_ButtonSetNames[g_ButtonSet]);
+                g_ButtonPick < 0 ? "auto" : g_ButtonSetNames[g_ButtonPick]);
         Wide_SaveIni();
     } else if (sel == ITEM_OVERLAY || sel == ITEM_FPS) {
         flag = sel == ITEM_OVERLAY ? &g_OverlayOn : &g_FpsOn;
@@ -441,6 +490,9 @@ static void Activate(void) {
         if (sel == ITEM_CHEATS) {
             page = PAGE_CHEATS;
             sel = 0;
+        } else if (sel == ITEM_CONTROLS) {
+            page = PAGE_CONTROLS;
+            sel = ctl_top = 0;
         } else if (sel == ITEM_CLOSE) {
             Close();
         } else if (sel == ITEM_EXIT) {
@@ -468,8 +520,56 @@ static void Activate(void) {
         } else {
             Change(1);
         }
+    } else if (page == PAGE_CONTROLS) {
+        if (sel < N_CTL_BUTTONS) {
+            capture = CAPTURE_TIME;
+            capture_armed = 0;
+        } else if (sel == CTL_RESET) {
+            Psyz_PadsMapReset();
+            fprintf(stderr, "[controls] menu: defaults\n");
+            Wide_SaveIni();
+        } else {
+            page = PAGE_MAIN;
+            sel = ITEM_CONTROLS;
+        }
     } else if (page == PAGE_CHOOSE && sel < n_owners) {
         Go(owners[sel]);
+    }
+}
+
+// Set the input of the selected PS button; the PS button that had it gets
+// this one's old input (a swap), so no input drives two PS buttons.
+static void Bind(PsyzInputDevice dev, int code) {
+    int bit = ctl_rows[sel].bit, old = Psyz_PadsMap(dev, bit, code), i;
+    for (i = 0; i < PSYZ_PAD_BUTTONS; i++) {
+        if (i != bit && Psyz_PadsMap(dev, i, PSYZ_INPUT_QUERY) == code) {
+            Psyz_PadsMap(dev, i, old);
+        }
+    }
+    fprintf(stderr, "[controls] menu: %s %s = %s\n", ctl_rows[sel].en,
+            dev == PSYZ_INPUT_KEY ? "key" : "pad",
+            Psyz_PadsInputName(dev, code));
+    Wide_SaveIni();
+}
+
+// A capture: wait until every input is up, then take the first key (PC)
+// or gamepad button pressed. The time out keeps the old input.
+static void Capture(void) {
+    int key = CTL_KEYS ? Psyz_PadsHeld(PSYZ_INPUT_KEY) : PSYZ_INPUT_NONE;
+    int pad = Psyz_PadsHeld(PSYZ_INPUT_GAMEPAD);
+    if (--capture <= 0) {
+        capture = 0;
+        prev = 0xFFFF;
+    } else if (!capture_armed) {
+        capture_armed = key < 0 && pad < 0;
+    } else if (key >= 0 || pad >= 0) {
+        capture = 0;
+        prev = 0xFFFF; // its PS button may change: no tap until it is up
+        if (key >= 0) {
+            Bind(PSYZ_INPUT_KEY, key);
+        } else {
+            Bind(PSYZ_INPUT_GAMEPAD, pad);
+        }
     }
 }
 
@@ -527,6 +627,14 @@ u16 PortMenu_Pad(u16 pressed) {
     if (drawn > 0) {
         drawn--;
     }
+    Buttons_Update();
+    if (capture) { // the held input is no tap when the capture ends
+        if (is_open && drawn) {
+            Capture();
+            return 0;
+        }
+        capture = 0;
+    }
 
     if ((pressed & COMBO) == COMBO && (tap & COMBO)) {
         if (is_open) {
@@ -556,9 +664,10 @@ u16 PortMenu_Pad(u16 pressed) {
         MapPad(pressed, tap);
         return 0;
     }
-    count = page == PAGE_MAIN     ? N_MAIN
-            : page == PAGE_CHEATS ? N_CHEATS
-                                  : n_owners;
+    count = page == PAGE_MAIN       ? N_MAIN
+            : page == PAGE_CHEATS   ? N_CHEATS
+            : page == PAGE_CONTROLS ? N_CTL
+                                    : n_owners;
     if (tap & ~PAD_OK) {
         exit_armed = 0; // only a second OK on EXIT quits
     }
@@ -575,9 +684,9 @@ u16 PortMenu_Pad(u16 pressed) {
     } else if (tap & PAD_OK) {
         Activate();
     } else if (tap & PAD_BACK) {
-        if (page == PAGE_CHEATS) {
+        if (page == PAGE_CHEATS || page == PAGE_CONTROLS) {
+            sel = page == PAGE_CHEATS ? ITEM_CHEATS : ITEM_CONTROLS;
             page = PAGE_MAIN;
-            sel = ITEM_CHEATS;
         } else if (page == PAGE_CHOOSE) {
             page = PAGE_MAP;
         } else {
@@ -762,6 +871,15 @@ enum {
     P_GO,
     P_BOSS, // P_SAVE, P_WARP follow (mark_names)
 };
+// the Controls page; 201..208 the PS button words of ctl_rows
+enum {
+    P_CONTROLS = 200,
+    P_BUTTON = 209,
+    P_KEYBOARD,
+    P_GAMEPAD,
+    P_PRESS,
+    P_DEFAULTS,
+};
 #define LINE_MAX 64
 #define MARK_ESC 0xFE
 #define SERIF_W 8
@@ -894,12 +1012,9 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     AddW(hint, P_OK, "OK");
     Add(hint, "   " HINT_BACK ": ");
     AddW(hint, P_BACK, "BACK");
-    w = TEXT_COLS * CELL_W;
-    if (uk) { // as wide as the longest line
-        w = Width(hint);
-        for (i = 0; i < count; i++) {
-            w = Width(lines[i]) > w ? Width(lines[i]) : w;
-        }
+    w = uk ? Width(hint) : TEXT_COLS * CELL_W;
+    for (i = 0; i < count; i++) { // as wide as the longest line
+        w = Width(lines[i]) > w ? Width(lines[i]) : w;
     }
     w += BORDER * 2;
     h = count * LINE_H - 5 + BORDER * 2;
@@ -930,14 +1045,17 @@ static void AddValue(char* line, int word, const char* en) {
 
 static void DrawMain(void) {
     static const char* voices[VOICE_COUNT] = {"PS1 EN", "JP", "PSP EN"};
-    static const char* sets[BUTTON_SETS] = {"SWITCH", "XBOX", "PSX"};
+    static const char* sets[BUTTON_SETS] = {"NINTENDO", "XBOX",
+                                            "PLAYSTATION"};
+    static const char* short_sets[BUTTON_SETS] = {"NINTENDO", "XBOX", "PS"};
     static const struct {
         int word;
         const char* en;
     } labels[N_MAIN] = {
         {P_SCALE, "SCALE"},     {P_VOICE, "VOICE"},   {P_LANGUAGE, "LANGUAGE"},
         {P_BUTTONS, "BUTTONS"}, {P_OVERLAY, "OVERLAY"}, {-1, "FPS"},
-        {P_EDITOR, "EDITOR"},   {P_CHEATS, "CHEATS"}, {P_EXIT, "EXIT GAME"},
+        {P_EDITOR, "EDITOR"},   {P_CONTROLS, "CONTROLS"},
+        {P_CHEATS, "CHEATS"},   {P_EXIT, "EXIT GAME"},
         {P_CLOSE, "CLOSE"},
     };
     int on[3];
@@ -959,14 +1077,14 @@ static void DrawMain(void) {
             continue;
         }
         AddW(lines[i], labels[i].word, labels[i].en);
-        if (i < ITEM_CHEATS && Width(lines[i]) > col) {
+        if (i < ITEM_CONTROLS && Width(lines[i]) > col) {
             col = Width(lines[i]);
         }
     }
     // the values in one column: en 9 cells (LANGUAGE has a gap), uk one
     // cell after the longest label
     col = uk ? col + SERIF_W : 9 * CELL_W;
-    for (i = 0; i < ITEM_CHEATS; i++) {
+    for (i = 0; i < ITEM_CONTROLS; i++) {
         PadTo(lines[i], col);
     }
     if (scale) {
@@ -983,7 +1101,15 @@ static void DrawMain(void) {
         Add(lines[ITEM_LANGUAGE], " ");
         AddW(lines[ITEM_LANGUAGE], P_RESTART, "RESTART");
     }
-    AddValue(lines[ITEM_BUTTONS], -1, sets[g_ButtonSet]);
+    if (g_ButtonPick < 0) { // "< AUTO: XBOX >"
+        Add(lines[ITEM_BUTTONS], "< ");
+        AddW(lines[ITEM_BUTTONS], P_AUTO, "AUTO");
+        Add(lines[ITEM_BUTTONS], ": ");
+        Add(lines[ITEM_BUTTONS], short_sets[g_ButtonSet]);
+        Add(lines[ITEM_BUTTONS], " >");
+    } else {
+        AddValue(lines[ITEM_BUTTONS], -1, sets[g_ButtonPick]);
+    }
     for (i = 0; i < 3; i++) { // OVERLAY FPS EDITOR
         AddValue(lines[ITEM_OVERLAY + i], on[i] ? P_ON : P_OFF,
                  on[i] ? "ON" : "OFF");
@@ -999,6 +1125,131 @@ static void DrawMain(void) {
     snprintf(tmp, sizeof(tmp), uk ? "%.28s" : "  %.29s", Editor_Status());
     Add(lines[ITEM_EDITOR + 1], tmp);
     Box(lines, N_MAIN + 1, sel > ITEM_EDITOR ? sel + 1 : sel, ITEM_EDITOR + 1);
+}
+
+// ASCII in capitals onto a line, at most n characters
+static void AddUpper(char* line, const char* s, int n) {
+    char tmp[24];
+    int i;
+    for (i = 0; s[i] && i < n && i < (int)sizeof(tmp) - 1; i++) {
+        tmp[i] = s[i] >= 'a' && s[i] <= 'z' ? s[i] - 32 : s[i];
+    }
+    tmp[i] = 0;
+    Add(line, tmp);
+}
+
+// a gamepad input: the mark of its position in the button set, or a name
+static void AddPadInput(char* line, int code) {
+    static const struct {
+        const char* sdl;
+        s8 mark;
+        s16 word;
+        const char* en;
+    } pads[] = {
+        {"x", 0, -1, ""},         {"b", 1, -1, ""},
+        {"a", 2, -1, ""},         {"y", 3, -1, ""},
+        {"righttrigger", 4, -1, ""}, {"leftshoulder", 5, -1, ""},
+        {"rightshoulder", 6, -1, ""}, {"lefttrigger", 7, -1, ""},
+        {"back", 8, -1, ""},      {"start", 9, -1, ""},
+        {"dpup", 10, 205, "UP"},  {"dpdown", 10, 206, "DOWN"},
+        {"dpleft", 10, 207, "LEFT"}, {"dpright", 10, 208, "RIGHT"},
+    };
+    const char* name = Psyz_PadsInputName(PSYZ_INPUT_GAMEPAD, code);
+    char m[2] = {0, 0};
+    int i;
+    if (code < 0) {
+        Add(line, "-");
+        return;
+    }
+    for (i = 0; i < LEN(pads); i++) {
+        if (!strcmp(name, pads[i].sdl)) {
+            m[0] = 1 + pads[i].mark;
+            Add(line, m);
+            if (*pads[i].en) {
+                Add(line, " ");
+                AddW(line, pads[i].word, pads[i].en);
+            }
+            return;
+        }
+    }
+    if (!strcmp(name, "leftstick") || !strcmp(name, "rightstick")) {
+        Add(line, g_ButtonSet == BUTTONS_PSX ? (name[0] == 'l' ? "L3" : "R3")
+                                             : (name[0] == 'l' ? "LS" : "RS"));
+        return;
+    }
+    AddUpper(line, name, 8);
+}
+
+static void AddKeyInput(char* line, int code) {
+    AddUpper(line, code < 0 ? "-" : Psyz_PadsInputName(PSYZ_INPUT_KEY, code),
+             10);
+}
+
+static void DrawControls(void) {
+    char lines[CTL_LINES + 1][LINE_MAX], cell[LINE_MAX], tmp[8];
+    int i, k, w, col1 = 0, col2 = 0, gap = 2 * (uk ? SERIF_W : CELL_W);
+    // the columns: as wide as their longest text on any line
+    for (i = 0; i <= N_CTL_BUTTONS; i++) {
+        Clear(cell);
+        if (i < N_CTL_BUTTONS) {
+            AddW(cell, ctl_rows[i].word, ctl_rows[i].en);
+        } else {
+            AddW(cell, P_BUTTON, "BUTTON");
+        }
+        col1 = Width(cell) > col1 ? Width(cell) : col1;
+        Clear(cell);
+        if (i < N_CTL_BUTTONS) {
+            AddKeyInput(cell, Psyz_PadsMap(PSYZ_INPUT_KEY, ctl_rows[i].bit,
+                                           PSYZ_INPUT_QUERY));
+        } else {
+            AddW(cell, P_KEYBOARD, "KEYBOARD");
+        }
+        col2 = Width(cell) > col2 ? Width(cell) : col2;
+    }
+    col1 += gap;
+    col2 = CTL_KEYS ? col1 + col2 + gap : col1;
+    if (sel < ctl_top) {
+        ctl_top = sel;
+    } else if (sel >= ctl_top + CTL_LINES) {
+        ctl_top = sel - CTL_LINES + 1;
+    }
+    // the header: the column names, or the capture prompt and its seconds
+    Clear(lines[0]);
+    if (capture) {
+        AddW(lines[0], P_PRESS, "PRESS A KEY OR BUTTON");
+        sprintf(tmp, " %d", (capture + 59) / 60);
+        Add(lines[0], tmp);
+    } else {
+        AddW(lines[0], P_BUTTON, "BUTTON");
+        PadTo(lines[0], col1);
+        if (CTL_KEYS) {
+            AddW(lines[0], P_KEYBOARD, "KEYBOARD");
+            PadTo(lines[0], col2);
+        }
+        AddW(lines[0], P_GAMEPAD, "GAMEPAD");
+    }
+    for (i = 1; i <= CTL_LINES; i++) {
+        k = ctl_top + i - 1;
+        Clear(lines[i]);
+        if (k == CTL_RESET) {
+            AddW(lines[i], P_DEFAULTS, "RESET TO DEFAULTS");
+        } else if (k == CTL_BACK) {
+            AddW(lines[i], P_BACK, "BACK");
+        } else {
+            AddW(lines[i], ctl_rows[k].word, ctl_rows[k].en);
+            PadTo(lines[i], col1);
+            if (CTL_KEYS) {
+                AddKeyInput(lines[i], Psyz_PadsMap(PSYZ_INPUT_KEY,
+                                                   ctl_rows[k].bit,
+                                                   PSYZ_INPUT_QUERY));
+                PadTo(lines[i], col2);
+            }
+            w = Psyz_PadsMap(PSYZ_INPUT_GAMEPAD, ctl_rows[k].bit,
+                             PSYZ_INPUT_QUERY);
+            AddPadInput(lines[i], w);
+        }
+    }
+    Box(lines, CTL_LINES + 1, sel - ctl_top + 1, 0);
 }
 
 static void DrawCheats(void) {
@@ -1388,6 +1639,8 @@ void PortMenu_Draw(OT_TYPE* ot) {
         DrawMain();
     } else if (page == PAGE_CHEATS) {
         DrawCheats();
+    } else if (page == PAGE_CONTROLS) {
+        DrawControls();
     } else {
         if (page == PAGE_CHOOSE) {
             DrawChoose();

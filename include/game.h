@@ -1036,8 +1036,10 @@ enum { BUTTONS_SWITCH, BUTTONS_XBOX, BUTTONS_PSX, BUTTON_SETS };
 #define BUTTON_MARKS_V (16 * 11)
 // the dotted row of the atlas, under the marks (the status page lines)
 #define MENU_DOTS_V (BUTTON_MARKS_V + (BUTTON_SETS * BUTTON_MARKS + 7) / 8 * 11)
-extern int g_ButtonSet;
+extern int g_ButtonSet;  // the set shown now (Buttons_Update)
+extern int g_ButtonPick; // sotn.ini buttons =: -1 auto, else a set
 extern const char* const g_ButtonSetNames[BUTTON_SETS];
+void Buttons_Update(void);
 int Buttons_Width(int b);
 int Buttons_Rows(int set, int b, u8 px[11][16]);
 void Buttons_Paint(u16* dst, int stride, int ink);

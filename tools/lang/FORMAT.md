@@ -15,7 +15,7 @@ Git holds only the Ukrainian side, in `tools/lang/uk/`:
 | `ua_psp.json` | Dialogue boxes that differ for the PSP voice set. |
 | `ua_code.json` | File-select lines (`code:<addr>`) and gothic words (`gothic:<addr>`). Not packed yet. |
 | `ua_menu.json` | `{g_MenuStr index: ua}`: MENU rows that replace the Xbox line (ДОСВІД, the two Saturn familiars). |
-| `ua_port.json` | `{index: ua}`: words of the port's own screens (PORT table): 0..5 the stat names of the status page, ATT DEF STR CON INT LCK in full, in sentence case; 6 the map word of its records; 7..11 the line of each item of the pause main list, in its order, 33 cells at most; 20..57 the words of the port menu (src/pc/port_menu.c P_*), drawn in the serif menu cells. The pack adds 100 + row: the status page words of g_MenuStr (`STATUS_ROWS` in sotn_lang.py) in sentence case. |
+| `ua_port.json` | `{index: ua}`: words of the port's own screens (PORT table): 0..5 the stat names of the status page, ATT DEF STR CON INT LCK in full, in sentence case; 6 the map word of its records; 7..11 the line of each item of the pause main list, in its order, 33 cells at most; 20..57 the words of the port menu (src/pc/port_menu.c P_*), drawn in the serif menu cells; 200..213 the words of its Controls page. The pack adds 100 + row: the status page words of g_MenuStr (`STATUS_ROWS` in sotn_lang.py) in sentence case. |
 | `ua_zones.json` | `{stage id, 2 hex digits: ua}`: area names (ZONE table). `proposed` lists the names not from the owner yet. |
 | `plates.py` | The words of the file-select name and card plates, drawn over the stock plate at pack time. |
 | `font8.png` | 128x128 palette image of the 8x8 sheet. Index = 4bpp nibble. Only cells 0x66..0x97 hold ink. |

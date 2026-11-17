@@ -4,6 +4,7 @@
 // the extra pixels per side in g_WideX and g_WideY. Other display modes
 // show the PS1 frame at the largest integer scale that fits.
 #include <game.h>
+#include <psyz/input.h>
 #include <psyz/video.h>
 #include <stdio.h>
 #include <string.h>
@@ -65,7 +66,53 @@ static const char ini_cheats[] =
 
 static const char ini_buttons[] =
     "\n"
-    "; buttons: the button marks of the menus: switch, xbox or psx.\n";
+    "; buttons: the button marks of the menus: auto = as the gamepad in use\n"
+    "; (keyboard only: the last gamepad, at first psx; the Switch: switch),\n"
+    "; psx = PlayStation, xbox = Xbox, switch = Nintendo.\n";
+
+// the PS buttons of the pad word, bit 0 first (psyz/input.h)
+static const char* const ps_buttons[PSYZ_PAD_BUTTONS] = {
+    "l2",  "r2", "l1", "r1",    "triangle", "circle", "cross", "square",
+    "select", "l3", "r3", "start", "up", "right", "down", "left"};
+static const char* const input_dev[2] = {"key", "pad"};
+
+static const char ini_controls[] =
+    "\n"
+    "; key_<button>, pad_<button>: the keyboard key and the gamepad button of\n"
+    "; each PS button (player 1). Keys by their SDL name: X, Return, Left\n"
+    "; Shift, Up, Keypad 8. Gamepad buttons by position: a = bottom, b = right,\n"
+    "; x = left, y = top face button; leftshoulder, rightshoulder,\n"
+    "; lefttrigger, righttrigger, leftstick, rightstick, back, start, dpup,\n"
+    "; dpdown, dpleft, dpright. none = no input. The port menu page CONTROLS\n"
+    "; changes them; its RESET restores the defaults.\n";
+
+// key_<button> = <name> or pad_<button> = <name>: 1 if the line is one
+static int IniInput(const char* line) {
+    char dev[4], button[16], name[48];
+    int d, b, code, n;
+    if (sscanf(line, " %3[a-z]_%15[a-z0-9] = %47[^\r\n]", dev, button,
+               name) != 3) {
+        return 0;
+    }
+    for (d = 0; d < 2 && strcmp(dev, input_dev[d]); d++) {
+    }
+    for (b = 0; b < PSYZ_PAD_BUTTONS && strcmp(button, ps_buttons[b]); b++) {
+    }
+    if (d == 2 || b == PSYZ_PAD_BUTTONS) {
+        return 0;
+    }
+    for (n = strlen(name); n > 0 && (name[n - 1] == ' ' || name[n - 1] == '\t');
+         n--) {
+        name[n - 1] = 0;
+    }
+    code = Psyz_PadsInputFromName(d, name);
+    if (code == PSYZ_INPUT_UNKNOWN) {
+        fprintf(stderr, "[ini] %s_%s = %s: unknown, kept\n", dev, button, name);
+    } else {
+        Psyz_PadsMap(d, b, code);
+    }
+    return 1;
+}
 
 int g_JpCards; // JP_CARDS_EXTRA
 const char* const g_JpCardsNames[JP_CARDS_MODES] = {"extra", "jp", "off"};
@@ -141,7 +188,14 @@ void Wide_SaveIni(void) {
     fputs(ini_language, f);
     fprintf(f, "language = %s\n", g_LangNext ? "uk" : "en");
     fputs(ini_buttons, f);
-    fprintf(f, "buttons = %s\n", g_ButtonSetNames[g_ButtonSet]);
+    fprintf(f, "buttons = %s\n",
+            g_ButtonPick < 0 ? "auto" : g_ButtonSetNames[g_ButtonPick]);
+    fputs(ini_controls, f);
+    for (i = 0; i < 2 * PSYZ_PAD_BUTTONS; i++) {
+        fprintf(f, "%s_%s = %s\n", input_dev[i & 1], ps_buttons[i >> 1],
+                Psyz_PadsInputName(i & 1, Psyz_PadsMap(i & 1, i >> 1,
+                                                       PSYZ_INPUT_QUERY)));
+    }
     fputs(ini_jp_cards, f);
     fprintf(f, "jp_cards = %s\n", g_JpCardsNames[g_JpCards]);
     fputs(ini_relic_toggle, f);
@@ -163,7 +217,8 @@ void Wide_SaveIni(void) {
 
 // Reads the settings file, writes it with the defaults when it is missing.
 // Keys: scale = N, voice = ps1|jp|psp, language = en|uk,
-// buttons = switch|xbox|psx (missing: switch on the Switch, xbox on PC),
+// buttons = auto|psx|xbox|switch (missing: auto), key_<button> and
+// pad_<button> = <input name> (IniInput),
 // jp_cards = extra|jp|off, relic_toggle = modern|stock,
 // spawn = <spawn point name>, cheat_* = 0|1 (cheat_character 0..2, 4), editor, overlay, fps = 0|1.
 // A missing key keeps its default (cheats, editor, overlay and fps off).
@@ -197,11 +252,14 @@ void Wide_LoadIni(const char* path) {
                 g_RelicToggle = IniWord("relic_toggle", word,
                                         relic_toggle_names, 2, 0);
             } else if (sscanf(line, " buttons = %15s", word) == 1) {
+                g_ButtonPick = -1; // auto, and an unknown word
                 for (v = 0; v < BUTTON_SETS; v++) {
                     if (!strcmp(word, g_ButtonSetNames[v])) {
-                        g_ButtonSet = v;
+                        g_ButtonPick = v;
                     }
                 }
+            } else if (IniInput(line)) {
+                // a key_ or pad_ line
             } else if (sscanf(line, " %31[a-z_] = %d", word, &v) == 2) {
                 for (i = 0; i < LEN(ini_flags); i++) {
                     if (!strcmp(word, ini_flags[i].key)) {
@@ -223,7 +281,7 @@ void Wide_LoadIni(const char* path) {
         stderr, "[voice] settings: voice %s\n", g_VoiceSetNames[g_VoiceSet]);
     fprintf(stderr, "[lang] settings: language %s\n", g_LangNext ? "uk" : "en");
     fprintf(stderr, "[buttons] settings: buttons %s\n",
-            g_ButtonSetNames[g_ButtonSet]);
+            g_ButtonPick < 0 ? "auto" : g_ButtonSetNames[g_ButtonPick]);
     fprintf(stderr, "[relics] settings: jp_cards %s relic_toggle %s\n",
             g_JpCardsNames[g_JpCards], relic_toggle_names[g_RelicToggle]);
     fprintf(stderr,
