@@ -189,6 +189,7 @@ build/pc/sotn
 ```
 
 The game reads its files from `build/pc/data` (a copy of `disks/us`, plus the Saturn stages).
+The window is 1280x720 and the view is 16:9 at scale 3. `--wide N` sets another scale.
 Settings: `build/pc/sotn --ini sotn.ini` reads and writes a settings file (see "Settings").
 
 ### 5. Build for Nintendo Switch

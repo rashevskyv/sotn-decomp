@@ -59,7 +59,8 @@ static void printHelp(void) {
            "ends\n");
     printf("  --replay-fast      disable frame limit during replay or demo\n");
     printf("  --editor           serve the tile editor page on port 8080\n");
-    printf("  --wide <scale>     16:9 wide view at this integer scale\n");
+    printf("  --wide <scale>     16:9 wide view at this integer scale "
+           "(default 3, 0 = off)\n");
     printf("  --ini <file>       settings file as sotn.ini on the Switch\n");
     printf("  --help             show this help message\n");
 }
@@ -77,6 +78,7 @@ static void printAllowedParams(const char* allowedValues[], int n) {
     }
     printf("\n");
 }
+static bool wide_set; // --wide or --ini picked the view
 static bool parseArgs(
     struct InitGameParams* outParams, int argc, char* argv[]) {
     assert(!!outParams);
@@ -164,8 +166,10 @@ static bool parseArgs(
             g_EditorOn = 1;
         } else if (strcmp(argv[i], "--wide") == 0 && i + 1 < argc) {
             Wide_Config(atoi(argv[++i]));
+            wide_set = true;
         } else if (strcmp(argv[i], "--ini") == 0 && i + 1 < argc) {
             Wide_LoadIni(argv[++i]); // the Switch sotn.ini, for tests
+            wide_set = true;
         } else {
             printf("argument %s not recognized", argv[i]);
             return false;
@@ -221,6 +225,13 @@ int Main(int argc, char* argv[]) {
         }
     }
 #endif
+    // 16:9 at scale 3 when no option and no sotn.ini set the view; the demo,
+    // replay and test runs keep the stock view their inputs were made with
+    int Wide_GetScale(void);
+    if (!wide_set && !Wide_GetScale() && params.demo < 0 &&
+        !params.replayPath && params.testMode == NO_TEST) {
+        Wide_Config(3);
+    }
     if (params.stage < 0 && params.spawnPoint != NULL) {
         params.stage = SpawnPoint_StageForName(params.spawnPoint);
     }

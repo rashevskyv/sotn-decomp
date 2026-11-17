@@ -172,43 +172,129 @@ const char D_801A7B80[] = "SELECT ！！";
 #ifdef PLATFORM_PSYZ
 #include <psyz/video.h>
 
+// The title prims of the step code, then one extra quad per text piece.
+#define TITLE_PRIMS (VERSION >= VER_JP12 ? 0x13 : 0x11)
+#define TITLE_TEXT 7 // PRESS START: prims 0..2, KONAMI line: prims 3..6
+// ponytail: measured on the stock logo; a new logo with other empty rows
+// at its bottom needs a new value
+#define TITLE_LOGO_BLANK 15 // empty rows under the logo art
+
+// The sprite rectangle of each text piece, read while it is still a sprite.
+static struct {
+    s16 x, y, w, h;
+} title_text[TITLE_TEXT];
+
+static void TitleQuad(Primitive* p, s32 x0, s32 y0, s32 x1, s32 y1, s32 u0,
+                      s32 v0, s32 u1, s32 v1) {
+    p->type = PRIM_GT4;
+    p->x0 = p->x2 = x0;
+    p->x1 = p->x3 = x1;
+    p->y0 = p->y1 = y0;
+    p->y2 = p->y3 = y1;
+    p->u0 = p->u2 = u0;
+    p->u1 = p->u3 = u1;
+    p->v0 = p->v1 = v0;
+    p->v2 = p->v3 = v1;
+    // a sprite has one colour: give the quad's corners vertex 0's
+    p->r1 = p->r2 = p->r3 = p->r0;
+    p->g1 = p->g2 = p->g3 = p->g0;
+    p->b1 = p->b2 = p->b3 = p->b0;
+}
+
+// A 4:3 TV shows the 512x240 title frame, so there a texel is 5/8 as wide as
+// it is high. The wide view draws square texels: the text looked flat and
+// small. One text line (pieces first..first+n-1 side by side) is drawn sy
+// rows per texel row and sx8/8 columns per texel column, centred on the
+// canvas (cx2 = twice the centre x) with its top row at y. Any texture in
+// the sprites' slot works: the size comes from the sprites, the texture
+// coordinates are read on every frame.
+static void TitleTextLine(Primitive** p, s32 first, s32 n, s32 cx2, s32 cw,
+                          s32 y, s32 sx8, s32 sy) {
+    s32 lo = 0x7FFF, hi = -0x7FFF, k, lc2, xs, xm, xe, u, v, h;
+    Primitive *P, *E;
+
+    for (k = first; k < first + n; k++) {
+        lo = MIN(lo, title_text[k].x);
+        hi = MAX(hi, title_text[k].x + title_text[k].w);
+    }
+    lc2 = lo + hi;
+    if ((hi - lo) * sx8 > cw * 8) {
+        sx8 = cw * 8 / (hi - lo); // the line must fit the canvas
+    }
+#define TX(x) ((cx2 + (2 * (x) - lc2) * sx8 / 8) / 2)
+    for (k = first; k < first + n; k++) {
+        P = p[k];
+        E = p[TITLE_PRIMS + k];
+        xs = title_text[k].x;
+        xe = xs + title_text[k].w;
+        h = title_text[k].h;
+        u = P->u0;
+        v = P->v0;
+        // a quad's end u is a byte, so u 0x100 does not exist: the piece
+        // ends at texel 0xFF and the extra quad draws that last column
+        xm = MIN(xe, xs + 0xFF - u);
+        E->drawMode = DRAW_HIDE;
+        if (xm < xe) {
+            E->r0 = P->r0, E->g0 = P->g0, E->b0 = P->b0;
+            E->tpage = P->tpage;
+            E->clut = P->clut;
+            E->priority = P->priority;
+            E->drawMode = P->drawMode;
+            TitleQuad(E, TX(xm), y, TX(xe), y + h * sy, 0xFF, v, 0xFF, v + h);
+        }
+        TitleQuad(P, TX(xs), y, TX(xm), y + h * sy, u, v, u + xm - xs, v + h);
+    }
+#undef TX
+}
+
 // The wide view gives the title a canvas larger than 512x240 (src/pc/wide.c).
-// The background stretches to the whole canvas, the logo stays centred, the
-// KONAMI line keeps its gap to the bottom and PRESS START (and the sound
-// mode option) moves down by half of that. Runs every frame after the step
-// code, so it follows dock changes and the colours the step code just set.
+// The background stretches to the whole canvas, the logo stays in place, the
+// KONAMI line keeps its gap to the bottom and PRESS START sits midway between
+// the logo and the KONAMI line. Runs every frame after the step code, so it
+// follows dock changes and the colours the step code just set.
 static void TitleFillCanvas(void) {
     PsyzRect a = Psyz_VideoGetDrawArea();
-    s32 w = a.ex - a.sx, ty = -a.sy, i;
+    s32 w = a.ex - a.sx, i, n, sy, sx8, ky, py;
     Primitive* prim;
+    Primitive* p[TITLE_PRIMS + TITLE_TEXT];
 
     if (g_GameEngineStep == 0 || g_GameEngineStep == 5 || w <= 0) {
         return;
     }
     prim = &g_PrimBuf[D_801BB010];
-    for (i = 0; prim != NULL; prim = prim->next, i++) {
-        if (i < 3) { // PRESS START BUTTON
-#if REGION == REGION_JP
-            prim->y0 = 0xA0 + ty / 2;
-#else
-            prim->y0 = 0xA8 + ty / 2;
-#endif
-        } else if (i < 7) { // KONAMI line
-            prim->y0 = 0xD6 + ty;
-        } else if (i < 11) { // background: four strips over the whole canvas
-            prim->type = PRIM_GT4;
-            prim->x0 = prim->x2 = a.sx + (i - 7) * w / 4;
-            prim->x1 = prim->x3 = a.sx + (i - 6) * w / 4;
-            prim->y0 = prim->y1 = a.sy;
-            prim->y2 = prim->y3 = a.ey;
-            prim->u0 = prim->u2 = 0;
-            prim->u1 = prim->u3 = 0x80;
-            prim->v0 = prim->v1 = 0;
-            prim->v2 = prim->v3 = 0xF0;
-            // a sprite has one colour: give the quad's corners vertex 0's
-            prim->r1 = prim->r2 = prim->r3 = prim->r0;
-            prim->g1 = prim->g2 = prim->g3 = prim->g0;
-            prim->b1 = prim->b2 = prim->b3 = prim->b0;
+    for (n = 0; prim != NULL && n < LEN(p); prim = prim->next, n++) {
+        p[n] = prim;
+    }
+    if (n < LEN(p)) {
+        return;
+    }
+    for (i = 0; i < TITLE_TEXT; i++) {
+        if (p[i]->type == PRIM_SPRT) { // just allocated by step 0
+            title_text[i].x = p[i]->x0;
+            title_text[i].y = p[i]->y0;
+            title_text[i].w = p[i]->u1;
+            title_text[i].h = p[i]->v1;
+        }
+    }
+    // whole rows: every texel row gets the same height
+    sy = MAX(1, (a.ey - a.sy + DISP_TITLE_H / 2) / DISP_TITLE_H);
+    sx8 = MAX(8, sy * 5); // 5/8 of the height, never narrower than square
+    // KONAMI line (prims 3..6): the stock gap to the bottom
+    ky = a.ey - (DISP_TITLE_H - title_text[3].y - title_text[3].h) -
+         title_text[3].h * sy;
+    TitleTextLine(p, 3, 4, a.sx + a.ex, w, ky, sx8, sy);
+    // PRESS START (prims 0..2): midway between the logo art (prim 11) and
+    // KONAMI
+    py = (p[11]->y0 + p[11]->v1 - TITLE_LOGO_BLANK + ky -
+          title_text[0].h * sy) /
+         2;
+    TitleTextLine(p, 0, 3, a.sx + a.ex, w, py, sx8, sy);
+
+    for (i = 7; i < TITLE_PRIMS; i++) {
+        prim = p[i];
+        if (i < 11) { // background: four strips over the whole canvas
+            TitleQuad(prim, a.sx + (i - 7) * w / 4, a.sy,
+                      a.sx + (i - 6) * w / 4, a.ey, 0, 0, 0x80, 0xF0);
         } else if (i == 15) { // leaf shadow, bottom right corner
             prim->x0 = a.ex - 0xFF;
             prim->y0 = a.ey - 0x90;
@@ -218,7 +304,7 @@ static void TitleFillCanvas(void) {
         }
 #if VERSION >= VER_JP12
         else if (i >= 17) { // MONO / STEREO
-            prim->y0 = soundModeSprites[i - 17][1] + ty / 2;
+            prim->y0 = soundModeSprites[i - 17][1] - a.sy / 2;
         }
 #endif
     }
@@ -245,7 +331,11 @@ void HandleTitleScreen(void) {
             g_LoadFile = 0x8003;
             g_LoadOvlIdx = 0xFF;
         }
-#if VERSION >= VER_JP12
+#ifdef PLATFORM_PSYZ
+        // the extra quads of TitleFillCanvas
+        D_801BB010 =
+            g_api.AllocPrimitives(PRIM_SPRT, TITLE_PRIMS + TITLE_TEXT);
+#elif VERSION >= VER_JP12
         D_801BB010 = g_api.AllocPrimitives(PRIM_SPRT, 0x13);
 #else
         D_801BB010 = g_api.AllocPrimitives(PRIM_SPRT, 0x11);

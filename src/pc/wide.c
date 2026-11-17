@@ -19,6 +19,8 @@ char g_IniSpawn[48];
 static PsyzSize last_disp;
 static int last_fbw, last_fbh;
 
+int Wide_GetScale(void) { return cfg_scale; }
+
 void Wide_Config(int scale) {
     cfg_scale = scale;
     last_disp.w = last_disp.h = 0; // Wide_OnFrame applies it again
