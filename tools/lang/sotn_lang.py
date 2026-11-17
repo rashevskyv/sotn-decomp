@@ -1338,6 +1338,27 @@ def plate_records(srcs):
     return out
 
 
+def local_records():
+    """uk/local/art.bin, git-ignored: the owner's pictures made from stock art (the uk title logo,
+    PRESS START, the game-over picture). Same records as art.bin; they go into the pack as they are. None if it is missing."""
+    p = os.path.join(UK, "local", "art.bin")
+    if not os.path.isfile(p):
+        print("art: no uk/local/art.bin: the title logo, PRESS START and the game-over picture stay English")
+        return []
+    data = open(p, "rb").read()
+    if data[:8] != b"SOTNART1":
+        sys.exit("uk/local/art.bin: not a SOTNART1 file")
+    out, o = [], 12
+    for _ in range(struct.unpack_from("<I", data, 8)[0]):
+        x, y, w, h, first, whole, _proven, nl = struct.unpack_from("<HHHHIIBB", data, o)
+        name = data[o + 18:o + 18 + nl].decode()
+        o += 18 + nl
+        out.append({"name": name, "x": x, "y": y, "w": w, "h": h, "first": first, "whole": whole,
+                    "le": data[o:o + w * h * 2]})
+        o += w * h * 2
+    return out
+
+
 def cmd_art(_args):
     recs = mod_records()
     srcs = art_sources()
@@ -1766,7 +1787,7 @@ def cmd_pack(_args):
         if any(n in STOCK_PIXELS for n in art_missing):
             print("     the labels with stock pixels come from the Xbox 360 mod's ps1vram_uk.bin:"
                   " put it in games/ (build.py) or set SOTN_LANG_MEDIA to its folder")
-    plates = plate_records(srcs)
+    plates = plate_records(srcs) + local_records()
     with open(os.path.join(OUT, "art.bin"), "wb") as f:
         f.write(b"SOTNART1" + struct.pack("<I", len(recs) + len(plates)))
         for r in recs:

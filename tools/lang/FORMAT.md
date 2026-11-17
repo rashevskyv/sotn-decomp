@@ -28,6 +28,7 @@ Git holds only the Ukrainian side, in `tools/lang/uk/`:
 | `dfont.png` | The owner's dialogue font, 8x11 cells, 16 a row. |
 | `bios12.png` | The owner's 12x16 letters (16 x 15 cells): the serif Cyrillic table, then the private letters. |
 | `art/*.png` | The changed texels of the font sheets (index 16: keep the stock texel of the US disc). |
+| `local/art.bin` | Not in git (`.gitignore`): the owner's pictures made from stock art, as art.bin records: the uk title logo (with the stock TM), PRESS START (3 strips at VRAM 544,432/448/464, made from the stock letters) and the game-over picture (F_GO.BIN, VRAM 640,0 128x240). The pack copies its records into art.bin; without it they stay English. |
 
 `tools/lang/serif_latin.py` holds the Latin letters, digits, marks and stat arrows of the serif menu
 font (mfont.bin). Both languages use it, so it is not in `uk/`.
@@ -203,3 +204,4 @@ struct { char name[16]; u32 offset, length; } file[count];   // offsets from the
 ```
 
 Without `ps1vram_uk.bin` the array has every file, but `art.bin` has no `STOCK_PIXELS` labels.
+Without `uk/local/art.bin` it has no uk title logo, no uk PRESS START and no uk game-over picture.
