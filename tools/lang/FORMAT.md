@@ -190,6 +190,11 @@ Loose PNG files replace VRAM pictures at draw time (psyz `hdtex.h`, sdl3_gl only
   To name a new file: save it with hash `00000000`, go to that screen, copy the hash from the log line.
 - `sotn.ini`: `hd_textures = 0` turns all files off; `hd_dump = 1` writes every sampled picture to
   `data/textures/dump/` with its key (stock art: never share or commit the dump).
+- 16:9 pictures: no name marker, the PNG aspect decides. The title background always fills the 16:9 canvas.
+  The game-over picture (`640_0_128x240_8`) fills it only when its PNG is wider than 4:3 (`w*3 > h*4`),
+  otherwise it stays 256x240 in the middle with black sides (`GameOverFillCanvas`, src/dra/game_handlers.c).
+  With an HD file for the game-over letters (`512_0_64x128_4`) the letters draw 1.5x (at most the canvas width)
+  around the middle of their band; without it they stay stock.
 - While HD primitives are on screen the canvas runs at output resolution (2x at 720p, 3x on the 1080p title).
 - `tools/lang/uk/hd_textures.py <game>/data/textures/uk` writes the uk files from the owner's hi-res sources in
   `tools/lang/uk/local/`. The PNGs are Konami-derived: never in git.

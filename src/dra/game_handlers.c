@@ -795,6 +795,49 @@ void func_800E5498(void) {
     g_GpuUsage.gt4++;
 }
 
+#ifdef PLATFORM_PSYZ
+#include <psyz/video.h>
+// The game-over picture (two quads, VRAM 640,0) is 256x240 in the middle of
+// the wide view. An HD file wider than 4:3 for it (data/textures) draws it
+// over the whole canvas instead, as the title stretches its background.
+// With the HD letters file (VRAM 512,0) the letters quad grows to 1.5x
+// around the middle of its band, never wider than the canvas.
+// Runs every frame, so it follows dock changes and a file that appears.
+static void GameOverFillCanvas(void) {
+    PsyzRect a = Psyz_VideoGetDrawArea();
+    Primitive* prim = &g_PrimBuf[D_8013640C];
+    s32 x0 = 0, x1 = 0x100, y0 = 0x60, y1 = 0x80, l = 0, r = 0xFF;
+    s32 tw, th, i, w, h;
+
+    // letters: stock 0..0xFF x 0x60..0x80
+    if (Psyz_HdTexSize(0x200, 0, 0x40, 0x80, 4, &tw, &th)) {
+        w = MAX(0xFF, MIN(0xFF * 3 / 2, a.ex - a.sx));
+        h = 0x20 * w / 0xFF;
+        l = 0x80 - w / 2, r = l + w;
+        y0 = 0x70 - h / 2, y1 = y0 + h;
+    }
+    prim->x0 = prim->x2 = l;
+    prim->x1 = prim->x3 = r;
+    prim->y0 = prim->y1 = y0;
+    prim->y2 = prim->y3 = y1;
+    prim = prim->next;
+    y0 = 0, y1 = 0xF0;
+
+    if (Psyz_HdTexSize(0x280, 0, 0x80, 0xF0, 8, &tw, &th) && tw * 3 > th * 4 &&
+        a.ex > a.sx) {
+        x0 = a.sx, y0 = a.sy, x1 = a.ex, y1 = a.ey;
+    }
+    for (i = 0; i < 2; i++, prim = prim->next) {
+        l = x0 + (x1 - x0) * i / 2;
+        r = x0 + (x1 - x0) * (i + 1) / 2;
+        prim->x0 = prim->x2 = l;
+        prim->x1 = prim->x3 = r;
+        prim->y0 = prim->y1 = y0;
+        prim->y2 = prim->y3 = y1;
+    }
+}
+#endif
+
 void func_psp_091040A0(u_long** gfxBank);
 void HandleGameOver(void) {
     Primitive* prim;
@@ -1113,6 +1156,13 @@ void HandleGameOver(void) {
         }
         break;
     }
+#ifdef PLATFORM_PSYZ
+    // the picture quads live from Gameover_AllocResources to Gameover_9
+    if (g_StageId != STAGE_ST0 && g_GameStep >= Gameover_2 &&
+        g_GameStep <= Gameover_9) {
+        GameOverFillCanvas();
+    }
+#endif
 }
 
 static RECT D_800A0240 = {0x340, 0x180, 0x40, 0x40};
