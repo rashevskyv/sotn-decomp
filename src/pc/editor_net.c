@@ -9,6 +9,7 @@
 //   GET  /castle.json  the castle rooms in map cells (the teleport map)
 //   GET  /room.bin     the current room layers and their tile tables
 //   GET  /gfx.bin      the stage tile pixels and palettes
+//   GET  /native.bin   the native planes of a Saturn stage room (404 if none)
 //   GET  /patch        the apron patch of the stage (text)
 //   POST /patch        save the apron patch (text body), shown at once
 //   POST /warp?stage=&room=&cx=&cy=   teleport, 409 + reason when refused
@@ -216,6 +217,35 @@ static void Room(void) {
     PutTileDef(head[6] ? bt : NULL);
 }
 
+// native.bin: the planes a Saturn stage draws (g_PcStageNativeLayer).
+// u16 "SN", version 1, layer count; per layer u16 w, h, pages, palettes, then
+// the map (w * h u16), the palettes (16 u16 each), the chars (32 KB a page).
+// 0 (the page gets 404) while the game draws the tile tables.
+static int Native(void) {
+    static const u16 head[3] = {0x4E53, 1, 3};
+    const PcNativeLayer* l;
+    u16 d[4];
+    int i;
+    if (!g_PcStageNativeLayer || !g_PcStageNativeLayer(0)) {
+        return 0;
+    }
+    Put(head, sizeof(head));
+    for (i = 0; i < head[2]; i++) {
+        l = g_PcStageNativeLayer(i);
+        d[0] = l ? l->w : 0;
+        d[1] = l ? l->h : 0;
+        d[2] = l ? l->pages : 0;
+        d[3] = l ? l->paletteCount : 0;
+        Put(d, sizeof(d));
+        if (l) {
+            Put(l->map, l->w * l->h * 2);
+            Put(l->palettes, l->paletteCount * 16 * 2);
+            Put(l->chars, l->pages * 256 * 256 / 2);
+        }
+    }
+    return 1;
+}
+
 static void Handle(int fd) {
     static char req[MAX_HEAD + 1];
     char method[8], path[256], *body, *query, *p;
@@ -287,6 +317,12 @@ static void Handle(int fd) {
     } else if (!strcmp(path, "/room.bin")) {
         Room();
         ReplyOut(fd, 200, "application/octet-stream");
+    } else if (!strcmp(path, "/native.bin")) {
+        if (Native()) {
+            ReplyOut(fd, 200, "application/octet-stream");
+        } else {
+            Reply(fd, 404, "text/plain", "no native planes", 16);
+        }
     } else if (!strcmp(path, "/gfx.bin")) {
         // the VRAM copy of the stage tiles, then all palettes (g_Clut)
         Put(g_TileVram, sizeof(u16) * 512 * 512);

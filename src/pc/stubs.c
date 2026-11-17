@@ -70,6 +70,7 @@ Point32 D_8006C38C;
 s32 g_CurrentStream;
 u16 g_ClutIds[0x400];
 bool (*g_PcStageLayerRenderer)(void);
+const PcNativeLayer* (*g_PcStageNativeLayer)(int layer);
 s32 D_8003C738;
 u8 g_CastleFlags[0x300];
 s32 D_8006C374;

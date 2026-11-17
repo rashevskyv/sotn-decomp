@@ -2451,6 +2451,21 @@ extern s32 D_8003C100;
 extern u16 g_ClutIds[]; // array of palette VRAM offsets
 #ifdef PLATFORM_PSYZ
 extern bool (*g_PcStageLayerRenderer)(void);
+// A Saturn stage (src/pc/stages/stage_saturn.c) draws its rooms from native
+// 8x8 Saturn planes, not from the tile tables: the editors read them here.
+// Layer 0 is the front plane, 1 the sky, 2 the back plane. NULL in other
+// stages and until the planes of the current room are loaded (the game then
+// draws the tile tables).
+typedef struct {
+    const u16* map;      // w * h cells: bits 0-11 character, 12-15 palette
+    const u8* chars;     // pages of 256x256 px, 4 bpp, 31 x 31 characters
+    const u16* palettes; // 16 colours each, colour 0 is transparent
+    const u16* tpages;   // VRAM page of each chars page
+    const u16* cluts;    // clut id of each palette
+    u16 w, h;            // cells; a cell is 8x8 Saturn px, game x = x*256/320
+    u16 pages, paletteCount;
+} PcNativeLayer;
+extern const PcNativeLayer* (*g_PcStageNativeLayer)(int layer);
 #endif
 extern s32 g_CutsceneHasControl;
 extern FgLayer D_8003C708;

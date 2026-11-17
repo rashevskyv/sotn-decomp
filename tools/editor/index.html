@@ -379,6 +379,45 @@ function tileCanvas(li, t) {
   return c;
 }
 
+// Saturn stages: the native 8x8 planes the game draws (stage_saturn.c), one
+// canvas per plane in Saturn px (game x = x * 256 / 320). 0 front, 1 sky, 2 back.
+function parseNative(buf) {
+  const h = new Uint16Array(buf, 0, 3);
+  if (h[0] !== 0x4E53) return null;
+  let o = 6;
+  const P = [];
+  for (let i = 0; i < h[2]; i++) {
+    const [w, ht, pages, pals] = new Uint16Array(buf, o, 4);
+    o += 8;
+    const map = new Uint16Array(buf, o, w * ht); o += w * ht * 2;
+    const pal = new Uint16Array(buf, o, pals * 16); o += pals * 32;
+    const chars = new Uint8Array(buf, o, pages * 32768); o += pages * 32768;
+    const c = document.createElement("canvas");
+    c.width = w * 8; c.height = ht * 8;
+    if (w && ht) {
+      const img = c.getContext("2d").createImageData(c.width, c.height);
+      for (let cy = 0; cy < ht; cy++) for (let cx = 0; cx < w; cx++) {
+        const pnd = map[cy * w + cx], ch = pnd & 0xFFF, p = pnd >> 12, k = ch % 961;
+        if (p >= pals || ch >= pages * 961) continue; // the game skips them too
+        const at = Math.floor(ch / 961) * 32768 + Math.floor(k / 31) * 1024 + (k % 31) * 4;
+        for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+          const b = chars[at + y * 128 + (x >> 1)];
+          const col = pal[p * 16 + (x & 1 ? b >> 4 : b & 15)];
+          if (!col) continue;
+          const j = ((cy * 8 + y) * c.width + cx * 8 + x) * 4;
+          img.data[j] = (col & 31) * 255 / 31;
+          img.data[j + 1] = ((col >> 5) & 31) * 255 / 31;
+          img.data[j + 2] = ((col >> 10) & 31) * 255 / 31;
+          img.data[j + 3] = 255;
+        }
+      }
+      c.getContext("2d").putImageData(img, 0, 0);
+    }
+    P.push({w, h: ht, c});
+  }
+  return P;
+}
+
 function parsePatch(text) {
   const m = new Map();
   let key = null;
@@ -425,7 +464,7 @@ function cellTile(x, y) {
 // the one writer: returns false (no change) for cells inside the room or
 // outside the margin. Tile 0 deletes the entry (the game draws no tile there).
 function setCell(x, y, t) {
-  if (!inApron(x, y)) return false;
+  if (room.native || !inApron(x, y)) return false; // native: no apron drawn
   const key = layerKey();
   if (!patch.has(key)) patch.set(key, new Map());
   if (t) patch.get(key).set(x + "," + y, t);
@@ -476,6 +515,8 @@ async function loadRoom() {
       gfxStage = st.stage; tileCache.clear();
     }
     room = parseRoom(await (await fetch("/room.bin")).arrayBuffer());
+    const nr = await fetch("/native.bin"); // 404: the game draws the tiles
+    room.native = nr.ok ? parseNative(await nr.arrayBuffer()) : null;
     tileCache.clear();
     patch = parsePatch(await (await fetch("/patch")).text());
     savedText = patchText(); undo = []; redo = [];
@@ -483,7 +524,9 @@ async function loadRoom() {
     if (clip && clip.stage !== room.stage) clip = null;
     $("#roominfo").textContent = `${stageName(room.stage)} layer ` +
       `${room.layer}: fg ${room.L[0].w}x${room.L[0].h}, bg ` +
-      `${room.L[1].w}x${room.L[1].h} tiles. Paint outside the white frame.`;
+      `${room.L[1].w}x${room.L[1].h} tiles. ` + (room.native ?
+      "Saturn stage: the game draws the native Saturn planes, view only." :
+      "Paint outside the white frame.");
     if (stageName(room.stage) === "?")
       msg("This stage has no apron file (not a castle stage).", "bad");
     afterEdit(); drawPalette();
@@ -498,9 +541,17 @@ function drawRoom() {
   c.width = (Ld.w + 2 * ax) * s; c.height = (Ld.h + 2 * ay) * s;
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = "#101218"; ctx.fillRect(0, 0, c.width, c.height);
-  const other = room.L[1 - layer];
+  const other = room.L[1 - layer], N = room.native;
+  // a Saturn stage: the planes the game draws (fg = front 0, bg = back 2),
+  // the other one dimmed
+  const plane = (n, a) => {
+    ctx.globalAlpha = a;
+    ctx.drawImage(n.c, ax * s, ay * s, n.w * 8 * 256 / 320 * zoomR, n.h * 8 * zoomR);
+    ctx.globalAlpha = 1;
+  };
+  if (N) { plane(N[layer ? 0 : 2], 0.35); plane(N[layer ? 2 : 0], 1); }
   // the other layer, dimmed, when it has the same size
-  if (other.w === Ld.w && other.h === Ld.h) {
+  if (!N && other.w === Ld.w && other.h === Ld.h) {
     ctx.globalAlpha = 0.35;
     for (let y = 0; y < Ld.h; y++) for (let x = 0; x < Ld.w; x++) {
       const t = other.tiles[y * other.w + x];
@@ -508,7 +559,7 @@ function drawRoom() {
     }
     ctx.globalAlpha = 1;
   }
-  for (let y = 0; y < Ld.h; y++) for (let x = 0; x < Ld.w; x++) {
+  if (!N) for (let y = 0; y < Ld.h; y++) for (let x = 0; x < Ld.w; x++) {
     const t = Ld.tiles[y * Ld.w + x];
     if (t) ctx.drawImage(tileCanvas(layer, t), (x + ax) * s, (y + ay) * s, s, s);
   }
@@ -561,6 +612,7 @@ function drawPalette() {
   };
   for (const t of Ld.tiles) add(t);
   for (let t = 1; t < 4096; t++) if (Ld.page[t] || Ld.gfx[t] || Ld.clut[t]) add(t);
+  if (room.native) list.length = 0; // view only: the tile tables are not drawn
   palList = list;
   const c = $("#palc"), ctx = c.getContext("2d"), s = PAL_S;
   c.width = PAL_COLS * s; c.height = Math.max(1, Math.ceil(list.length / PAL_COLS)) * s;
