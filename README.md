@@ -1,37 +1,229 @@
-# Castlevania: Symphony of the Night Decompilation
+# sotn-native
 
-A work-in-progress decompilation of Castlevania Symphony of the Night for Sony PlayStation 1, Sony PlayStation Portable and Sega Saturn. It aims to recreate the source code from the existing binaries using static and/or dynamic analysis. The code compiles byte-for-byte to the same binaries of the game, effectively being a matching decompilation.
+A native port of Castlevania: Symphony of the Night for PC (Linux) and Nintendo Switch.
+It is built from the [sotn-decomp](https://github.com/Xeeynamo/sotn-decomp) decompilation
+and runs on [psyz](https://github.com/Xeeynamo/psyz), a PlayStation SDK for modern systems.
+The port adds content from the Sega Saturn and PSP versions and a Ukrainian translation.
 
-It currently supports the following versions of the game:
+Українською: [README.uk.md](README.uk.md). The upstream README: [README.upstream.md](README.upstream.md).
 
-* `us` the reference build with the serial number SLUS-00067
-* `hd` an unreleased PS1 Japanese build found in Castlevania: Dracula X Chronicles game data
-* `pspeu` European build from Castlevania: Dracula X Chronicles
-* `saturn` the port created by an external development team
+**No game data is in this repository.** You need your own, legally obtained discs.
+The build reads them from your disk and makes the game files on your machine.
 
-This repo does not include any assets or assembly code necessary for compiling the binaries. A prior copy of the game is required to extract the required assets.
+## What works
 
-## Useful links
+| Part | State |
+|---|---|
+| PC (Linux, x86-64) build of the PS1 US game | Works. Main test platform for the code. |
+| Nintendo Switch NRO (homebrew) | Works. Tested on one console. |
+| 16:9 view at an integer scale, port menu, button icons, rumble on damage (Switch) | Works. |
+| Saturn stages: Underground Garden, Cursed Prison and their inverted versions; stitched rooms | Experimental. Enemies and bosses are ported by hand and can differ from the Saturn game. |
+| Saturn character select screen | Works. Needs the Saturn disc for its art. |
+| Maria as a player (from the PSP version) | Experimental. |
+| PSP familiar names, the two JP familiar cards | Works (the cards are an option). |
+| Voice sets (Japanese and PSP English) | Works, but see "Voice sets" below: the pack cannot be made from this repository alone yet. |
+| Ukrainian language | Works in our builds, but see "Ukrainian language" below: the pack cannot be made from this repository alone yet. |
+| Cheats, teleport map, tile editor page (port 8080, no password) | Test tools. |
 
-* [Build guide](https://github.com/Xeeynamo/sotn-decomp/wiki/Build)
-* [Decompilation guide](https://github.com/Xeeynamo/sotn-decomp/wiki/Decompilation)
-* [Progress report](https://sotn.xee.dev/)
-* [decomp.dev progress](https://decomp.dev/Xeeynamo/sotn-decomp)
+All tests are manual. Expect bugs.
 
-Decompiling a game is a mastodontic task. If you have some basic programming skills, please join us in this journey. Any contribution will be very appreciated!
+## What you need
 
-[![Join to our Discord server](https://discord.com/api/guilds/1079389589950705684/widget.png?style=banner2)](https://sotn-discord.xee.dev/)
+### Discs
 
-## Special thanks
+Put your own disc images in `disks/` (see below). sotn-decomp names each version.
 
-This project is possible thanks to the hard work of tools provided by the Decompilation community:
+| Disc | sotn-decomp name | Required | Adds |
+|---|---|---|---|
+| PlayStation, US (SLUS-00067) | `us` | Yes | The whole game. |
+| PSP, Castlevania: The Dracula X Chronicles, Europe (ULES-00841) | `pspeu` | No | Maria as a player, her voice, familiar names. |
+| Sega Saturn, Japan (T-9527G) | `saturn` | No | The Saturn stages, the character select art. |
 
-* [mips2c](https://github.com/matt-kempster/m2c) from @matt-kempster to decompile MIPS assembly into C. This has proven to be more accurate than Hexrays IDA and Ghidra.
-* [splat](https://github.com/ethteck/splat) from @ethteck to disassemble code and extract data with a symbol map. This tool provides the fundamentals of the SOTN decomp.
-* [asm-differ](https://github.com/simonlindholm/asm-differ) from @simonlindholm to know how the decompiled code compares to the original binary.
-* [decomp-permuter](https://github.com/simonlindholm/decomp-permuter) from @simonlindholm to pick different versions of the same code that better matches the original binary.
-* [maspsx](https://github.com/mkst/maspsx) by @mkst to replicate the customized assembler used in the official PSX SDK.
-* [decomp.me](https://github.com/decompme/decomp.me/) by @ethteck, @nanaian and @mkst to provide a collaborative decompilation site to share and contribute to work-in-progress decompiled functions.
-* [frogress](https://github.com/decompals/frogress) by @ethteck to store and retrieve progression data.
-* [esa-new](https://github.com/mkst/esa-new) by @mkst as an inspiration on how to set-up a PS1 decompilation project.
-* [oot](https://github.com/zeldaret/oot) as an inspiration of what it is possible to achieve with a complete decompiled video game.
+The build checks only that the files it needs exist. Other releases of the discs are not tested.
+
+### Tools (Debian or Ubuntu, also under WSL 2)
+
+- The upstream packages: `sudo apt install $(cat tools/requirements-debian.txt)`.
+- CMake 3.28 or later, Ninja, a C and C++ compiler (GCC or Clang).
+- Rust (`rustup`, stable `cargo`). Every build needs it.
+- Go 1.24 or later. The Saturn stages and Maria need it.
+- `xxd` (Maria's voice), `7z` (PSP), `bchunk` (Saturn), `ffmpeg` with the ATRAC3plus decoder (voice sets).
+- Python 3 with Pillow (with FreeType and libraqm), PyYAML and numpy:
+  `sudo apt install python3-pil python3-yaml python3-numpy libraqm0`.
+  Check: `python3 -c "from PIL import features; print(features.check('freetype2'), features.check('raqm'))"` prints `True True`.
+- For the Linux build: the X11 or Wayland development packages that SDL3 needs
+  (see the SDL3 documentation; SDL is built from `tools/psyz/external/SDL`).
+
+For the Switch build you also need:
+
+- [devkitPro](https://devkitpro.org/wiki/Getting_Started) with `switch-dev`, `switch-mesa` and `switch-libdrm_nouveau`
+  (`sudo dkp-pacman -S switch-dev switch-mesa switch-libdrm_nouveau`).
+- The devkitPro fork of SDL3, branch `switch-sdl-3.4`, with the patch from this repository:
+
+  ```sh
+  git clone -b switch-sdl-3.4 https://github.com/devkitPro/SDL.git ~/SDL-switch
+  git -C ~/SDL-switch am "$PWD/tools/sdl-switch/0001-switch-SetWindowSize-uses-the-pending-size.patch"
+  ```
+
+  Run the second command from the root of this repository.
+
+## How the parts fit
+
+```mermaid
+flowchart LR
+    subgraph discs[Your discs]
+        PS1[PS1 US<br>sotn.us.cue + .bin]
+        PSP[PSP EU<br>sotn.pspeu.iso]
+        SAT[Saturn JP<br>sotn.saturn.cue + .bin]
+    end
+    PS1 -->|make extract_disk| US[disks/us]
+    PSP -->|make extract_disk VERSION=pspeu| PSPD[disks/pspeu]
+    SAT -->|make extract-disk VERSION=saturn| SATD[disks/saturn]
+    US -->|make extract| ASSETS[assets/]
+    US & ASSETS & PSPD & SATD --> CMAKE[CMake build<br>pcdata, Maria, Saturn stages, uk pack]
+    CMAKE --> PC[build/pc/sotn<br>+ build/pc/data]
+    CMAKE --> NRO[build/switch/sotn.nro<br>+ build/switch/data]
+    NRO -->|copy to the SD card| SD[/switch/sotn-native/]
+```
+
+## Build, step by step
+
+### 1. Get the source
+
+```sh
+git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-native.git
+cd sotn-native
+```
+
+### 2. Put the discs in `disks/`
+
+- PS1: the `.cue` file and its `.bin` tracks. Rename the cue file to `disks/sotn.us.cue`.
+  The `FILE` lines in the cue must point at the `.bin` files (relative to `disks/`).
+- PSP: `disks/sotn.pspeu.iso`.
+- Saturn: `disks/sotn.saturn.bin` and `disks/sotn.saturn.cue`.
+
+### 3. Extract the discs
+
+```sh
+make extract_disk                       # PS1 -> disks/us
+make extract_disk VERSION=pspeu         # PSP -> disks/pspeu (optional)
+make extract-disk VERSION=saturn        # Saturn -> disks/saturn (optional)
+make python-dependencies                # Python tools of sotn-decomp, in .venv
+make extract                            # PS1 assets -> assets/
+```
+
+The PSP step needs only these files from the image:
+`PSP_GAME/USRDIR/res/ps/PSPBIN/dra.bin`, `maria.bin` and `res/ps/snd_e/SE/sd_mar2.spk`.
+
+### 4. Build for PC (Linux)
+
+```sh
+cmake -S . -B build/pc -G Ninja -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl \
+      -DENABLE_SATURN_STAGES=ON
+cmake --build build/pc
+```
+
+- Leave out `-DENABLE_SATURN_STAGES=ON` if you have no Saturn disc.
+- Maria is switched on by itself when `disks/pspeu/.../maria.bin` exists (`-DUSE_PLAYER_MARIA=OFF` to switch her off).
+- Optional: `-DSOTN_CHARSEL_ART=<folder>` with your own portraits for the character select screen
+  (`alucard.webp`, `richter.webp`, `maria_psp.png`, `maria_psx.png`). A missing file uses the Saturn portrait.
+- `make pc` is a short way to build with the default options.
+
+Run it:
+
+```sh
+build/pc/sotn
+```
+
+The game reads its files from `build/pc/data` (a copy of `disks/us`, plus the Saturn stages).
+Settings: `build/pc/sotn --ini sotn.ini` reads and writes a settings file (see "Settings").
+
+### 5. Build for Nintendo Switch
+
+```sh
+export DEVKITPRO=/opt/devkitpro
+cmake -S . -B build/switch -G Ninja \
+      -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/cmake/Switch.cmake -DCMAKE_BUILD_TYPE=Release \
+      -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl -DPSYZ_SDL_DIR=$HOME/SDL-switch \
+      -DENABLE_SATURN_STAGES=ON
+cmake --build build/switch
+```
+
+The result is `build/switch/sotn.nro`. The same optional settings as for PC apply.
+
+### 6. Install on the Switch
+
+The port uses its own folder, `/switch/sotn-native/`, on the SD card:
+
+| Path on the SD card | What | From |
+|---|---|---|
+| `/switch/sotn-native/sotn.nro` | The program | `build/switch/sotn.nro` |
+| `/switch/sotn-native/data/` | The game files | `build/switch/data/` (all of it) |
+| `/switch/sotn-native/data/ST/<STAGE>/F_<STAGE>.BIN` | Saturn stitched rooms (only with Saturn stages) | `build/switch/saturn_stitches/disks/us/ST/` (copy over `data/ST/`) |
+| `/switch/sotn-native/voice/jp/`, `voice/psp/` | Voice sets (optional) | see "Voice sets" |
+| `/switch/sotn-native/sotn.ini` | Settings | written by the game at the first start |
+
+The game also writes these files there: `sotn-xa.cue` (music; it points at `data/SD/XA_STR1`),
+`sotn.log`, `sotn.prev.log`, `sotn.out.log` and the memory cards `bu00/` and `bu10/`.
+No other files are needed. Start the port from the homebrew menu.
+
+## Settings (`sotn.ini`)
+
+The game writes the file with the default values when it is missing.
+The port menu changes most of them in the game. A missing key keeps its default.
+
+| Key | Values | Default | Effect |
+|---|---|---|---|
+| `scale` | 1 to 8 | 3 | Integer pixel scale of the 16:9 view. |
+| `voice` | `ps1`, `jp`, `psp` | `ps1` | Voice set. `jp` and `psp` need the clips in `voice/`; a missing clip plays the PS1 voice. |
+| `language` | `en`, `uk` | `en` | Language. A change needs a restart. `uk` without the pack shows English. |
+| `buttons` | `switch`, `xbox`, `psx` | `switch` on Switch, `xbox` on PC | The button icons in the menus. |
+| `jp_cards` | `extra`, `jp`, `off` | `extra` | The two JP familiar cards: added next to the US items, in the JP/PSP places, or not at all. Read at start. |
+| `relic_toggle` | `modern`, `stock` | `modern` | The picture of the relic switch. |
+| `spawn` | a name, or empty | empty | Test start point: `np3-stage15-door`, `marble-soul`, `caverns-soul`, `reverse-trapdoor-underground`, `reverse-marble-soul`, `reverse-caverns-soul`. |
+| `cheat_refill` | 0, 1 | 0 | HP, MP and hearts stay full. |
+| `cheat_invincible` | 0, 1 | 0 | Hits do nothing. |
+| `cheat_walls` | 0, 1 | 0 | Mist form passes every wall and does not end. |
+| `cheat_items` | 0, 1 | 0 | All weapons, items and relics. |
+| `cheat_map` | 0, 1 | 0 | The whole map of both castles. |
+| `cheat_skip_prologue` | 0, 1 | 0 | A new game starts as Alucard at the castle gate. |
+| `cheat_character` | 0, 1, 2, 4 | 0 | Who plays a loaded save: 0 the game's rule, 1 Alucard, 2 Richter, 4 Maria. |
+| `editor` | 0, 1 | 0 | Tile editor page on port 8080. No password: use it only on a trusted network. |
+| `overlay` | 0, 1 | 0 | A corner shows the stage, the room and the cheats. |
+| `fps` | 0, 1 | 0 | A corner shows the frames per second. |
+
+The key `aspect` of old files is ignored: the view is always 16:9.
+Saturn stages and Maria are build options, not settings. Rumble is always on (Switch).
+
+## Voice sets
+
+`tools/voicepack/extract_voice.py` makes `voice/jp/` and `voice/psp/` from the PSP image.
+It needs two manifest files that map each sound to a clip in the image.
+The manifests are not in this repository yet, so the voice sets cannot be made from it alone.
+Without them the game uses the PS1 voices.
+
+## Ukrainian language
+
+The text, fonts and the drawn labels are in `tools/lang/` (see `tools/lang/FORMAT.md`).
+The pack is made at build time. It also needs three local inputs:
+`SOTN_LANG_XBLA` (the translation workspace), `SOTN_LANG_PICORIPI` (the
+`castlevania_sotn_xbla` plugin folder of [Picoripi](https://github.com/rashevskyv/Picoripi))
+and `SOTN_LANG_MEDIA` (the files of the Ukrainian Xbox 360 mod).
+The workspace and the mod files are not public yet. Without them the build has English only.
+
+## Credits
+
+- [sotn-decomp](https://github.com/Xeeynamo/sotn-decomp): Luciano Ciccariello (Xeeynamo) and all its contributors. See [README.upstream.md](README.upstream.md) for the tools they thank.
+- [psyz](https://github.com/Xeeynamo/psyz) by Xeeynamo (MIT), with SDL (libsdl.org) and cimgui.
+- sotn-vita by artesanalintelligence: the PC data templates (`tools/pcdata`), the boss links and the static module scheme of psyz.
+- sotn-ultimate: the Saturn stages and the Saturn character select screen are ported from its translation of the Saturn code.
+- devkitPro and its SDL fork for the Switch.
+- [Alegreya Sans](https://github.com/huertatipografica/Alegreya-Sans) by The Alegreya Sans Project Authors (SIL Open Font License 1.1, `tools/lang/fonts/OFL-AlegreyaSans.txt`).
+- Picoripi: the Ukrainian translation tool.
+
+Castlevania and Symphony of the Night are trademarks of Konami. This project is not affiliated with Konami.
+
+## Licence
+
+GNU Affero General Public License v3 (see [LICENSE](LICENSE)), like sotn-decomp.
+Submodules and fonts keep their own licences.
