@@ -220,6 +220,19 @@ int Main(int argc, char* argv[]) {
         return -1;
     }
     Lang_Init();
+    {
+        // HD pictures: loose PNG files, the language folder before common
+        extern int g_Lang, g_HdTextures, g_HdDump;
+        fprintf(stderr, "[hd] settings: hd_textures %d hd_dump %d\n",
+                g_HdTextures, g_HdDump);
+        if (g_HdTextures) {
+            Psyz_HdTexAddDir(g_Lang ? "data/textures/uk" : "data/textures/en");
+            Psyz_HdTexAddDir("data/textures/common");
+        }
+        if (g_HdDump) {
+            Psyz_HdTexDump("data/textures/dump");
+        }
+    }
     Buttons_Update();
     MainGame();
     ResetGame();

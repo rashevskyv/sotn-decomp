@@ -147,10 +147,22 @@ static const char ini_editor[] =
     "; (http://<console address>:8080/ in a PC browser on the same network).\n"
     "; No password: switch it on only on a trusted network.\n";
 
+int g_HdTextures = 1; // data/textures PNG files replace pictures
+int g_HdDump;         // write the sampled pictures to data/textures/dump
+
+static const char ini_hd[] =
+    "\n"
+    "; hd_textures: 1 = PNG files in data/textures/<language>/ and\n"
+    "; data/textures/common/ replace pictures; 0 = the original pictures.\n"
+    "; hd_dump: 1 = write every picture the game draws to data/textures/dump/\n"
+    "; (for artists; slow; stock art: do not share the files).\n";
+
 static const struct {
     const char* key;
     int* value;
 } ini_flags[] = {
+    {"hd_textures", &g_HdTextures},
+    {"hd_dump", &g_HdDump},
     {"cheat_refill", &g_Cheat.refill},
     {"cheat_invincible", &g_Cheat.invincible},
     {"cheat_walls", &g_Cheat.walls},
@@ -212,6 +224,8 @@ void Wide_SaveIni(void) {
     fprintf(f, "editor = %d\n", g_EditorOn);
     fputs(ini_overlay, f);
     fprintf(f, "overlay = %d\nfps = %d\n", g_OverlayOn, g_FpsOn);
+    fputs(ini_hd, f);
+    fprintf(f, "hd_textures = %d\nhd_dump = %d\n", g_HdTextures, g_HdDump);
     fclose(f);
 }
 
@@ -220,7 +234,8 @@ void Wide_SaveIni(void) {
 // buttons = auto|psx|xbox|switch (missing: auto), key_<button> and
 // pad_<button> = <input name> (IniInput),
 // jp_cards = extra|jp|off, relic_toggle = modern|stock,
-// spawn = <spawn point name>, cheat_* = 0|1 (cheat_character 0..2, 4), editor, overlay, fps = 0|1.
+// spawn = <spawn point name>, cheat_* = 0|1 (cheat_character 0..2, 4), editor, overlay, fps = 0|1,
+// hd_textures = 0|1 (missing: 1), hd_dump = 0|1.
 // A missing key keeps its default (cheats, editor, overlay and fps off).
 // The view is always 16:9: the aspect key of an old file does nothing.
 void Wide_LoadIni(const char* path) {
