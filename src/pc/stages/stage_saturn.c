@@ -695,6 +695,30 @@ static bool SaturnStageRenderNativeLayers(void) {
 #endif
     return true;
 }
+
+// g_PcStageNativeLayer: the planes SaturnStageRenderNativeLayers draws
+static const PcNativeLayer* SaturnStageNativePlane(int layer) {
+    static PcNativeLayer out;
+    SaturnStageNativeLayer* native;
+
+    if (layer < 0 || layer >= SATURN_STAGE_NATIVE_LAYERS || !s_NativeReady ||
+        s_NativeRoom != SaturnStageCurrentRoom()) {
+        return NULL;
+    }
+    native = &s_NativeLayers[layer];
+    out = (PcNativeLayer){
+        .map = &native->map[2],
+        .chars = (const u8*)native->chars,
+        .palettes = native->palettes,
+        .tpages = native->tpages,
+        .cluts = native->cluts,
+        .w = native->width,
+        .h = native->height,
+        .pages = native->pageCount,
+        .paletteCount = native->paletteCount,
+    };
+    return &out;
+}
 #endif
 
 #ifndef SATURN_STAGE_ROOM_TEST
@@ -1121,6 +1145,7 @@ void Psyz_ModuleStart(void* param) {
     s_NativeReady = false;
     s_GameOverDisk = false;
     g_PcStageLayerRenderer = SaturnStageRenderNativeLayers;
+    g_PcStageNativeLayer = SaturnStageNativePlane;
 #endif
 }
 
