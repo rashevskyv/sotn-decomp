@@ -86,7 +86,7 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
     const char* actorName;
     char ch;
 
-    actorName = actor_names[DRAW_NAME_ACTOR_INDEX];
+    actorName = LANG_CELL(actor_names[DRAW_NAME_ACTOR_INDEX]);
     chCount = 0;
     while (true) {
         ch = *actorName++;
@@ -112,7 +112,7 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
     // Fill prims to render the actor name on screen
     prim = &g_PrimBuf[primIndex];
     g_Dialogue.primIndex[1] = primIndex;
-    actorName = actor_names[DRAW_NAME_ACTOR_INDEX];
+    actorName = LANG_CELL(actor_names[DRAW_NAME_ACTOR_INDEX]);
     x = 0x38;
     while (prim != NULL) {
         ch = *actorName++;

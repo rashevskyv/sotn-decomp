@@ -375,7 +375,7 @@ void EntityCutscene(Entity* self) {
         rect.w = 2;
         rect.h = 8;
         vCoord = (g_Dialogue.nextCharY * 0xC) + 0x180;
-        MoveImage(&rect, g_Dialogue.nextCharX, vCoord);
+        LANG_DIALOGUE_GLYPH(&rect, g_Dialogue.nextCharX, vCoord);
         g_Dialogue.nextCharX += 2;
         break;
     case 2:

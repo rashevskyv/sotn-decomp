@@ -2,6 +2,7 @@
 #include "rbo2.h"
 #include "sfx.h"
 
+#ifndef VERSION_PC
 INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", EntityBreakable);
 
 INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", func_us_8019A98C_from_rcen);
@@ -13,6 +14,9 @@ INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", func_801CDC80);
 INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", func_us_8019B52C);
 
 INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", func_us_8019C718);
+#else
+#include "unk_1B284_pc.h"
+#endif
 
 extern EInit D_us_801804AC;
 extern u8 D_us_80180708[];
@@ -345,6 +349,7 @@ void func_us_8019C924(Entity* self) {
     }
 }
 
+#ifndef VERSION_PC
 INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", func_us_8019D4CC);
 
 INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", func_us_8019D950);
@@ -377,6 +382,7 @@ INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", polarPlacePartsList);
 INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", func_us_8019D260_from_rcen);
 
 INCLUDE_ASM("boss/rbo2/nonmatchings/unk_1B284", func_us_8019F260);
+#endif
 
 extern EInit g_EInitInteractable;
 extern s32 g_BossMgrState;

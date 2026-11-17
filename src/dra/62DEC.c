@@ -258,7 +258,7 @@ static s32 HandleSaveMenu(s32 arg0) {
             }
             if (D_80137E4C == 6) {
 #if REGION != REGION_JP
-                func_800F9D88("Data saved．", 0, 1);
+                func_800F9D88(LANG_SJIS("Data saved．"), 0, 1);
 #elif TARGET != TARGET_PSP
                 func_800F9D40("セーブしました　　　", 0, 1);
 #elif TARGET == TARGET_PSP

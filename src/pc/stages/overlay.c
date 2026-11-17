@@ -27,8 +27,11 @@ static bool LoadOverlay(PsyzModule* current, const char* name, void* o) {
 }
 
 static PsyzModule CurrentStageOverlay;
+s32 g_StageMusicId;
 bool LoadStageOverlay(const char* name, Overlay* o) {
     g_PcStageLayerRenderer = NULL;
+    g_WideBandTop = g_WideBandBottom = 0; // a Saturn module sets its band
+    g_StageMusicId = 0;                   // and its music
     if (!LoadOverlay(&CurrentStageOverlay, name, o)) {
         return false;
     }

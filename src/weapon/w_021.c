@@ -12,6 +12,11 @@ extern u16* g_WeaponCluts[];
 #include "gen/w_021_1.h"
 #include "gen/w_021_2.h"
 #define g_Animset w_021_1
+
+#ifdef VERSION_PC
+_Static_assert(offsetof(ET_Food, foodId) == offsetof(ET_Weapon, equipId),
+               "foodId must alias the equipId that DRA writes");
+#endif
 #define g_Animset2 w_021_2
 #include "sfx.h"
 
@@ -175,6 +180,7 @@ void func_97000_8017AB54(u8* str, u8 lowerLeft) {
             xpos += 8;
         }
     }
+    Wide_MoveCornerText(g_unkGraphicsStruct.BottomCornerTextPrims, lowerLeft);
     g_unkGraphicsStruct.BottomCornerTextTimer = 0x130;
 }
 
@@ -463,7 +469,7 @@ s32 func_ptr_80170004(Entity* self) {
             g_api.PlaySfx(SFX_ITEM_PICKUP);
             temp_s1 = g_api.equipDefs[upperParams].name;
             g_api.AddToInventory(upperParams, EQUIP_HAND);
-            func_97000_8017AB54(temp_s1, 1);
+            func_97000_8017AB54((u8*)temp_s1, 1);
             DestroyEntity(self);
             return;
         }
@@ -522,7 +528,7 @@ s32 func_ptr_80170004(Entity* self) {
             g_api.PlaySfx(SFX_ITEM_PICKUP);
             temp_s1 = g_api.equipDefs[upperParams].name;
             g_api.AddToInventory(upperParams, EQUIP_HAND);
-            func_97000_8017AB54(temp_s1, 1);
+            func_97000_8017AB54((u8*)temp_s1, 1);
             DestroyEntity(self);
         }
         break;

@@ -126,7 +126,11 @@ s8 g_KeyStatus[SPU_VOICE_NUM];
 s32 D_80138F7C;
 s16 D_80138F80;
 STATIC_PAD_BSS(2);
+#ifdef PLATFORM_PSYZ
+u_long* g_SeqPointers[10]; // holds addresses: pointer-sized
+#else
 s32 g_SeqPointers[10];
+#endif
 s16 g_SfxRingBufferReadPos;
 STATIC_PAD_BSS(2);
 DebugMode g_DebugMode;

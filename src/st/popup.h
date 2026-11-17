@@ -193,5 +193,6 @@ void BottomCornerText(u8* str, u8 leftAlign) {
         }
 #endif
     }
+    Wide_MoveCornerText(g_unkGraphicsStruct.BottomCornerTextPrims, leftAlign);
     g_unkGraphicsStruct.BottomCornerTextTimer = 0x130;
 }

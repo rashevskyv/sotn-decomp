@@ -632,12 +632,21 @@ void StoreSaveData(SaveData* save, s32 block, s32 cardIcon) {
     dst->info.cardIcon = cardIcon;
     dst->info.stage = g_StageId;
     dst->info.endGameFlags = g_GameClearFlag;
+#ifdef PLATFORM_PSYZ
+    // save guard: the cheat CHARACTER does not change who owns the save
+    dst->info.character =
+        g_CheatSaveChar >= 0 ? g_CheatSaveChar : g_PlayableCharacter;
+#else
     dst->info.character = g_PlayableCharacter;
+#endif
     dst->info.nRoomsExplored = g_RoomCount;
     dst->info.roomX = g_Tilemap.left;
     dst->info.roomY = g_Tilemap.top;
     dst->info.saveSize = sizeof(SaveData);
     *dstStatus = g_Status;
+#ifdef USE_PLAYER_MARIA
+    Maria_SaveStash(&dstStatus->subWeapon, &dstStatus->D_80097C40);
+#endif
     *dstNav = g_MenuNavigation;
     *dstSettings = g_Settings;
 
@@ -671,11 +680,22 @@ s32 ApplySaveData(SaveData* save) {
     g_StageId = savePtr->info.stage;
     g_GameClearFlag = savePtr->info.endGameFlags;
     g_PlayableCharacter = savePtr->info.character;
+#ifdef PLATFORM_PSYZ
+    // cheat CHARACTER: another character plays, the save keeps its own
+    g_CheatSaveChar = g_PlayableCharacter;
+    g_PlayableCharacter = Cheat_Character(g_PlayableCharacter);
+#ifdef USE_PLAYER_MARIA
+    Maria_ResetStash();
+#endif
+#endif
     g_RoomCount = savePtr->info.nRoomsExplored;
     g_Tilemap.left = savePtr->info.roomX;
     g_Tilemap.top = savePtr->info.roomY;
 
     g_Status = *srcStatus;
+#if defined(PLATFORM_PSYZ) && defined(USE_PLAYER_MARIA)
+    Maria_SyncStash(); // the cheat CHARACTER plays: the owner's values wait
+#endif
 #ifdef CLOCK_BUGFIX
     g_TimerCopyHours = g_Status.timerHours;
     g_TimerCopyMinutes = g_Status.timerMinutes;

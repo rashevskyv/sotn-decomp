@@ -115,6 +115,10 @@ static u16 g_testCollEnemyLookup[] = {
 
 #endif
 
+// the Saturn stages' enemies (ids 400 on) have no bestiary entry
+#define COLL_ENEMY_LOOKUP(id)                                                  \
+    ((id) < LEN(g_testCollEnemyLookup) ? g_testCollEnemyLookup[id] : 0)
+
 static u8 g_testCollLuckCutoff[] = {0x00, 0x40, 0x20, 0x10};
 
 static u8 g_testColluCoords[] = {
@@ -401,7 +405,7 @@ void HitDetection(void) {
                 CreateEntityFromEntity(E_SOUL_STEAL_ORB, entity, otherEntity);
             }
         }
-        miscVar1 = g_testCollEnemyLookup[entityHit->enemyId];
+        miscVar1 = COLL_ENEMY_LOOKUP(entityHit->enemyId);
         if (miscVar1) {
             miscVar1--;
             miscVar3 = 1 << (miscVar1 & 7);
@@ -623,7 +627,7 @@ void HitDetection(void) {
                                 miscVar3 = ITEMDROP_TURQUOISE;
                             } else {
                                 miscVar1 =
-                                    g_testCollEnemyLookup[entityHit->enemyId];
+                                    COLL_ENEMY_LOOKUP(entityHit->enemyId);
                             }
                         } else if (miscVar3 & 0x20) {
                             miscVar3 = enemyDef->uncommonItemId;

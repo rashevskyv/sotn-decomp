@@ -70,12 +70,14 @@ void Update(void) {
                 x = e->posX.i.hi;
                 y = e->posY.i.hi;
                 if (UPDATE_FLAGS & FLAG_DESTROY_IF_BARELY_OUT_OF_CAMERA) {
-                    if (x < -64 || x > 320 || y < -64 || y > 288) {
+                    if (x < -64 - WIDE_X || x > 320 + WIDE_X ||
+                        y < -64 - WIDE_Y || y > 288 + WIDE_Y) {
                         DestroyEntity(e);
                         continue;
                     }
                 } else {
-                    if (x < -128 || x > 384 || y < -128 || y > 352) {
+                    if (x < -128 - WIDE_X || x > 384 + WIDE_X ||
+                        y < -128 - WIDE_Y || y > 352 + WIDE_Y) {
                         DestroyEntity(e);
                         continue;
                     }
@@ -105,16 +107,18 @@ void Update(void) {
 #if VERSION < VER_BETA_MAD
             if (e->flags & FLAG_UNK_20000000) {
                 if (!(e->flags & FLAG_UNK_10000000)) {
-                    if (e->posX.i.hi < -64 || e->posX.i.hi > 320 ||
-                        e->posY.i.hi < -64 || e->posY.i.hi > 288) {
+                    if (e->posX.i.hi < -64 - WIDE_X ||
+                        e->posX.i.hi > 320 + WIDE_X ||
+                        e->posY.i.hi < -64 - WIDE_Y ||
+                        e->posY.i.hi > 288 + WIDE_Y) {
                         continue;
                     }
                 }
             }
 #else
             if ((flags & FLAG_UNK_20000000) && !(flags & FLAG_UNK_10000000)) {
-                if (e->posX.i.hi < -64 || e->posX.i.hi > 320 ||
-                    e->posY.i.hi < -64 || e->posY.i.hi > 288) {
+                if (e->posX.i.hi < -64 - WIDE_X || e->posX.i.hi > 320 + WIDE_X ||
+                    e->posY.i.hi < -64 - WIDE_Y || e->posY.i.hi > 288 + WIDE_Y) {
                     continue;
                 }
             }

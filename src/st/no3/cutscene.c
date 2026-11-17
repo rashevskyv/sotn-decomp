@@ -789,7 +789,7 @@ void EntityCutscene(Entity* self) {
         };
         D_pspeu_09299818 = nextChar;
 #elif VERSION == VER_US
-        MoveImage(&rect, g_Dialogue.nextCharX, vCoord);
+        LANG_DIALOGUE_GLYPH(&rect, g_Dialogue.nextCharX, vCoord);
         g_Dialogue.nextCharX += 2;
 #endif
         break;

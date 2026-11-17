@@ -15,6 +15,8 @@
 #define SFX_START (0x600)
 #if TARGET == TARGET_PSP
 #define SFX_LAST (0x90B)
+#elif defined(USE_PLAYER_MARIA)
+#define SFX_LAST (0x8F5) // PC: up to SFX_VO_MAR_DEATH (sound_data.c)
 #else
 #define SFX_LAST (0x8E0)
 #endif
@@ -606,7 +608,13 @@ extern Equipment* g_EquipDefs;
 extern RelicDesc g_RelicDefs[30];
 extern SpellDef g_SpellDefs[28];
 extern const char* g_MenuStr[110];
+#ifdef ENABLE_SATURN_STAGES
+// 400-429: the Saturn stages' enemies (src/pc/stages/stage_saturn.c)
+#define SATURN_ENEMY_DEFS_END 430
+extern EnemyDef g_EnemyDefs[SATURN_ENEMY_DEFS_END];
+#else
 extern EnemyDef g_EnemyDefs[400];
+#endif
 extern Accessory g_AccessoryDefs[90];
 extern Equipment g_EquipDefs[217];
 #endif

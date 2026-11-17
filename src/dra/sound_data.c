@@ -22,7 +22,23 @@ XaMusicConfig g_XaMusicConfigs[] = {
 
 Unkstruct_800BF554 g_SfxData[] = {
 #include GEN_VERSION(sfx_config.h)
+#ifdef USE_PLAYER_MARIA
+// PC: PSP Maria's voices SFX_VO_MAR_8E6..SFX_VO_MAR_DEATH. Her bank
+// (tools/maria-sfx, from sd_mar2.spk) is vab 1 while she plays, in the
+// place of Richter's (pl_maria.c). 0x8E1..0x8E5 are unused.
+#define MAR_VO(i)                                                              \
+    {1, 1 + (i) / 8, 60, (i) == 15 ? 124 : 127, 0, ((i) % 8) * 2,             \
+     (i) == 15 ? 90 : 80}
+    {0}, {0}, {0}, {0}, {0},
+    MAR_VO(0), MAR_VO(1), MAR_VO(2), MAR_VO(3), MAR_VO(4), MAR_VO(5),
+    MAR_VO(6), MAR_VO(7), MAR_VO(8), MAR_VO(9), MAR_VO(10), MAR_VO(11),
+    MAR_VO(12), MAR_VO(13), MAR_VO(14), MAR_VO(15),
+#undef MAR_VO
+#endif
 };
+#ifdef USE_PLAYER_MARIA
+STATIC_ASSERT(LEN(g_SfxData) == SFX_LAST - SFX_START + 1, "sfx table size");
+#endif
 
 s8 D_800C097C[] = {0x00, 0x00, 0x3C, 0x00, 0x3C, 0x01, 0x00, 0x00, 0x38, 0x00,
                    0x78, 0x08, 0x00, 0x00, 0x3A, 0x00, 0x32, 0x01, 0xFF, 0x00};

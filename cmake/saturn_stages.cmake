@@ -12,11 +12,14 @@ option(SATURN_STAGE_ENTITY_LABELS
 
 enable_testing()
 
+# The other arguments are the stage's own sources (src/st/<name>/*.c)
 function(add_saturn_stage name source music test_stage)
     set(disc "${CMAKE_SOURCE_DIR}/disks/saturn")
     string(TOUPPER "${name}" upper)
-    set(asset_dir "${SOTN_RUNTIME_DATA_DIR}/ST/${upper}")
-    add_overlay(${name} src/pc/stages/stage_saturn.c)
+    # Host folder for the converter output. On Switch SOTN_RUNTIME_DATA_DIR
+    # is the sdmc: path on the console: only the define below uses it.
+    set(asset_dir "${CMAKE_BINARY_DIR}/data/ST/${upper}")
+    add_overlay(${name} src/pc/stages/stage_saturn.c ${ARGN})
     set(outputs
         "${asset_dir}/conversion-report.json"
         "${asset_dir}/saturn_stage_data.h"
@@ -59,7 +62,7 @@ function(add_saturn_stage name source music test_stage)
     add_dependencies(${PROJECT_NAME} ${name}_pc_assets)
     add_dependencies(${name} ${name}_pc_assets)
     target_compile_definitions(${name} PRIVATE
-        SATURN_STAGE_ASSET_DIR="${asset_dir}"
+        SATURN_STAGE_ASSET_DIR="${SOTN_RUNTIME_DATA_DIR}/ST/${upper}"
         SATURN_STAGE_NATIVE_8X8)
     target_include_directories(${name} PRIVATE "${asset_dir}")
     if(SATURN_STAGE_ENTITY_LABELS)
@@ -81,7 +84,49 @@ function(add_saturn_stage name source music test_stage)
     add_test(NAME ${name}_rooms COMMAND ${name}_room_test)
 endfunction()
 
-add_saturn_stage(stage15 STAGE_15 SD25 TEST_STAGE15)
+# Underground Garden: the PS1 stage framework (create_entity, collision,
+# st_update) runs the Saturn enemies; gdn_entities.py converts their sprites,
+# palettes and enemy records from the disc into the build folder
+set(SATURN_GDN_SOURCES
+    src/st/stage15/bss.c
+    src/st/stage15/collision.c
+    src/st/stage15/create_entity.c
+    src/st/stage15/d_prize_drops.c
+    src/st/stage15/e_breakable.c
+    src/st/stage15/e_collect.c
+    src/st/stage15/e_init.c
+    src/st/stage15/e_misc.c
+    src/st/stage15/e_particles.c
+    src/st/stage15/e_room_bg.c
+    src/st/stage15/popup.c
+    src/st/stage15/prim_helpers.c
+    src/st/stage15/st_common.c
+    src/st/stage15/st_update.c)
+add_saturn_stage(stage15 STAGE_15 SD25 TEST_STAGE15 ${SATURN_GDN_SOURCES})
+find_program(SATURN_GDN_PYTHON python3)
+if(NOT SATURN_GDN_PYTHON)
+    message(FATAL_ERROR "python3 is required to convert the Saturn enemies")
+endif()
+set(gdn_dir "${CMAKE_BINARY_DIR}/data/ST/STAGE15")
+set(gdn_disc "${CMAKE_SOURCE_DIR}/disks/saturn")
+add_custom_command(
+    OUTPUT "${gdn_dir}/gdn_entities.h" "${gdn_dir}/gdn_defs.h"
+    COMMAND ${SATURN_GDN_PYTHON} -B
+            "${CMAKE_SOURCE_DIR}/tools/saturn/entities/gdn_entities.py"
+            "${gdn_disc}" "${gdn_dir}/gdn_entities.h"
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/saturn/entities/gdn_entities.py"
+        "${CMAKE_SOURCE_DIR}/tools/saturn/entities/saturn_sprites.py"
+        "${gdn_disc}/STAGE_15.PRG"
+        "${gdn_disc}/STAGE_15.CHR"
+        "${gdn_disc}/0.BIN"
+        "${gdn_disc}/GAME.PRG"
+    VERBATIM
+    COMMENT "Converting the Saturn Underground Garden enemies")
+add_custom_target(stage15_gdn_assets
+    DEPENDS "${gdn_dir}/gdn_entities.h" "${gdn_dir}/gdn_defs.h")
+add_dependencies(stage15 stage15_gdn_assets)
+target_compile_definitions(stage15 PRIVATE SATURN_STAGE_GDN)
 add_saturn_stage(stage16 STAGE_16 SD26 TEST_STAGE16)
 add_saturn_stage(rstage15 RSTAGE15 SD29 TEST_RSTAGE15)
 add_saturn_stage(rstage16 RSTAGE16 SD2C TEST_RSTAGE16)

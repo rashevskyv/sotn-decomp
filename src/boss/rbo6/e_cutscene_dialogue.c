@@ -45,7 +45,8 @@ static s16 D_us_8018087C[] = {
     0x001D, 0x000A, 0x0035, 0x0010, 0x001B, 0x003D, 0x0017, 0x002E, 0x000B,
     0x0049, 0x0042, 0x003D, 0x002A, 0x0001, 0x000C, 0x001B, 0x0034, 0x0041,
     0x0035, 0x0008, 0x000E, 0x004D, 0x0011, 0x0034, 0x0041, 0x0029, 0x0048};
-static const char* actor_names[] = {_S("Alucard"), _S("Dracula")};
+// not static: cutscene_actor_name.h above declares it extern
+const char* actor_names[] = {_S("Alucard"), _S("Dracula")};
 
 // Externs
 extern u8* cutscene_1;
@@ -395,7 +396,7 @@ void EntityCutscene(Entity* self) {
         rect.w = 2;
         rect.h = 8;
         vCoord = (g_Dialogue.nextCharY * 0xC) + 0x180;
-        MoveImage(&rect, g_Dialogue.nextCharX, vCoord);
+        LANG_DIALOGUE_GLYPH(&rect, g_Dialogue.nextCharX, vCoord);
         g_Dialogue.nextCharX += 2;
         break;
     case 2:

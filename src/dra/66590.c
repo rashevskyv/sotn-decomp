@@ -130,6 +130,10 @@ u16 g_CharBuffer[0x42]; // needs  more space on PC
 u16 g_CharBuffer[0x30];
 #endif
 
+#ifdef PLATFORM_PSYZ
+#include "../../tools/lang/uk/bios_glyphs_uk.h"
+#endif
+
 u16 g_SjisPages[] = {
 #if !IS_VER_INTL
     '踪',   '眷', '翔', '彷', '徨', '苺', '獰', '賤', '贄',
@@ -145,6 +149,9 @@ u16 g_SjisPages[] = {
 #endif
 #if VERSION == VER_JP12
     '顰',
+#endif
+#ifdef PLATFORM_PSYZ
+    UK_SJIS_PAGES, // the Ukrainian letters with no Shift-JIS code
 #endif
 };
 
@@ -359,6 +366,9 @@ u8 g_CustomGlyphs[][30] = {
         0x00, 0x00, // □□□□□□□□□□□□□□□□
     },
 #endif
+#ifdef PLATFORM_PSYZ
+    UK_CUSTOM_GLYPHS,
+#endif
 };
 // LUT of ceil(index / 2)
 u16 D_800AC934[] = {0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8};
@@ -368,6 +378,32 @@ u16 D_800AC934[] = {0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8};
     x >>= 1
 
 void* Krom2RawAdd(int sjiscode);
+#ifdef PLATFORM_PSYZ
+// The Ukrainian glyphs are designed at 12 columns and stored as 16 with the
+// middle column of each triple doubled (d0 d1 d1 d2). The stock squeeze below
+// blends 4 source columns into 3 with 4 shades, so a doubled column leaks a
+// grey shadow into both neighbours. The Xbox 360 port shows each triple as
+// c0, c1|c2, c3 in one shade: draw these glyphs the same way, so the screen
+// shows the design. The nibble order is the one of the stock loop.
+static const u16 uk_pages[] = {UK_SJIS_PAGES};
+static void SharpRows(const u8* bitmap) {
+    u16* dst = g_CharBuffer;
+    u16 t[4][3];
+    s32 i, g, nib;
+
+    for (i = 0; i < 15; i++, bitmap += 2) {
+        for (g = 0; g < 4; g++) {
+            nib = (bitmap[g >> 1] >> ((g & 1) * 4)) & 0xF; // b0 = bit 0
+            t[g][0] = (nib & 1) * 4;
+            t[g][1] = (nib & 6) ? 4 : 0;
+            t[g][2] = (nib >> 3) * 4;
+        }
+        *dst++ = t[0][2] << 0xC | t[1][0] << 8 | t[1][1] << 4 | t[1][2];
+        *dst++ = t[3][1] << 0xC | t[3][2] << 8 | t[0][0] << 4 | t[0][1];
+        *dst++ = t[2][0] << 0xC | t[2][1] << 8 | t[2][2] << 4 | t[3][0];
+    }
+}
+#endif
 u16* func_80106A28(u16 ch, u16 kind) {
     u8* bitmap;
     u16* srcPtr;
@@ -380,7 +416,16 @@ u16* func_80106A28(u16 ch, u16 kind) {
 
     // Krom2RawAdd returns a pointer to 30 bytes: 15 rows of 2 bytes for a
     // bitmap of size 16x15.
+#ifdef PLATFORM_PSYZ
+    // under language = uk, the owner's serif design of the Cyrillic letters
+    u8* sharp;
+    bitmap = sharp = (u8*)Lang_Glyph(ch);
+    if (!bitmap) {
+        bitmap = (u8*)Krom2RawAdd(ch);
+    }
+#else
     bitmap = (u8*)Krom2RawAdd(ch);
+#endif
     if (bitmap == (u8*)-1) {
         // If the BIOS doesn't contain the character, look up a custom glyph
         srcPtr = g_SjisPages;
@@ -393,6 +438,11 @@ u16* func_80106A28(u16 ch, u16 kind) {
             ch = 0x819A; // Use ★ when a character is not found
             bitmap = (u8*)Krom2RawAdd(ch);
         }
+#ifdef PLATFORM_PSYZ
+        if (ch >= UK_SJIS_FIRST && ch < UK_SJIS_FIRST + LEN(uk_pages)) {
+            sharp = bitmap; // a private Ukrainian letter (bios_glyphs_uk.h)
+        }
+#endif
     }
 
     srcPtr = g_CharBuffer;
@@ -448,6 +498,11 @@ u16* func_80106A28(u16 ch, u16 kind) {
         bitmap++;
     }
 
+#ifdef PLATFORM_PSYZ
+    if (sharp) {
+        SharpRows(sharp);
+    }
+#endif
     destPtr = g_CharBuffer;
     srcPtr = g_CharBuffer;
     switch (kind) {

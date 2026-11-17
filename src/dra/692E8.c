@@ -425,6 +425,11 @@ static void CheckStageCollision(s32 isTransformed) {
         if (mist && g_Player.colFloor[i].effects & EFFECT_MIST_ONLY) {
             g_Player.colFloor[i].effects = EFFECT_NONE;
         }
+#ifdef PLATFORM_PSYZ
+        if (mist && g_Cheat.walls) {
+            g_Player.colFloor[i].effects = EFFECT_NONE;
+        }
+#endif
         if (PLAYER.step == Player_MorphBat || PLAYER.step == Player_MorphMist) {
             if (g_Player.colFloor[i].effects &
                 (EFFECT_SOLID_FROM_ABOVE | EFFECT_SOLID_FROM_BELOW)) {
@@ -452,6 +457,11 @@ static void CheckStageCollision(s32 isTransformed) {
         if (mist && g_Player.colCeiling[i].effects & EFFECT_MIST_ONLY) {
             g_Player.colCeiling[i].effects = EFFECT_NONE;
         }
+#ifdef PLATFORM_PSYZ
+        if (mist && g_Cheat.walls) {
+            g_Player.colCeiling[i].effects = EFFECT_NONE;
+        }
+#endif
         if (PLAYER.step == Player_MorphBat || PLAYER.step == Player_MorphMist) {
             if (g_Player.colCeiling[i].effects &
                 (EFFECT_SOLID_FROM_ABOVE | EFFECT_SOLID_FROM_BELOW)) {
@@ -474,6 +484,11 @@ static void CheckStageCollision(s32 isTransformed) {
         if (mist && g_Player.colWall[i].effects & EFFECT_MIST_ONLY) {
             g_Player.colWall[i].effects = EFFECT_NONE;
         }
+#ifdef PLATFORM_PSYZ
+        if (mist && g_Cheat.walls) {
+            g_Player.colWall[i].effects = EFFECT_NONE;
+        }
+#endif
     }
     CheckWallRight();
     CheckWallLeft();
@@ -1024,7 +1039,12 @@ specialmove:
 #endif
 
         if (g_unkGraphicsStruct.D_8009744C == 0) {
+#ifdef PLATFORM_PSYZ
+            // a warp asks for mist: the same checks as the mist button
+            if ((CHECK_SHOULDER(BTN_MIST) || g_CheatMistRequest) &&
+#else
             if (CHECK_SHOULDER(BTN_MIST) &&
+#endif
                 (HandleTransformationMP(FORM_MIST, CHECK_ONLY) == 0) &&
                 (PLAYER.step == Player_Stand || PLAYER.step == Player_Walk ||
                  PLAYER.step == Player_Crouch || PLAYER.step == Player_Fall ||
@@ -1034,6 +1054,9 @@ specialmove:
                  (PLAYER.step == Player_MorphBat && PLAYER.step_s) ||
                  (PLAYER.step == Player_MorphWolf && PLAYER.step_s &&
                   PLAYER.step_s != 8))) {
+#ifdef PLATFORM_PSYZ
+                g_CheatMistRequest = 0;
+#endif
                 func_80109328();
                 SetPlayerStep(Player_MorphMist);
                 PlaySfx(SFX_TRANSFORM_LOW);

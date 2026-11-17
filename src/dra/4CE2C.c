@@ -35,6 +35,125 @@ typedef struct {
     /* 0x30 */ RECT rect;
 } TilemapRenderer;
 
+#ifdef PLATFORM_PSYZ
+static s32 ClampTile(s32 t, s32 n) { return t < 0 ? 0 : t >= n ? n - 1 : t; }
+
+// The cells of the wide view outside the room (or layer). The loops below
+// skip them, as on the PS1. bg 0 is the foreground, 1 is bg layer 0: those
+// two take tiles from the apron patch (src/pc/apron.c). A cell the patch
+// does not cover, or a layer without a patch, repeats the nearest edge tile
+// of the layer: rock walls look right, an open doorway at the edge smears.
+static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
+                      s32 startTx, s32 startTy, s32 subX, s32 subY) {
+    s32 i, j, tx, ty, x0, y0;
+    u16 tile, clut;
+
+    if (!WIDE_COLS && !WIDE_ROWS) {
+        return;
+    }
+    y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
+    for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS; i++, y0 += TILE_SIZE) {
+        ty = startTy + i;
+        x0 = r->x - subX - WIDE_COLS * TILE_SIZE;
+        for (j = -WIDE_COLS; j < N_HORIZ_TILES + WIDE_COLS;
+             j++, x0 += TILE_SIZE) {
+            tx = startTx + j;
+            if (tx >= 0 && tx < r->roomTileWidth && ty >= 0 &&
+                ty < r->roomTileHeight) {
+                continue;
+            }
+            tile = bg <= 1 ? Apron_Tile(bg, tx, ty) : 0xFFFF;
+            if (tile == 0xFFFF) {
+                tile = layout[ClampTile(ty, r->roomTileHeight) *
+                                  r->roomTileWidth +
+                              ClampTile(tx, r->roomTileWidth)];
+            }
+            if (tile == 0 || tile >= 0x1000 || g_GpuUsage.sp16 >= MAXSPRT16) {
+                continue;
+            }
+            clut = g_ClutIds[r->clut[tile]];
+            if (r->clutAlt) {
+                clut = g_ClutIds[0x100 + r->clut[tile]];
+            }
+            sp16->clut = clut;
+            sp16->x0 = x0;
+            sp16->y0 = y0;
+            sp16->u0 = (u8)(r->gfx[tile] << 4);
+            sp16->v0 = r->gfx[tile] & 0xF0;
+            setSemiTrans(sp16, r->isSemiTrans);
+            setShadeTex(sp16, true);
+            *r->sp16 = *sp16;
+            addPrim(r->order + r->page[tile] + r->ot, r->sp16);
+            r->sp16++;
+            g_GpuUsage.sp16++;
+        }
+    }
+}
+
+// A backdrop one screen wide (or high) behind a larger room. On the PS1 it
+// fills the 256x240 view and stays still; a repeat or an edge column looks
+// wrong, so stretch it over the wide view, one quad per tile.
+static bool StretchBackdrop(TilemapRenderer* r, BgLayer* bg) {
+    s32 sx = WIDE_X && bg->w == 1 && g_Tilemap.hSize > 1;
+    s32 sy = WIDE_Y && bg->h == 1 && g_Tilemap.vSize > 1;
+    s32 vw = DISP_STAGE_W + 2 * WIDE_X, vh = DISP_STAGE_H + 2 * WIDE_Y;
+    s32 tx, ty, x, y, xa, xb, ya, yb;
+    u16 tile, tpage;
+    u8 u, v;
+    POLY_GT4* p; // a GT4 slot stays GT4: menu and map code reuse it
+
+    if ((!sx && !sy) || (r->flags & LAYER_WRAP_BG)) {
+        return false;
+    }
+    for (ty = 0; ty < r->roomTileHeight; ty++) {
+        y = ty * TILE_SIZE - bg->scrollY.i.hi;
+        ya = sy ? y * vh / DISP_STAGE_H - WIDE_Y : y;
+        yb = sy ? (y + TILE_SIZE) * vh / DISP_STAGE_H - WIDE_Y : y + TILE_SIZE;
+        if (yb <= -WIDE_Y || ya >= DISP_STAGE_H + WIDE_Y) {
+            continue;
+        }
+        for (tx = 0; tx < r->roomTileWidth; tx++) {
+            x = tx * TILE_SIZE - bg->scrollX.i.hi;
+            xa = sx ? x * vw / DISP_STAGE_W - WIDE_X : x;
+            xb = sx ? (x + TILE_SIZE) * vw / DISP_STAGE_W - WIDE_X
+                    : x + TILE_SIZE;
+            tile = bg->layout[ty * r->roomTileWidth + tx];
+            if (xb <= -WIDE_X || xa >= DISP_STAGE_W + WIDE_X || tile == 0 ||
+                g_GpuUsage.gt4 >= MAX_POLY_GT4_COUNT) {
+                continue;
+            }
+            u = r->gfx[tile] << 4;
+            v = r->gfx[tile] & 0xF0;
+            tpage = r->page[tile] + 8 + r->tpage;
+            if (r->flags & LAYER_TPAGE_ALT) {
+                tpage += 0x80;
+            }
+            p = &g_CurrentBuffer->polyGT4[g_GpuUsage.gt4++];
+            setPolyGT4(p);
+            setSemiTrans(p, r->isSemiTrans);
+            setShadeTex(p, true);
+            setRGB0(p, 0x80, 0x80, 0x80);
+            setRGB1(p, 0x80, 0x80, 0x80);
+            setRGB2(p, 0x80, 0x80, 0x80);
+            setRGB3(p, 0x80, 0x80, 0x80);
+            p->x0 = p->x2 = xa + r->x;
+            p->x1 = p->x3 = xb + r->x;
+            p->y0 = p->y1 = ya + r->y;
+            p->y2 = p->y3 = yb + r->y;
+            // u8: the last texel column (row) of a page ends at 0xFF
+            p->u0 = p->u2 = u;
+            p->u1 = p->u3 = u == 0xF0 ? 0xFF : u + TILE_SIZE;
+            p->v0 = p->v1 = v;
+            p->v2 = p->v3 = v == 0xF0 ? 0xFF : v + TILE_SIZE;
+            p->tpage = tpage;
+            p->clut = g_ClutIds[r->clut[tile] + (r->clutAlt ? 0x100 : 0)];
+            addPrim(r->order + r->page[tile] + r->ot, p);
+        }
+    }
+    return true;
+}
+#endif
+
 void RenderTilemap(void) {
     s32 i, j;
     s32 l;
@@ -97,9 +216,10 @@ void RenderTilemap(void) {
                 r->isSemiTrans = true;
                 r->tpage = r->flags & LAYER_TPAGE_ID;
             }
-            y0 = r->y - subY;
-            for (i = 0; i < N_VERTI_TILES; i++, y0 += TILE_SIZE) {
-                x0 = r->x - subX;
+            y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
+            for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS;
+                 i++, y0 += TILE_SIZE) {
+                x0 = r->x - subX - WIDE_COLS * TILE_SIZE;
                 ty = startTy + i;
                 if (ty < 0) {
                     continue;
@@ -109,14 +229,20 @@ void RenderTilemap(void) {
                 }
                 row = ty * r->roomTileWidth;
                 r->tiles = &t->fg[startTx + row];
-                for (j = 0, tx = startTx; j < N_HORIZ_TILES; j++,
-                    x0 += TILE_SIZE, tx++) {
+                for (j = -WIDE_COLS, tx = startTx - WIDE_COLS;
+                     j < N_HORIZ_TILES + WIDE_COLS; j++, x0 += TILE_SIZE, tx++) {
                     if (tx < 0) {
                         continue;
                     }
                     if (tx >= r->roomTileWidth) {
                         break;
                     }
+#ifdef PLATFORM_PSYZ
+                    if (WIDE_COLS) {
+                        // the skip above does not move the pointer
+                        r->tiles = &t->fg[tx + row];
+                    }
+#endif
 
                     tile = *r->tiles++;
                     if (tile == 0) {
@@ -145,6 +271,9 @@ void RenderTilemap(void) {
                     g_GpuUsage.sp16++;
                 }
             }
+#ifdef PLATFORM_PSYZ
+            ApronPass(r, sp16, 0, t->fg, startTx, startTy, subX, subY);
+#endif
 
             for (i = 0; i < 24; i++) {
                 if (g_GpuUsage.drawModes >= MAX_DRAW_MODES) {
@@ -192,9 +321,15 @@ void RenderTilemap(void) {
             r->isSemiTrans = true;
             r->tpage = r->flags & LAYER_TPAGE_ID;
         }
-        y0 = r->y - subY;
-        for (i = 0; i < N_VERTI_TILES; i++, y0 += TILE_SIZE) {
-            x0 = r->x - subX;
+#ifdef PLATFORM_PSYZ
+        if (StretchBackdrop(r, bg)) {
+            goto draw_modes;
+        }
+#endif
+        y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
+        for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS;
+             i++, y0 += TILE_SIZE) {
+            x0 = r->x - subX - WIDE_COLS * TILE_SIZE;
             ty = startTy + i;
             if (r->flags & LAYER_WRAP_BG) {
                 ty &= TILE_SIZE - 1;
@@ -207,8 +342,8 @@ void RenderTilemap(void) {
             }
             row = ty * r->roomTileWidth;
             r->tiles = &bg->layout[startTx + row];
-            for (j = 0, tx = startTx; j < N_HORIZ_TILES; j++, x0 += TILE_SIZE,
-                tx++) {
+            for (j = -WIDE_COLS, tx = startTx - WIDE_COLS;
+                 j < N_HORIZ_TILES + WIDE_COLS; j++, x0 += TILE_SIZE, tx++) {
                 if (r->flags & LAYER_WRAP_BG) {
                     tx &= 0xF;
                     r->tiles = &bg->layout[tx + row];
@@ -219,6 +354,11 @@ void RenderTilemap(void) {
                 if (tx >= r->roomTileWidth) {
                     break;
                 }
+#ifdef PLATFORM_PSYZ
+                if (WIDE_COLS) {
+                    r->tiles = &bg->layout[tx + row];
+                }
+#endif
 
                 tile = *r->tiles++;
                 if (tile == 0) {
@@ -247,6 +387,12 @@ void RenderTilemap(void) {
                 g_GpuUsage.sp16++;
             }
         }
+#ifdef PLATFORM_PSYZ
+        if (!(r->flags & LAYER_WRAP_BG)) {
+            ApronPass(r, sp16, l + 1, bg->layout, startTx, startTy, subX, subY);
+        }
+    draw_modes:
+#endif
         for (i = 0; i < 24; i++) {
             if (g_GpuUsage.drawModes >= MAX_DRAW_MODES) {
                 break;
@@ -329,4 +475,7 @@ void LoadRoomLayer(s32 layerIndex) {
     for (i = 1; i < MAX_BG_LAYER_COUNT; i++) {
         g_BgLayers[i].flags = 0;
     }
+#ifdef PLATFORM_PSYZ
+    Apron_OnRoomLayer(layerIndex);
+#endif
 }

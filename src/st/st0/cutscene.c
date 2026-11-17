@@ -188,6 +188,8 @@ static u8 SetCutsceneScript(u8* script) {
     Primitive* prim;
     s16 firstPrimIndex;
 
+    script = LANG_SCRIPT(script); // the rebuilt Ukrainian script
+
     firstPrimIndex = g_api.AllocPrimitives(PRIM_SPRT, 8);
     g_Dialogue.primIndex[2] = firstPrimIndex;
     if (firstPrimIndex == -1) {
@@ -760,7 +762,7 @@ void EntityCutscene(Entity* self) {
         };
         buffer_2 = nextByte;
 #else
-        MoveImage(&rect, g_Dialogue.nextCharX, vCoord);
+        LANG_DIALOGUE_GLYPH(&rect, g_Dialogue.nextCharX, vCoord);
         g_Dialogue.nextCharX += 2;
 #endif
         break;

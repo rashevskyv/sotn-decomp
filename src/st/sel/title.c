@@ -169,6 +169,62 @@ const char D_801A7B80[] = "ステージセレクト";
 const char D_801A7B80[] = "SELECT ！！";
 #endif
 
+#ifdef PLATFORM_PSYZ
+#include <psyz/video.h>
+
+// The wide view gives the title a canvas larger than 512x240 (src/pc/wide.c).
+// The background stretches to the whole canvas, the logo stays centred, the
+// KONAMI line keeps its gap to the bottom and PRESS START (and the sound
+// mode option) moves down by half of that. Runs every frame after the step
+// code, so it follows dock changes and the colours the step code just set.
+static void TitleFillCanvas(void) {
+    PsyzRect a = Psyz_VideoGetDrawArea();
+    s32 w = a.ex - a.sx, ty = -a.sy, i;
+    Primitive* prim;
+
+    if (g_GameEngineStep == 0 || g_GameEngineStep == 5 || w <= 0) {
+        return;
+    }
+    prim = &g_PrimBuf[D_801BB010];
+    for (i = 0; prim != NULL; prim = prim->next, i++) {
+        if (i < 3) { // PRESS START BUTTON
+#if REGION == REGION_JP
+            prim->y0 = 0xA0 + ty / 2;
+#else
+            prim->y0 = 0xA8 + ty / 2;
+#endif
+        } else if (i < 7) { // KONAMI line
+            prim->y0 = 0xD6 + ty;
+        } else if (i < 11) { // background: four strips over the whole canvas
+            prim->type = PRIM_GT4;
+            prim->x0 = prim->x2 = a.sx + (i - 7) * w / 4;
+            prim->x1 = prim->x3 = a.sx + (i - 6) * w / 4;
+            prim->y0 = prim->y1 = a.sy;
+            prim->y2 = prim->y3 = a.ey;
+            prim->u0 = prim->u2 = 0;
+            prim->u1 = prim->u3 = 0x80;
+            prim->v0 = prim->v1 = 0;
+            prim->v2 = prim->v3 = 0xF0;
+            // a sprite has one colour: give the quad's corners vertex 0's
+            prim->r1 = prim->r2 = prim->r3 = prim->r0;
+            prim->g1 = prim->g2 = prim->g3 = prim->g0;
+            prim->b1 = prim->b2 = prim->b3 = prim->b0;
+        } else if (i == 15) { // leaf shadow, bottom right corner
+            prim->x0 = a.ex - 0xFF;
+            prim->y0 = a.ey - 0x90;
+        } else if (i == 16) { // leaf shadow, top left corner
+            prim->x0 = a.sx;
+            prim->y0 = a.sy;
+        }
+#if VERSION >= VER_JP12
+        else if (i >= 17) { // MONO / STEREO
+            prim->y0 = soundModeSprites[i - 17][1] + ty / 2;
+        }
+#endif
+    }
+}
+#endif
+
 void HandleTitleScreen(void) {
     Primitive* prim;
     Primitive* prim15;
@@ -594,6 +650,9 @@ void HandleTitleScreen(void) {
             g_StageId = STAGE_MEMORYCARD;
             g_GameEngineStep = 5;
         }
+#ifdef PLATFORM_PSYZ
+        TitleFillCanvas();
+#endif
         return;
 #if VERSION >= VER_JP12
     // allow selecting between MONO and STEREO when pressing SELECT
@@ -639,4 +698,7 @@ void HandleTitleScreen(void) {
         break;
 #endif
     }
+#ifdef PLATFORM_PSYZ
+    TitleFillCanvas();
+#endif
 }

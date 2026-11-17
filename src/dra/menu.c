@@ -47,6 +47,23 @@ static s32 D_80137954;
 static s32 prevMusicId;
 static s32 g_ServantPrevious;
 
+#ifdef PLATFORM_PSYZ
+// 0 or 0xRRGGBB: MenuDrawImg tints the cells it draws (texel * colour / 0x80)
+static u32 g_MenuTint;
+#define MENU_TINT(rgb) (g_MenuTint = (rgb))
+// The stat bonus sign: the drawn arrow cells of the menu font atlas, or the
+// stock + and - when the atlas is off (no language pack)
+#define STAT_SIGN(up)                                                          \
+    (LANG_MENU_FONT_ON() ? ((up) ? MENU_CELL_UP : MENU_CELL_DOWN)              \
+                         : ((up) ? CH('+') : CH('-')))
+// The status page in the layout of the PSP version: STPOS(ps1, psp)
+#define STPOS(ps1, psp) (psp)
+#else
+#define MENU_TINT(rgb)
+#define STAT_SIGN(up) ((up) ? CH('+') : CH('-'))
+#define STPOS(ps1, psp) (ps1)
+#endif
+
 extern s32 g_PrevEquippedWeapons[2];
 
 const char* D_800A2D48[] = {
@@ -91,6 +108,14 @@ static const char* D_800A2D68[] = {
     "\x02\x03\x04\xFF",
 #endif
 };
+#ifdef PLATFORM_PSYZ
+// src/pc/lang.c: the status page labels of another language
+void Lang_SetStatusLabels(const char* glyphs, const char* att, const char* def) {
+    D_800A2D64 = glyphs;
+    D_800A2D68[0] = att;
+    D_800A2D68[1] = def;
+}
+#endif
 #elif TARGET != TARGET_PSP
 static const char* D_800A2D10 = "装備技システム短剣必殺使攻撃力防";
 
@@ -608,6 +633,14 @@ void MenuDrawImg(MenuContext* ctx, s32 x, s32 y, s32 w, u32 h, s32 u, s32 v,
         sp->r0 = c;
         sp->g0 = c;
         sp->b0 = c;
+#ifdef PLATFORM_PSYZ
+        if (g_MenuTint) {
+            SetShadeTex(sp, 0);
+            sp->r0 = g_MenuTint >> 16;
+            sp->g0 = g_MenuTint >> 8;
+            sp->b0 = g_MenuTint;
+        }
+#endif
         sp->clut = g_ClutIds[clut];
         AddPrim(&ot[otIdx], sp);
         g_GpuUsage.sp++;
@@ -709,6 +742,50 @@ void func_800F5E68(MenuContext* ctx, s32 cursorIdx, s32 x, s32 y, s32 w, s32 h,
     MenuDrawRect(ctx, x, y + (cursorIdx * (h + yGap)), w, h, r, 0, 0);
 }
 
+#ifdef PLATFORM_PSYZ
+// The relic window and the info bar under it are 416 wide, centred on
+// the 384 frame (x -16..400: the menu has the 16:9 canvas, Wide_OnFrame).
+// Left column names are up to 132 px (texels 0..131), right ones 120
+// (132..251, func_800F99B8), in both languages.
+// uk: «Карта носатого демона» (RELIC_LONG) is 172, so it takes its texture
+// row alone and «Серце Влада» (RELIC_LONG + 1) goes to the free row 11 of
+// page 6 (y 0x88).
+#define RELIC_LONG 24
+#define RELIC_LONG_W 0xB0
+#define RELIC_SPARE_Y 0x88
+#define RELIC_WIN_X (-16)
+#define RELIC_WIN_W 416
+#define RELIC_X0 RELIC_WIN_X
+#define RELIC_COL 224
+#define RELIC_U 0x84
+#define RELIC_W(i)                                                             \
+    (g_Lang && (i) == RELIC_LONG ? RELIC_LONG_W                                \
+     : !((i) & 1)                ? 0x84                                        \
+                                 : 0x78)
+// the info bar as wide as the relic window while the relic page is up
+extern MenuContextInit g_MenuInit[NUM_MENU];
+static void RelicInfoBar(int wide) {
+    MenuContext* bar = &g_Menus[MENU_DG_INFO_BAR];
+    bar->cursorX = bar->unk1.x =
+        wide ? RELIC_WIN_X : g_MenuInit[MENU_DG_INFO_BAR].cursorX;
+    bar->cursorW = bar->unk1.w =
+        wide ? RELIC_WIN_W : g_MenuInit[MENU_DG_INFO_BAR].cursorW;
+}
+// the relic under the cursor (jp_cards = off skips relics 23 and 24)
+#if SKIP_JP_RELICS
+#define RELIC_CUR                                                              \
+    (g_MenuNavigation.cursorRelic +                                            \
+     (JP_RELICS_HIDDEN && g_MenuNavigation.cursorRelic >= 23 ? 2 : 0))
+#else
+#define RELIC_CUR g_MenuNavigation.cursorRelic
+#endif
+#else
+#define RELIC_CUR g_MenuNavigation.cursorRelic
+#define RELIC_X0 0
+#define RELIC_COL 0xB0
+#define RELIC_U 0x78
+#define RELIC_W(i) 0x78
+#endif
 void DrawRelicsMenu(MenuContext* ctx) {
     s32 ctx_h;
     s32 switchFadeLevel;
@@ -723,9 +800,9 @@ void DrawRelicsMenu(MenuContext* ctx) {
     relic = g_Status.relics;
 #if VERSION >= VER_US
     for (i = 0, var_s3 = 0; i < 30; i++, var_s3++, relic++) {
-#if REGION != REGION_JP
+#if SKIP_JP_RELICS
         // Skips rendering of the JP-exclusive familiars (sprite and nosedevil)
-        if (i == 23) {
+        if (JP_RELICS_HIDDEN && i == 23) {
             i += 2;
             relic += 2;
         }
@@ -737,7 +814,7 @@ void DrawRelicsMenu(MenuContext* ctx) {
     for (i = 0; i < 30; i++, relic++) {
 #define INDEXER i
 #endif
-        spriteX = (i & 1) * 0xB0;
+        spriteX = RELIC_X0 + (i & 1) * RELIC_COL;
         spriteY = (INDEXER / 2) * 0x13 + 0x22 + ctx_h;
         if (*relic & RELIC_FLAG_FOUND) {
             if (spriteY < 0) {
@@ -746,14 +823,21 @@ void DrawRelicsMenu(MenuContext* ctx) {
             if (spriteY > 0xC0) {
                 continue;
             }
+#ifdef PLATFORM_PSYZ
+            if (g_Lang && i == RELIC_LONG + 1) {
+                MenuDrawSprite(ctx, spriteX + 0x38, spriteY, RELIC_W(i), 0x10,
+                               0, func_800F548C(RELIC_SPARE_Y), 0x1A1, 6, 1, 0,
+                               0);
+            } else
+#endif
             if ((i & 2) == 0) {
-                MenuDrawSprite(
-                    ctx, spriteX + 0x38, spriteY, 0x78, 0x10, (i & 1) * 0x78,
-                    func_800F548C(i / 4 + 0x80), 0x1A1, 6, 1, 0, 0);
+                MenuDrawSprite(ctx, spriteX + 0x38, spriteY, RELIC_W(i), 0x10,
+                               (i & 1) * RELIC_U, func_800F548C(i / 4 + 0x80),
+                               0x1A1, 6, 1, 0, 0);
             } else {
-                MenuDrawSprite(
-                    ctx, spriteX + 0x38, spriteY, 0x78, 0x10, (i & 1) * 0x78,
-                    func_800F548C(i / 4 + 3), 0x1A1, 7, 1, 0, 0);
+                MenuDrawSprite(ctx, spriteX + 0x38, spriteY, RELIC_W(i), 0x10,
+                               (i & 1) * RELIC_U, func_800F548C(i / 4 + 3),
+                               0x1A1, 7, 1, 0, 0);
             }
         }
         // Determine the U value for the texture to use for the switch
@@ -782,14 +866,18 @@ void DrawRelicsMenu(MenuContext* ctx) {
                        INDEXER == g_MenuNavigation.cursorRelic, 0x40, 0);
     }
     spriteY = (g_MenuNavigation.cursorRelic / 2) * 0x13 + 0x22 + ctx_h;
-    MenuDrawRect(ctx, ((g_MenuNavigation.cursorRelic & 1) * 0xB0) + 8,
-                 spriteY - 1, 0xA8, 0x12, 0x60, 0, 0);
+    MenuDrawRect(ctx,
+                 RELIC_X0 + ((g_MenuNavigation.cursorRelic & 1) * RELIC_COL) + 8,
+                 spriteY - 1, RELIC_W(RELIC_CUR) + 0x30,
+                 0x12, 0x60, 0, 0);
 #undef INDEXER
 }
 
 void MenuDrawAlucardPortrait(MenuContext* ctx) {
-    MenuDrawSprite(ctx, 0x10, 0x24, 0x40, 0x40, 0, 0x80, 0x150, 0x9C, 1, 0, 0);
-    MenuDrawSprite(ctx, 0x10, 0x64, 0x40, 0x20, 0, 0xC0, 0x150, 0x9C, 0, 0, 1);
+    MenuDrawSprite(
+        ctx, 0x10, 0x24, 0x40, 0x40, 0, 0x80, 0x150, 0x9C, 1, 0, 0);
+    MenuDrawSprite(
+        ctx, 0x10, 0x64, 0x40, 0x20, 0, 0xC0, 0x150, 0x9C, 0, 0, 1);
 }
 
 // Equivalent of floor(number * .75)
@@ -836,6 +924,41 @@ void func_800F6508(MenuContext* ctx, s32 x, s32 y) {
     MenuDrawRect(ctx, x, y, 0x70, 0xB, yellow, yellow, 0);
 }
 
+#ifdef PLATFORM_PSYZ
+// An untextured quad: corners top left, top right, bottom left, bottom right;
+// rgb0 on the left two, rgb1 on the right two (a bar's gradient, a triangle
+// when the right two meet)
+static void MenuDrawQuad(MenuContext* ctx, s32 x0, s32 y0, s32 x1, s32 y1,
+                         s32 x2, s32 y2, s32 x3, s32 y3, u32 rgb0, u32 rgb1) {
+    OT_TYPE* ot = g_CurrentBuffer->ot;
+    POLY_G4* poly = &g_CurrentBuffer->polyG4[g_GpuUsage.g4];
+    s32 otIdx = ctx->otIdx + 1;
+
+    setSemiTrans(poly, 0);
+    setShadeTex(poly, 0);
+    poly->x0 = x0;
+    poly->y0 = y0;
+    poly->x1 = x1;
+    poly->y1 = y1;
+    poly->x2 = x2;
+    poly->y2 = y2;
+    poly->x3 = x3;
+    poly->y3 = y3;
+    if (!ScissorPolyG4(poly, ctx)) {
+        poly->r0 = poly->r2 = rgb0 >> 16;
+        poly->g0 = poly->g2 = rgb0 >> 8;
+        poly->b0 = poly->b2 = rgb0;
+        poly->r1 = poly->r3 = rgb1 >> 16;
+        poly->g1 = poly->g3 = rgb1 >> 8;
+        poly->b1 = poly->b3 = rgb1;
+        AddPrim(&ot[otIdx], poly);
+        g_GpuUsage.g4++;
+        func_800F53D4(0, otIdx);
+    }
+}
+
+#endif
+
 // Draw main menu cursor
 void func_800F6568(MenuContext* ctx) {
     s32 height;
@@ -847,9 +970,20 @@ void func_800F6568(MenuContext* ctx) {
     } else {
         r = 0x5F - (g_Timer & 0x1F);
     }
+#ifdef PLATFORM_PSYZ
+    // the bar 2 px inside the list box, rows of 14 from y + 3, and a yellow
+    // triangle at its left (the status page, MenuDrawStatusPage)
+    // (in one OT slot the prim added last is drawn first: the triangle first)
+    height = ctx->cursorY + 3 + g_MenuNavigation.cursorMain * 14;
+    MenuDrawQuad(ctx, ctx->cursorX + 4, height + 3, ctx->cursorX + 9,
+                 height + 7, ctx->cursorX + 4, height + 12, ctx->cursorX + 9,
+                 height + 7, 0xFAD85A, 0xFAD85A);
+    MenuDrawRect(ctx, ctx->cursorX + 2, height, ctx->cursorW - 4, 14, r, 0, 0);
+#else
     MenuDrawRect(ctx, ctx->cursorX,
                  ctx->cursorY + (g_MenuNavigation.cursorMain * height),
                  ctx->cursorW, height, r, 0, 0);
+#endif
 }
 
 // Draw equip menu cursor
@@ -893,7 +1027,15 @@ void func_800F66BC(
     }
 }
 
+// uk: the cells of the serif atlas are 8x11 and 3 rows taller (lang.c)
+#define MENU_FONT_TPAGE 0x1D
+
 void MenuDrawChar(char ch, s32 x, s32 y, MenuContext* ctx) {
+    if (LANG_MENU_FONT_ON()) {
+        MenuDrawImg(ctx, x, y - 3, 8, 11, (ch & 0xF) * 8, ((u8)ch >> 4) * 11,
+                    0x196, MENU_FONT_TPAGE, 1, 0);
+        return;
+    }
     MenuDrawImg(
         ctx, x, y, 8, 8, (ch & 0xF) * 8, (ch & 0xF0) >> 1, 0x196, 0x1E, 1, 0);
 }
@@ -939,7 +1081,7 @@ void MenuDrawStr(const char* str, s32 x, s32 y, MenuContext* ctx) {
         x += ChWidth;
     }
     D_80137614 = 1;
-    func_800F53D4(0x1E, ctx->otIdx + 2);
+    func_800F53D4(LANG_MENU_FONT_ON() ? MENU_FONT_TPAGE : 0x1E, ctx->otIdx + 2);
 }
 
 void MenuDrawInt(s32 number, s32 x, s32 y, MenuContext* ctx) {
@@ -970,6 +1112,21 @@ void func_800F6A48(void) {
 u8 g_ChButtons[] = {SQUARE,  CIRCLE,  CROSS,   TRIANGLE,
                     CH('R'), CH('L'), CH('R'), CH('L')};
 u8 g_ChButtons2[] = {CH('2'), CH('1'), CH('1'), CH('2')};
+
+#ifdef PLATFORM_PSYZ
+// port: the mark of PS button b (g_ChButtons order) in the button set of the
+// port menu, from the atlas rows under the cells (src/pc/buttons.c). Returns
+// its width with a 1 px gap, or 0 with no atlas: the stock marks then.
+static s32 MenuDrawButton(MenuContext* ctx, s32 b, s32 x, s32 y) {
+    s32 k = g_ButtonSet * BUTTON_MARKS + b;
+    if (!LANG_MENU_FONT_ON()) {
+        return 0;
+    }
+    MenuDrawImg(ctx, x, y - 3, 16, 11, (k & 7) * 16,
+                BUTTON_MARKS_V + (k >> 3) * 11, 0x196, MENU_FONT_TPAGE, 1, 0);
+    return Buttons_Width(b) + 1;
+}
+#endif
 
 char g_ChRgb[] = {CH('R'), CH('G'), CH('B')};
 
@@ -1134,6 +1291,12 @@ void MenuButtonConfigDraw(MenuContext* ctx) {
     for (i = 0, x = startX; i < 7; i++) {
         MenuDrawStr(g_MenuStr[i + 22], cursorX, 0x30 + i * 16, ctx);
         buttonId = g_Settings.buttonConfig[i];
+#ifdef PLATFORM_PSYZ
+        if (MenuDrawButton(
+                ctx, buttonId, XVAR + 0x30 + buttonId * 12, 0x30 + i * 16)) {
+            continue;
+        }
+#endif
         MenuDrawChar(g_ChButtons[buttonId], XVAR + 0x30 + (buttonId * 12),
                      0x30 + i * 16, ctx);
         if (buttonId >= 4) {
@@ -1283,6 +1446,303 @@ void MenuStatChangesDraw(void) {
     }
 }
 
+#ifdef PLATFORM_PSYZ
+// uk: РІВЕНЬ is a cell longer than LEVEL, so in the familiar list the level
+// number after it goes half of this right (the next column starts close by)
+#define LEVEL_NUM_DX (g_Lang ? 8 : 0)
+
+void MenuDrawLine(s32 x0, s32 y0, s32 x1, s32 y1, s32 isColorStatic);
+
+// a white box of the status page, w x h from x, y, drawn as a window border
+static void MenuDrawFrame(s32 x, s32 y, s32 w, s32 h) {
+    MenuDrawLine(x, y, x + w - 1, y, MENU_DG_BG + 1);
+    MenuDrawLine(x, y + h - 1, x + w - 1, y + h - 1, MENU_DG_BG + 1);
+    MenuDrawLine(x, y, x, y + h - 1, MENU_DG_BG + 1);
+    MenuDrawLine(x + w - 1, y, x + w - 1, y + h - 1, MENU_DG_BG + 1);
+}
+
+// The px width of a menu cell string, as MenuDrawStr draws it: 0xFF 0x00
+// ends it, 0xFF and a cell is a mark over the cell before it
+static s32 MenuStrWidth(const char* s) {
+    s32 w = 0;
+    u8 ch;
+    while (true) {
+        ch = *s++;
+        if (ch == 0xFF) {
+            ch = *s++;
+            if (ch == 0) {
+                break;
+            }
+            if (ch != 0xFF) {
+                continue;
+            }
+        }
+        w += 8;
+    }
+    return w;
+}
+
+// The status page of the port in the layout of Aria of Sorrow (the owner's
+// choice, 2026-11-16), in the BG window x 0..383 y 20..226. Coordinates are
+// the cell tops (MenuDrawStr draws a cell 3 rows above its y, so y = top + 3);
+// a value "ends at" x when its last cell ends there (MenuDrawInt: x - 8).
+// Every box has the same gap above its first row and under its last one.
+//   name (10,20); portrait frame (9,31)-(72,126); level (10,131)
+//   right panel (82,20)-(376,140): rows 26/38/50 HP MP hearts (values end at
+//     226; bars 238..370), status; dots 65; rows 71..107 STR CON INT LCK
+//     (end 226), attack (two hands), defense (end 370); dots 120; row 124
+//     exp, next
+//   main list (7,146)-(96,222), rows of 14 (g_MenuInit, func_800F8754)
+//   records (102,146)-(376,192): rows 151/164/177, two columns
+//   description (102,198)-(376,222): the line of the selected list item
+#define ST_RGB_HP TINT_HP    // the HP label and bar
+#define ST_RGB_MP 0x5070FF   // the MP label and bar
+#define ST_RGB_GOLD TINT_GOLD // the Gold label
+#define ST_RGB_DOTS 0x3C3C50 // the dotted lines
+#define ST_Y(top) ((top) + 3)
+
+// The port's own words of the status page: 0..5 ATT DEF STR CON INT LCK in
+// full, 6 Map, 7..11 the line of each main list item. uk: PORT 0..11 from
+// the pack; en: menu cells, made once from ASCII.
+const char* PortWord(int i) {
+    static const char* const en[] = {
+        "Attack",
+        "Defense",
+        "Strength",
+        "Constitution",
+        "Intelligence",
+        "Luck",
+        "Map",
+        "Set weapons, armor, accessories.",
+        "Spells and their button inputs.",
+        "Turn relics on or off.",
+        "Buttons, cloak, windows, sound.",
+        "Familiar levels and experience.",
+    };
+    static char cells[LEN(en)][34];
+    const char* ua = Lang_Port(i);
+    s32 j;
+
+    if (ua) {
+        return ua;
+    }
+    if (!cells[i][0]) {
+        for (j = 0; en[i][j]; j++) {
+            cells[i][j] = CH(en[i][j]);
+        }
+        cells[i][j] = 0xFF;
+    }
+    return cells[i];
+}
+
+// A g_MenuStr word of the status page in sentence case (Level, Gold, Poison).
+// uk: PORT 100 + row, which sotn_lang.py makes from the pack; en: the stock
+// cells once, the first letter A..Z and the rest a..z.
+static const char* Label(int row) {
+    static char cells[48][16];
+    const u8* s = (const u8*)g_MenuStr[row];
+    const char* ua = Lang_Port(100 + row);
+    s32 j, c;
+
+    if (ua) {
+        return ua;
+    }
+    if (!cells[row][0]) {
+        for (j = 0; s[j] != 0xFF && j < 15; j++) {
+            c = s[j];
+            if (j && c >= CH('A') && c <= CH('Z')) {
+                c += CH('a') - CH('A');
+            } else if (!j && c >= CH('a') && c <= CH('z')) {
+                c -= CH('a') - CH('A');
+            }
+            cells[row][j] = c;
+        }
+        cells[row][j] = 0xFF;
+    }
+    return cells[row];
+}
+
+// rgb times k / 256 per channel
+static u32 RgbScale(u32 rgb, s32 k) {
+    return ((rgb >> 16 & 0xFF) * k / 256) << 16 |
+           ((rgb >> 8 & 0xFF) * k / 256) << 8 | (rgb & 0xFF) * k / 256;
+}
+
+// A bar at x, y (133 x 7 with its frame): the part cur / max filled, dark
+// to bright, the rest dark
+static void MenuDrawBar(MenuContext* ctx, s32 x, s32 y, s32 cur, s32 max,
+                        u32 rgb) {
+    const s32 w = 131;
+    s32 f = max > 0 ? w * cur / max : 0;
+
+    f = cur > 0 && f < 1 ? 1 : f > w ? w : f;
+    MenuDrawFrame(x, y, w + 2, 7);
+    MenuDrawQuad(ctx, x + 1, y + 1, x + 1 + f, y + 1, x + 1, y + 6, x + 1 + f,
+                 y + 6, RgbScale(rgb, 154), RgbScale(rgb, 154 + 102 * f / w));
+    MenuDrawRect(ctx, x + 1 + f, y + 1, w - f, 5, 20, 20, 30);
+}
+
+// The dotted line from x0 to x1 at y: the dot row of the atlas (lang.c),
+// 128 texels a sprite; a dim line when the atlas is off
+static void MenuDrawDots(MenuContext* ctx, s32 x0, s32 x1, s32 y) {
+    s32 w;
+
+    if (!LANG_MENU_FONT_ON()) {
+        MenuDrawRect(ctx, x0, y, x1 - x0 + 1, 1, 60, 60, 80);
+        return;
+    }
+    MENU_TINT(ST_RGB_DOTS);
+    for (; x0 <= x1; x0 += w) {
+        w = x1 - x0 + 1 < 128 ? x1 - x0 + 1 : 128;
+        MenuDrawImg(ctx, x0, y, w, 1, 0, MENU_DOTS_V, 0x196, MENU_FONT_TPAGE,
+                    1, 0);
+    }
+    MENU_TINT(0);
+}
+
+// value / max at y: the value ends at 186, the '/' at 194, max at 226
+static void MenuDrawPair(MenuContext* ctx, s32 v, s32 max, s32 y) {
+    MenuDrawInt(v, 178, y, ctx);
+    MenuDrawChar(CH('/'), 186, y, ctx);
+    MenuDrawInt(max, 218, y, ctx);
+}
+
+static void MenuDrawStatusPage(MenuContext* ctx) {
+    s32 buttonCFG;
+    s32 x, y, i, h, v;
+
+    // the portrait, 62 x 94 of the stock 64 x 96, in its frame
+    MenuDrawSprite(ctx, 10, 32, 62, 63, 1, 0x81, 0x150, 0x9C, 1, 0, 0);
+    MenuDrawSprite(ctx, 10, 95, 62, 31, 1, 0xC0, 0x150, 0x9C, 0, 0, 1);
+    if (ctx->unk1C == 0) {
+        MenuDrawFrame(9, 31, 64, 96);
+        MenuDrawFrame(82, 20, 295, 121);
+        MenuDrawFrame(102, 146, 275, 47);
+        MenuDrawFrame(102, 198, 275, 25);
+    }
+    MenuDrawStr(g_MenuStr[IsAlucart() ? 42 : 0], 10, ST_Y(20), ctx);
+    MenuDrawStr(Label(8), 10, ST_Y(131), ctx);
+    MenuDrawInt(g_Status.level, 72, ST_Y(131), ctx);
+
+    // HP, MP (labels in the colour of their bars), hearts; the bars; the
+    // status word in the colour of the state
+    MENU_TINT(ST_RGB_HP);
+    MenuDrawStr(g_MenuStr[12], 90, ST_Y(26), ctx);
+    MENU_TINT(ST_RGB_MP);
+    MenuDrawStr(g_MenuStr[13], 90, ST_Y(38), ctx);
+    MENU_TINT(0);
+    MenuDrawStr(Label(14), 90, ST_Y(50), ctx);
+    MenuDrawPair(ctx, g_Status.hp, g_Status.hpMax, ST_Y(26));
+    MenuDrawPair(ctx, g_Status.mp, g_Status.mpMax, ST_Y(38));
+    MenuDrawPair(ctx, g_Status.hearts, g_Status.heartsMax, ST_Y(50));
+    MenuDrawBar(ctx, 238, 28, g_Status.hp, g_Status.hpMax, ST_RGB_HP);
+    MenuDrawBar(ctx, 238, 40, g_Status.mp, g_Status.mpMax, ST_RGB_MP);
+    MenuDrawStr(Label(15), 238, ST_Y(50), ctx);
+    i = 37;
+    if (g_Player.status & PLAYER_STATUS_CURSE) {
+        i = 40;
+    }
+    if (g_Player.status & PLAYER_STATUS_POISON) {
+        i = 38;
+    }
+    if (g_Player.status & PLAYER_STATUS_STONE) {
+        i = 39;
+    }
+    if (IsAlucart()) {
+        i = 45;
+    }
+    MENU_TINT(i == 38 ? 0x30FF30 : i == 40 ? 0x7020FF : i == 39 ? 0x606060 : 0);
+    MenuDrawStr(Label(i), 370 - MenuStrWidth(Label(i)), ST_Y(50), ctx);
+    MENU_TINT(0);
+    MenuDrawDots(ctx, 86, 372, 65);
+
+    // STR..LCK: the base, then the bonus as an arrow and a number (red up,
+    // blue down) ending at 226; with no bonus the base ends there
+    for (i = 0, y = ST_Y(71); i < 4; i++, y += 12) {
+        MenuDrawStr(PortWord(i + 2), 90, y, ctx);
+        v = g_Status.statsEquip[i];
+        MenuDrawInt(g_Status.statsBase[i], v ? 194 : 218, y, ctx);
+        if (v != 0) {
+            MENU_TINT(v > 0 ? TINT_BONUS_UP : TINT_BONUS_DOWN);
+            MenuDrawChar(STAT_SIGN(v > 0), 202, y, ctx);
+            MenuDrawInt(v > 0 ? v : -v, 218, y, ctx);
+            MENU_TINT(0);
+        }
+    }
+    // Attack: each hand's button mark (the set of the port menu, the live
+    // mapping) ending at 338 and its attack ending at 370; Defense
+    MenuDrawStr(PortWord(0), 238, ST_Y(71), ctx);
+    for (h = 0; h < 2; h++) {
+        y = ST_Y(71) + h * 12;
+        buttonCFG = g_Settings.buttonConfig[h];
+        if (MenuDrawButton(ctx, buttonCFG, 338 - Buttons_Width(buttonCFG), y)) {
+        } else if (buttonCFG < 4) {
+            MenuDrawChar(g_ChButtons[buttonCFG], 330, y, ctx);
+        } else {
+            MenuDrawChar(g_ChButtons[buttonCFG], 322, y, ctx);
+            MenuDrawChar(g_ChButtons2[buttonCFG - 4], 330, y, ctx);
+        }
+        MenuDrawInt(g_Status.attackHands[h], 362, y, ctx);
+    }
+    MenuDrawStr(PortWord(1), 238, ST_Y(95), ctx);
+    MenuDrawInt(g_Status.defenseEquip, 362, ST_Y(95), ctx);
+    MenuDrawDots(ctx, 86, 372, 120);
+    MenuDrawStr(Label(5), 90, ST_Y(124), ctx);
+    MenuDrawInt(g_Status.exp, 218, ST_Y(124), ctx);
+    MENU_TINT(TINT_NEXT);
+    MenuDrawStr(Label(6), 238, ST_Y(124), ctx);
+    MENU_TINT(0);
+    MenuDrawInt(g_Status.level != 99
+                    ? g_ExpNext[g_Status.level + 1] - g_Status.exp
+                    : 0,
+                362, ST_Y(124), ctx);
+
+    // the records: Gold, Kills, Rooms ending at 232; Time (h:mm:ss), the map
+    // (rooms of 942, as the save screen: 200.6% at most), relics found
+    MENU_TINT(ST_RGB_GOLD);
+    MenuDrawStr(Label(7), 110, ST_Y(151), ctx);
+    MENU_TINT(0);
+    MenuDrawInt(g_Status.gold, 224, ST_Y(151), ctx);
+    MenuDrawStr(Label(11), 110, ST_Y(164), ctx);
+    MenuDrawInt(g_Status.killCount, 224, ST_Y(164), ctx);
+    MenuDrawStr(Label(10), 110, ST_Y(177), ctx);
+    MenuDrawInt(g_RoomCount, 224, ST_Y(177), ctx);
+    y = ST_Y(151);
+    MenuDrawStr(Label(9), 246, y, ctx);
+    MenuDrawInt(g_Status.timerHours, 312, y, ctx);
+    MenuDrawChar(CH(':'), 320, y, ctx);
+    MenuDrawTime(g_Status.timerMinutes, 336, y, ctx, 2);
+    MenuDrawChar(CH(':'), 344, y, ctx);
+    MenuDrawTime(g_Status.timerSeconds, 360, y, ctx, 2);
+    y = ST_Y(164);
+    v = g_RoomCount * 1000 / 942;
+    MenuDrawStr(PortWord(6), 246, y, ctx);
+    MenuDrawInt(v / 10, 336, y, ctx);
+    MenuDrawChar(CH('.'), 344, y, ctx);
+    MenuDrawInt(v % 10, 352, y, ctx);
+    MenuDrawChar(CH('%'), 360, y, ctx);
+    y = ST_Y(177);
+    for (i = 0, v = 0; i < NUM_RELICS; i++) {
+#if SKIP_JP_RELICS
+        if (JP_RELICS_HIDDEN && (i == RELIC_JP_0 || i == RELIC_JP_1)) {
+            continue;
+        }
+#endif
+        v += (g_Status.relics[i] & RELIC_FLAG_FOUND) != 0;
+    }
+    MenuDrawStr(g_MenuStr[94], 246, y, ctx);
+    MenuDrawInt(v, 336, y, ctx);
+    MenuDrawChar(CH('/'), 344, y, ctx);
+    MenuDrawInt(NUM_AVAIL_RELICS, 360, y, ctx);
+
+    // the line of the selected main list item
+    MenuDrawStr(PortWord(7 + g_MenuNavigation.cursorMain % 5), 110, ST_Y(205),
+                ctx);
+}
+#else
+#define LEVEL_NUM_DX 0
+#endif
+
 void MenuDrawStats(s32 menuDialogue) {
     MenuContext* ctx;
     s32 buttonCFG;
@@ -1292,6 +1752,12 @@ void MenuDrawStats(s32 menuDialogue) {
 
     ctx = &g_Menus[menuDialogue];
     make_all();
+#ifdef PLATFORM_PSYZ
+    if (menuDialogue == MENU_DG_BG) {
+        MenuDrawStatusPage(ctx);
+        return;
+    }
+#endif
     if (menuDialogue == MENU_DG_BG) {
         MenuDrawAlucardPortrait(ctx);
         if (IsAlucart()) {
@@ -1321,7 +1787,7 @@ void MenuDrawStats(s32 menuDialogue) {
         MenuDrawStr(g_MenuStr[7], 32, 200, ctx);
         MenuDrawInt(g_Status.gold, 144, 200, ctx);
         MenuDrawStr(g_MenuStr[8], 248, 40, ctx);
-        MenuDrawInt(g_Status.level, 304, 40, ctx);
+        MenuDrawInt(g_Status.level, 304 + LEVEL_NUM_DX, 40, ctx);
         MenuDrawStr(g_MenuStr[15], 248, 56, ctx);
         i = 37;
         if (g_Player.status & PLAYER_STATUS_CURSE) {
@@ -1371,6 +1837,12 @@ void MenuDrawStats(s32 menuDialogue) {
     func_800F66BC(D_800A2D68[0], x, y, ctx, 1);
 
     buttonCFG = g_Settings.buttonConfig[0];
+#ifdef PLATFORM_PSYZ
+    // port: the marks end where the stock marks end, a row apart (11 high)
+    if (MenuDrawButton(
+            ctx, buttonCFG, x + 56 - Buttons_Width(buttonCFG), y - 1)) {
+    } else
+#endif
     if (buttonCFG < 4) {
         MenuDrawChar(g_ChButtons[buttonCFG], x + 44, y, ctx);
     } else {
@@ -1380,6 +1852,11 @@ void MenuDrawStats(s32 menuDialogue) {
     MenuDrawInt(g_Status.attackHands[0], x + 76, y, ctx);
 
     buttonCFG = g_Settings.buttonConfig[1];
+#ifdef PLATFORM_PSYZ
+    if (MenuDrawButton(
+            ctx, buttonCFG, x + 56 - Buttons_Width(buttonCFG), y + 11)) {
+    } else
+#endif
     if (buttonCFG < 4) {
         MenuDrawChar(g_ChButtons[buttonCFG], x + 44, y + 10, ctx);
     } else {
@@ -1411,14 +1888,18 @@ void MenuDrawStats(s32 menuDialogue) {
         MenuDrawStr(g_MenuStr[i + 1], x, y + i * 12, ctx);
         MenuDrawInt(g_Status.statsBase[i], x + 44, y + i * 12, ctx);
         if (g_Status.statsEquip[i] != 0) {
+            // port: the bonus is an arrow and a number, red up, blue down
             if (g_Status.statsEquip[i] > 0) {
-                MenuDrawChar(CH('+'), x + 52, y + i * 12, ctx);
+                MENU_TINT(TINT_BONUS_UP);
+                MenuDrawChar(STAT_SIGN(1), x + 52, y + i * 12, ctx);
                 phi_a0_5 = g_Status.statsEquip[i];
             } else {
-                MenuDrawChar(CH('-'), x + 52, y + i * 12, ctx);
+                MENU_TINT(TINT_BONUS_DOWN);
+                MenuDrawChar(STAT_SIGN(0), x + 52, y + i * 12, ctx);
                 phi_a0_5 = -g_Status.statsEquip[i];
             }
             MenuDrawInt(phi_a0_5, x + 68, y + i * 12, ctx);
+            MENU_TINT(0);
         }
     }
 }
@@ -1432,7 +1913,9 @@ void MenuSpellsDraw(MenuContext* ctx) {
     s32 yCoord;
     const u8* comboPointer;
 #if REGION != REGION_JP
-    s32 startXCoord = 176;
+    // port: the combo column starts after the longest name (en Dark
+    // Metamorphosis, uk Темна метаморфоза end near x 188); MP moves with it
+    s32 startXCoord = STPOS(176, 200);
     MenuDrawStr(g_MenuStr[98], 104, 40, ctx);
 #elif TARGET == TARGET_PSP
     const s32 startXCoord = 180;
@@ -1465,6 +1948,30 @@ void MenuSpellsDraw(MenuContext* ctx) {
             charNum -= 2;
         }
 #endif
+#ifdef PLATFORM_PSYZ
+        // port: the marks of the live button config, no word "or": the two
+        // attack buttons as [a]/[b]. Wing Smash (stock "?" marks) holds the
+        // jump button through the arrows and lets it go: [jump]+arrows+[jump].
+        if (LANG_MENU_FONT_ON()) {
+            s32 x = startXCoord;
+            if (spell == SPELL_WING_SMASH) {
+                x += MenuDrawButton(ctx, g_Settings.buttonConfig[2], x, yCoord);
+                MenuDrawChar(CH('+'), x, yCoord, ctx);
+                x += 8;
+            }
+            MenuDrawStr(g_SpellDefs[spell].combo, x, yCoord, ctx);
+            x += charNum * 8;
+            MenuDrawChar(CH('+'), x, yCoord, ctx);
+            x += 8;
+            if (spell == SPELL_WING_SMASH) {
+                MenuDrawButton(ctx, g_Settings.buttonConfig[2], x, yCoord);
+            } else {
+                x += MenuDrawButton(ctx, g_Settings.buttonConfig[0], x, yCoord);
+                MenuDrawChar(CH('/'), x - 1, yCoord, ctx);
+                MenuDrawButton(ctx, g_Settings.buttonConfig[1], x + 7, yCoord);
+            }
+        } else
+#endif
         if (spell != SPELL_WING_SMASH) {
             MenuDrawStr(g_SpellDefs[spell].combo, startXCoord, yCoord, ctx);
             MenuDrawChar(CH('+'), startXCoord + (charNum * 8), yCoord, ctx);
@@ -1482,10 +1989,14 @@ void MenuSpellsDraw(MenuContext* ctx) {
             }
             // This writes the word "or", because spells say '{Square} or
             // {Circle}'
+            // (port: a '/' in place of the word)
             charNum++;
-            MenuDrawChar(CH('o'), startXCoord + (charNum * 8), yCoord, ctx);
+            MenuDrawChar(
+                STPOS(CH('o'), CH('/')), startXCoord + (charNum * 8), yCoord, ctx);
+#ifndef PLATFORM_PSYZ
             charNum++;
             MenuDrawChar(CH('r'), startXCoord + (charNum * 8), yCoord, ctx);
+#endif
             buttonCFG = g_Settings.buttonConfig[1];
             charNum++;
             if (buttonCFG < 4) {
@@ -1508,8 +2019,8 @@ void MenuSpellsDraw(MenuContext* ctx) {
             MenuDrawChar(
                 CH('?'), startXCoord + 24 + (charNum * 8), yCoord, ctx);
         }
-        MenuDrawStr(g_MenuStr[13], 292, yCoord, ctx);
-        MenuDrawInt(g_SpellDefs[spell].mpUsage, 316, yCoord, ctx);
+        MenuDrawStr(g_MenuStr[13], STPOS(292, 320), yCoord, ctx);
+        MenuDrawInt(g_SpellDefs[spell].mpUsage, STPOS(316, 344), yCoord, ctx);
     }
     for (i = 0; i < 8; i++) {
         if (g_Status.spells[i] & 0x80) {
@@ -1526,13 +2037,59 @@ void MenuSpellsDraw(MenuContext* ctx) {
     }
     // The colorIntensity gets passed to the MenuRect's R and G values, making
     // it a brighter or dimmer yellow.
-    MenuDrawRect(ctx, 26, (g_MenuNavigation.cursorSpells * 0x10) + 0x3B, 300,
-                 17, colorIntensity, colorIntensity, 0);
+    MenuDrawRect(ctx, 26, (g_MenuNavigation.cursorSpells * 0x10) + 0x3B,
+                 STPOS(300, 328), 17, colorIntensity, colorIntensity, 0);
 #else
     func_800F5E68(
         ctx, g_MenuNavigation.cursorSpells, 0x1A, 0x3B, 0x12C, 0x11, -1, 1);
 #endif
 }
+
+#ifdef PLATFORM_PSYZ
+// The US data keeps the Japanese LEVEL/EXP labels of the two familiars
+// carried over from the Saturn version: draw the labels of the other rows
+// (a language pack translates them). Their US names are Japanese: under en
+// the build takes the PSP English names from the PSP disc, under uk the
+// language pack swaps them.
+#define FAMILIAR_JP_LABELS 0
+#ifdef SOTN_PSP_FAMILIAR_NAMES
+#include "psp_familiar_names.h"
+#endif
+
+// A name has 7 cells before the LEVEL label. A longer one takes two lines
+// (the second one beside EXP), split after its first hyphen or at its
+// first space.
+static void MenuDrawFamiliarName(s32 i, s32 x, s32 y, MenuContext* ctx) {
+    const char* s = g_MenuStr[i + 46];
+    char head[16];
+    s32 n, k;
+
+#ifdef SOTN_PSP_FAMILIAR_NAMES
+    if (!g_Lang && i >= FAM_STATS_YOUSEI) {
+        s = psp_familiar_names[i - FAM_STATS_YOUSEI];
+    }
+#endif
+    for (n = 0; s[n] != (char)0xFF; n++) {
+    }
+    for (k = 0; n > 7 && k < n && k < LEN(head) - 2; k++) {
+        if (s[k] == 0 || s[k] == CH('-')) {
+            memcpy(head, s, k + (s[k] != 0));
+            head[k + (s[k] != 0)] = 0xFF;
+            head[k + (s[k] != 0) + 1] = 0;
+            MenuDrawStr(head, x, y, ctx);
+            MenuDrawStr(s + k + 1, x, y + 16, ctx);
+            return;
+        }
+    }
+    MenuDrawStr(s, x, y, ctx);
+}
+// a 7-cell name (uk Напів-фея, the PSP English Saturn names) meets the label;
+// 4 px apart
+#define FAMILIAR_LABEL_DX 4
+#else
+#define FAMILIAR_JP_LABELS 1
+#define FAMILIAR_LABEL_DX 0
+#endif
 
 void MenuFamiliarsDraw(MenuContext* ctx) {
     s32 i;
@@ -1555,22 +2112,29 @@ void MenuFamiliarsDraw(MenuContext* ctx) {
         if (i == FAM_STATS_NOSE_DEMON) {
             x += 172;
         }
+#ifdef PLATFORM_PSYZ
+        MenuDrawFamiliarName(i, x, y, ctx);
+#else
         strId = i + 46;
         MenuDrawStr(g_MenuStr[strId], x, y, ctx);
-        if (i < FAM_STATS_YOUSEI) {
+#endif
+        if (i < FAM_STATS_YOUSEI || !FAMILIAR_JP_LABELS) {
             strId = 8;
         } else {
             strId = 43;
         }
-        MenuDrawStr(g_MenuStr[strId], x + 56, y, ctx);
-        MenuDrawInt(g_Status.statsFamiliars[i].level, x + 112, y, ctx);
-        if (i < FAM_STATS_YOUSEI) {
+        MenuDrawStr(g_MenuStr[strId], x + 56 + FAMILIAR_LABEL_DX, y, ctx);
+        MenuDrawInt(g_Status.statsFamiliars[i].level,
+                    x + 112 + FAMILIAR_LABEL_DX + LEVEL_NUM_DX / 2, y, ctx);
+        if (i < FAM_STATS_YOUSEI || !FAMILIAR_JP_LABELS) {
             strId = 5;
         } else {
             strId = 44;
         }
-        MenuDrawStr(g_MenuStr[strId], x + 56, y + 16, ctx);
-        MenuDrawInt(g_Status.statsFamiliars[i].exp % 100, x + 112, y + 16, ctx);
+        MenuDrawStr(g_MenuStr[strId], x + 56 + FAMILIAR_LABEL_DX, y + 16, ctx);
+        MenuDrawInt(
+            g_Status.statsFamiliars[i].exp % 100,
+            x + 112 + FAMILIAR_LABEL_DX + LEVEL_NUM_DX / 2, y + 16, ctx);
         switch (i) {
         case FAM_STATS_BAT:
             MenuDrawImg(ctx, 16, 64, 24, 30, 104, 129, 0x1D2, 0x1E, 1, 0);
@@ -1619,6 +2183,10 @@ void func_800F82F4(void) {
 void MenuSystemDraw(MenuContext* ctx) {
 #if REGION == REGION_JP
     const int Width = 80;
+#elif defined(PLATFORM_PSYZ)
+    // uk: the longest label has 19 cells (152 px from x 32): the bar from
+    // x 30 must reach x 184
+    const int Width = g_Lang ? 156 : 128;
 #else
     const int Width = 128;
 #endif
@@ -1728,23 +2296,33 @@ void func_800F8754(MenuContext* ctx, s32 x, s32 y) {
     MenuDrawStr(g_MenuStr[96], x + 2, y + 68, ctx);
 }
 #elif REGION != REGION_JP
+#ifdef PLATFORM_PSYZ
+// The status page: the list box (7,146)-(96,222) with rows of 14 from its
+// cell top 151 (the cursor bar from y + 3, func_800F6568); the labels (up to
+// 9 cells) start 12 in, after the cursor triangle
+#define MAIN_X(en) 12
+#define MAIN_Y(row) (8 + (row) * 14)
+#else
+#define MAIN_X(en) (en)
+#define MAIN_Y(row) (4 + (row) * 16)
+#endif
 void func_800F8754(MenuContext* ctx, s32 x, s32 y) {
     if (D_801375DC == 0) {
         D_8013784C = 1;
     }
 
-    MenuDrawStr(g_MenuStr[93], x + 14, y + 20, ctx);
+    MenuDrawStr(g_MenuStr[93], x + MAIN_X(14), y + MAIN_Y(1), ctx);
     if (D_801375E0[NUM_FAMILIARS] == 0) {
         D_8013784C = 1;
     } else {
         D_8013784C = 0;
     }
 
-    MenuDrawStr(g_MenuStr[96], x + 2, y + 68, ctx);
+    MenuDrawStr(g_MenuStr[96], x + MAIN_X(2), y + MAIN_Y(4), ctx);
     D_8013784C = 0;
-    MenuDrawStr(g_MenuStr[92], x + 18, y + 4, ctx);
-    MenuDrawStr(g_MenuStr[94], x + 14, y + 36, ctx);
-    MenuDrawStr(g_MenuStr[95], x + 14, y + 52, ctx);
+    MenuDrawStr(g_MenuStr[92], x + MAIN_X(18), y + MAIN_Y(0), ctx);
+    MenuDrawStr(g_MenuStr[94], x + MAIN_X(14), y + MAIN_Y(2), ctx);
+    MenuDrawStr(g_MenuStr[95], x + MAIN_X(14), y + MAIN_Y(3), ctx);
 }
 #elif TARGET == TARGET_PSP
 void func_800F8754(MenuContext* ctx, s32 x, s32 y) {
@@ -1809,6 +2387,33 @@ void func_800F892C(s32 index, s32 x, s32 y, MenuContext* ctx) {
     MenuDrawImg(ctx, x, y, 16, 16, (index & 7) * 16,
                 ((index & 0xF8) * 2) | 0x80, index + 0x1D0, 0x1A, 1, 0);
 }
+
+#ifdef PLATFORM_PSYZ
+// port: the page tabs left of the equip list, L1 over an up arrow at y 124
+// and R1 over a down arrow at y 174, in the marks of the button set (the
+// stock 16x16 pictures say L1 and R1). 0 hidden, 1 shown, 2 pressed (the
+// flash of the stock clut 0x181); func_800F96F4 sets them.
+static s32 g_PageTab[2];
+
+static void MenuDrawPageTabs(MenuContext* ctx) {
+    s32 i, b, rgb;
+    for (i = 0; i < 2; i++) {
+        if (!g_PageTab[i]) {
+            continue;
+        }
+        b = i ? 6 : 5; // R1, L1: the pad bits the list reads
+        rgb = g_PageTab[i] == 2 ? 0xFFD040 : 0;
+        // the mark keeps its colours; the arrow flashes
+        MenuDrawButton(ctx, b, 7 + (16 - Buttons_Width(b)) / 2, i ? 177 : 132);
+        rgb = rgb ? rgb : 0xE0E0E0;
+        if (i) { // down, under R1
+            MenuDrawQuad(ctx, 12, 185, 19, 185, 15, 189, 16, 189, rgb, rgb);
+        } else { // up, over L1
+            MenuDrawQuad(ctx, 15, 124, 16, 124, 12, 128, 19, 128, rgb, rgb);
+        }
+    }
+}
+#endif
 
 void func_800F8990(MenuContext* ctx, s32 x, s32 y) {
     const s32 Cols = 2;
@@ -2110,10 +2715,18 @@ void MenuDraw(void) {
         prim->drawMode = DRAW_DITHERING | DRAW_MENU;
 
         // draw the white window border
+#ifdef PLATFORM_PSYZ
+        if (i == MENU_DG_BG) { // the status page: a background, no border
+            goto no_border;
+        }
+#endif
         MenuDrawLine(cx, cy, cx, cy + ch - 1, i + 1);
         MenuDrawLine(cx, cy, cx + cw - 1, cy, i + 1);
         MenuDrawLine(cx + cw - 1, cy, cx + cw - 1, cy + ch - 1, i + 1);
         MenuDrawLine(cx, cy + ch - 1, cx + cw - 1, cy + ch - 1, i + 1);
+#ifdef PLATFORM_PSYZ
+    no_border:
+#endif
 
         switch (i) {
         case MENU_DG_MAIN:
@@ -2158,6 +2771,9 @@ void MenuDraw(void) {
         case MENU_DG_EQUIP_SELECTOR:
             func_800F8990(menu, x, y);
             MenuStatChangesDraw();
+#ifdef PLATFORM_PSYZ
+            MenuDrawPageTabs(menu);
+#endif
             break;
         case MENU_DG_INFO_BAR:
             func_800F5AE4(menu);
@@ -2252,6 +2868,21 @@ void func_800F96F4(void) {
     } else {
         prim->drawMode = DRAW_HIDE;
     }
+#ifdef PLATFORM_PSYZ
+    // the marks of the button set instead (MenuDrawPageTabs); the stock
+    // pictures stay when the atlas is off
+    prim = &g_PrimBuf[D_801377FC[NUM_MENU + 1]];
+    for (temp_a2 = 0; temp_a2 < 2; temp_a2++, prim = prim->next) {
+        g_PageTab[temp_a2] = prim->drawMode == DRAW_HIDE ? 0
+                             : prim->clut == 0x188    ? 1
+                                                      : 2;
+        if (LANG_MENU_FONT_ON()) {
+            prim->drawMode = DRAW_HIDE;
+        } else {
+            g_PageTab[temp_a2] = 0;
+        }
+    }
+#endif
 }
 
 static void func_800F97DC(void) {
@@ -2331,6 +2962,19 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
     } else {
         var_s4 = 0x3C;
     }
+#ifdef PLATFORM_PSYZ
+    // a relic name of the left column may be 132 px wide (texels 0..132
+    // of its page); the right column moves to texels 132..252
+    // (RELIC_* in DrawRelicsMenu; a sprite edge at 256 wraps to u 0)
+    if (arg2 && !(y & 0x200)) {
+        var_s4 = 0x42;
+    }
+    // 0x400: the long name alone in its row (RELIC_LONG, func_800F9E18)
+    if (g_Lang && arg2 && (y & 0x400)) {
+        var_s4 = RELIC_LONG_W / 2;
+    }
+    y &= ~0x400;
+#endif
     for (i = 0; i < var_s4 * FontHeight; i++) {
         D_8013794C[i] = 0;
     }
@@ -2341,6 +2985,11 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
     }
     if (y & 0x200) {
         x += 0x20;
+#ifdef PLATFORM_PSYZ
+        if (arg2) {
+            x += 1; // 132 texels
+        }
+#endif
         y &= ~0x200;
     }
     y = func_800F548C(y);
@@ -2410,6 +3059,20 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
         if (var_a3 < FontWidth / 2) {
             var_a3 += 1;
         }
+#ifdef PLATFORM_PSYZ
+        // the 12-texel cell is clipped at the right edge (or it would
+        // spill into the next row); its ink ends var_a3 bytes in, so a
+        // name as wide as the column still shows whole
+        if (var_s3 + FontWidth / 2 > var_s4) {
+            for (i = 0; i < FontHeight; i++) {
+                for (j = 0; j < var_s4 - var_s3; j++) {
+                    D_8013794C[i * var_s4 + var_s3 + j] =
+                        var_a2[i * FontWidth / 2 + j];
+                }
+            }
+            break;
+        }
+#endif
         for (i = 0; i < FontHeight; i++) {
             dest_addr = &D_8013794C[i * var_s4 + var_s3];
             *dest_addr++ = *var_a2++;
@@ -2459,6 +3122,18 @@ void func_800F9D88(const char* str, u32 y, bool arg2) {
 void func_800F9DD0(const char* src, char* dst) {
     s32 i;
 
+#ifdef PLATFORM_PSYZ
+    // the whole name: a uk name can have more than 16 two-byte letters
+    // (Темна метаморфоза has 17), which the PS1 loop cut off. An odd length
+    // gets an ASCII space, so the full-width spaces after it stay pairs.
+    for (i = 0; *src; i++) {
+        *dst++ = *src++;
+    }
+    if (i & 1) {
+        *dst = ' ';
+    }
+    return;
+#endif
     for (i = 0; i < 16; i++) {
         if (*src == 0)
             break;
@@ -2472,7 +3147,11 @@ void func_psp_091040A0(u_long** gfxBank);
 #if VERSION < VER_US
 void func_800F9E18(s32 arg0) {
     const int ItemsPerRow = 2;
+#ifdef PLATFORM_PSYZ
+    char buffer[64]; // uk relic names take 2 bytes per letter
+#else
     char buffer[38];
+#endif
     s32 nHalfScreenSize = arg0 * 5;
     s32 nItems = nHalfScreenSize + 5;
     s32 i;
@@ -2496,7 +3175,11 @@ void func_800F9E18(s32 arg0) {
 #else
 void func_800F9E18(s32 arg0) {
     const int ItemsPerRow = 2;
+#ifdef PLATFORM_PSYZ
+    char buffer[64]; // uk relic names take 2 bytes per letter
+#else
     char buffer[38];
+#endif
     s32 nHalfScreenSize = arg0 * 5;
     s32 i = (arg0 * 5) + 5;
     s32 nItems = i;
@@ -2517,6 +3200,17 @@ void func_800F9E18(s32 arg0) {
 #endif
 
     for (i = nHalfScreenSize; i < nItems; i++, nHalfScreenSize++) {
+#ifdef PLATFORM_PSYZ
+        // uk: the long name fills its row; its right neighbour goes to the
+        // spare row (RELIC_LONG in DrawRelicsMenu)
+        if (g_Lang && i == RELIC_LONG / ItemsPerRow) {
+            strcpy(buffer, g_RelicDefs[RELIC_LONG].name);
+            func_800F99B8(buffer, (i / ItemsPerRow + 0x80) | 0x400, true);
+            strcpy(buffer, g_RelicDefs[RELIC_LONG + 1].name);
+            func_800F99B8(buffer, RELIC_SPARE_Y, true);
+            continue;
+        }
+#endif
         strcpy(buffer, g_RelicDefs[i * ItemsPerRow + 0].name);
         if ((nHalfScreenSize & 1) == 0) {
             func_800F99B8(buffer, (nHalfScreenSize / ItemsPerRow) + 0x80, true);
@@ -2577,7 +3271,17 @@ void func_800F9F40(void) {
         spellId = g_Status.spells[i];
         if (spellId & 0x80) {
             spellId ^= 0x80;
+#ifdef PLATFORM_PSYZ
+            // Shift-JIS full-width spaces (the literal is UTF-8 here, whose
+            // bytes after the name drew as garbage): 20 clear the 240 px row
+            for (s32 j = 0; j < 40; j += 2) {
+                buffer[j] = 0x81;
+                buffer[j + 1] = 0x40;
+            }
+            buffer[40] = 0;
+#else
             strcpy(buffer, "　　　　　　　　　　　　　　　　　　　　　");
+#endif
             func_800F9DD0(g_SpellDefs[spellId].name, buffer);
             ShowText(buffer, 0x80 + i);
         }
@@ -3107,8 +3811,8 @@ s32 D_800A2DEC[] = {
 
 MenuContextInit g_MenuInit[NUM_MENU] = {
 #if REGION != REGION_JP
-    {158, 100, 76, 80, 0x40},  // MENU_DG_MAIN
-    {0, 24, 360, 200, 0x10},   // MENU_DG_BG
+    {STPOS(158, 7), STPOS(100, 146), STPOS(76, 90), STPOS(80, 77), 0x40}, // MENU_DG_MAIN
+    {0, STPOS(24, 0), STPOS(360, 384), STPOS(200, 240), 0x10}, // MENU_DG_BG
     {0, 24, 360, 97, 0x20},    // MENU_DG_EQUIP_OVERVIEW
     {0, 120, 360, 74, 0x20},   // MENU_DG_EQUIP_SELECTOR
     {0, 193, 360, 31, 0x40},   // MENU_DG_INFO_BAR
@@ -3357,9 +4061,9 @@ s32 func_800FB23C(s32* nav, u8* order, u8* count, u32* selected) {
 
 void func_800FB9BC(void) {
     const s32 ItemsPerRow = 2;
-#if IS_VER_INTL
-    const s32 VertScrollWindow = 120;
-    const s32 YScrollPerElement = 14;
+#if SKIP_JP_RELICS
+    const s32 VertScrollWindow = JP_RELICS_HIDDEN ? 120 : 140;
+    const s32 YScrollPerElement = JP_RELICS_HIDDEN ? 14 : 15;
 #else
     const s32 VertScrollWindow = 140;
     const s32 YScrollPerElement = 15;
@@ -3384,6 +4088,16 @@ void func_800FB9BC(void) {
         context->otIdx = g_MenuInit[i].otIdx;
         context->unk1C = 2;
     }
+#ifdef PLATFORM_PSYZ
+    // a save made with jp_cards = extra or jp may hold the cursor on relic
+    // 28 or 29, past the end of the list under jp_cards = off
+    if (g_MenuNavigation.cursorRelic >= NUM_AVAIL_RELICS) {
+        g_MenuNavigation.cursorRelic = NUM_AVAIL_RELICS - 1;
+    }
+    context = &g_Menus[MENU_DG_RELICS];
+    context->cursorX = context->unk1.x = RELIC_WIN_X;
+    context->cursorW = context->unk1.w = RELIC_WIN_W;
+#endif
     g_Menus[MENU_DG_RELICS].h = g_Menus[MENU_DG_RELICS].unk16 =
         ((g_MenuNavigation.cursorRelic / ItemsPerRow) * -VertScrollWindow) /
         YScrollPerElement;
@@ -3425,6 +4139,98 @@ void func_800FBAC4(void) {
         g_Status.equipHandOrder[i] = *ptr++;
     }
 }
+
+#ifdef PLATFORM_PSYZ
+// relic_toggle = modern: the relic switch is a pill with no text, the knob
+// right on green (ON) or left on red (OFF). It takes the stock switch's
+// texels (47x15 at u 0 ON and u 0x30 OFF, v 0x70 of page 0x1F at VRAM
+// 960,256, 4 bits) and its 7 fade cluts (0x1C8.., the pulse of the
+// selected one), so the draw call and its dim and pulse stay. The stock
+// pixels are saved when the menu opens and put back when it closes.
+#define TOGGLE_SHADES 7
+static void RelicToggle(int on) {
+    // the clut entries: 1, 2 green and its edge; 3, 4 the knob and its
+    // edge; 5, 6 red and its edge
+    static const u8 rgb[7][3] = {{0, 0, 0},       {46, 170, 82},
+                                 {32, 119, 57},   {255, 255, 255},
+                                 {190, 190, 190}, {214, 64, 64},
+                                 {150, 45, 45}};
+    static u16 saved[24 * 15], savedClut[TOGGLE_SHADES][16];
+    static int painted;
+    RECT tex = {960, 256 + 0x70, 24, 15}, clut;
+    u16 img[24 * 15], pal[16];
+    s32 i, x, y, half, ink, id, px, py, d;
+
+    if (on == painted || (on && g_RelicToggle != RELIC_TOGGLE_MODERN)) {
+        return;
+    }
+    clut.w = 16;
+    clut.h = 1;
+    if (on) {
+        StoreImage(&tex, (u_long*)saved);
+        for (i = 0; i < TOGGLE_SHADES; i++) {
+            id = g_ClutIds[0x1C8 + i];
+            clut.x = (id & 0x3F) << 4;
+            clut.y = id >> 6;
+            StoreImage(&clut, (u_long*)savedClut[i]);
+        }
+        DrawSync(0);
+        // a 26x13 pill at x 10, y 1, the knob of radius 4.5 in one end
+        for (i = 0; i < 24 * 15; i++) {
+            img[i] = 0;
+        }
+        for (half = 0; half < 2; half++) {
+            for (y = 0; y < 15; y++) {
+                for (x = 0; x < 47; x++) {
+                    // pixel centres in half pixels: the caps at 33 and 59
+                    px = x * 2 + 1;
+                    py = y * 2 + 1 - 15;
+                    d = px < 33 ? 33 - px : px > 59 ? px - 59 : 0;
+                    d = d * d + py * py;
+                    ink = d > 13 * 13 ? 0 : d > 11 * 11 ? 2 : 1;
+                    d = px - (half ? 33 : 59);
+                    d = d * d + py * py;
+                    ink = d <= 7 * 7 ? 3 : d <= 9 * 9 ? 4 : ink;
+                    if (half && (ink == 1 || ink == 2)) {
+                        ink += 4; // red
+                    }
+                    img[y * 24 + half * 12 + x / 4] |= ink << (x & 3) * 4;
+                }
+            }
+        }
+        LoadImage(&tex, (u_long*)img);
+        // the pulse of the selected switch: 75% to 100%
+        for (i = 0; i < TOGGLE_SHADES; i++) {
+            for (ink = 0; ink < 16; ink++) {
+                pal[ink] = 0;
+                if (ink && ink < 7) {
+                    for (x = 0; x < 3; x++) {
+                        y = rgb[ink][x] * 31 * (18 + i) / (255 * 24);
+                        pal[ink] |= (y ? y : 1) << x * 5;
+                    }
+                }
+            }
+            id = g_ClutIds[0x1C8 + i];
+            clut.x = (id & 0x3F) << 4;
+            clut.y = id >> 6;
+            LoadImage(&clut, (u_long*)pal);
+        }
+    } else {
+        LoadImage(&tex, (u_long*)saved);
+        for (i = 0; i < TOGGLE_SHADES; i++) {
+            id = g_ClutIds[0x1C8 + i];
+            clut.x = (id & 0x3F) << 4;
+            clut.y = id >> 6;
+            LoadImage(&clut, (u_long*)savedClut[i]);
+        }
+    }
+    DrawSync(0);
+    painted = on;
+}
+#define RELIC_TOGGLE(on) RelicToggle(on)
+#else
+#define RELIC_TOGGLE(on)
+#endif
 
 void MenuHandle(void) {
     s32 i;
@@ -3511,6 +4317,8 @@ block_4:
             currentMusicId = 0;
             func_800F6A48();
             func_800F84CC();
+            LANG_MENU_FONT(1);
+            RELIC_TOGGLE(1);
             SetFadeMode(FADE_FROM_BLACK);
 #if REGION != REGION_JP
             func_800F98AC(D_800A2D64, 0);
@@ -3537,6 +4345,8 @@ block_4:
         break;
     case MENU_STEP_EXIT_4:
         if (func_801025F4()) {
+            LANG_MENU_FONT(0);
+            RELIC_TOGGLE(0);
             SetFadeWidth(DISP_STAGE_W);
             SetStageDisplayBuffer();
             func_800FAC48();
@@ -3959,12 +4769,15 @@ block_4:
         g_MenuStep++;
         break;
     case MENU_STEP_RELIC_INIT_2:
+#ifdef PLATFORM_PSYZ
+        RelicInfoBar(1);
+#endif
         MenuShow(MENU_DG_INFO_BAR);
         MenuShow(MENU_DG_RELICS);
         func_800F9808(2);
         id = g_MenuNavigation.cursorRelic;
-#if IS_VER_INTL
-        if (id >= RELIC_JP_0) {
+#if SKIP_JP_RELICS
+        if (JP_RELICS_HIDDEN && id >= RELIC_JP_0) {
             id += 2; // Skip the two exclusive Japanese relics
         }
 #endif
@@ -3975,7 +4788,13 @@ block_4:
         g_MenuStep++;
         break;
     case MENU_STEP_RELIC:
-#if IS_VER_INTL
+#if SKIP_JP_RELICS
+#ifdef PLATFORM_PSYZ
+        if (!JP_RELICS_HIDDEN) {
+            g_Menus[MENU_DG_RELICS].unk16 =
+                ((g_MenuNavigation.cursorRelic / 2) * -140) / 15;
+        } else
+#endif
         g_Menus[MENU_DG_RELICS].unk16 =
             ((g_MenuNavigation.cursorRelic / 2) * -120) / 14;
 #else
@@ -3983,16 +4802,16 @@ block_4:
             ((g_MenuNavigation.cursorRelic / 2) * -140) / 15;
 #endif
         var_s1 = g_MenuNavigation.cursorRelic;
-#if IS_VER_INTL
-        if (var_s1 >= RELIC_JP_0) {
+#if SKIP_JP_RELICS
+        if (JP_RELICS_HIDDEN && var_s1 >= RELIC_JP_0) {
             var_s1 += 2; // Skip the two exclusive Japanese relics
         }
 #endif
         MenuHandleCursorInput(
             &g_MenuNavigation.cursorRelic, NUM_AVAIL_RELICS, 1);
         id = g_MenuNavigation.cursorRelic;
-#if IS_VER_INTL
-        if (id >= RELIC_JP_0) {
+#if SKIP_JP_RELICS
+        if (JP_RELICS_HIDDEN && id >= RELIC_JP_0) {
             id += 2; // Skip the two exclusive Japanese relics
         }
 #endif
@@ -4053,6 +4872,9 @@ block_4:
             MenuShow(MENU_DG_BG);
             MenuHide(MENU_DG_INFO_BAR);
             MenuHide(MENU_DG_RELICS);
+#ifdef PLATFORM_PSYZ
+            RelicInfoBar(0);
+#endif
             D_80137608 = 0;
             g_MenuStep = MENU_STEP_OPENED;
         }

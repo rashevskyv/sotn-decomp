@@ -45,8 +45,12 @@ s32 LoadFileSim(s32 fileId, s32 type);
 
 void Psyz_ModuleStart(void* param) {
     Overlay* o = param;
+    INFOF("sel: copy overlay %p -> %p (%zu bytes)", (void*)&g_Overlay, o,
+          sizeof(Overlay));
     memcpy(o, &g_Overlay, sizeof(Overlay));
+    INFOF("sel: init cutscene");
     InitCutscenePc();
+    INFOF("sel: start done");
 }
 
 void Psyz_ModuleStop(void) {}

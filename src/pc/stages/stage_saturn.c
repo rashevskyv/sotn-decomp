@@ -18,11 +18,30 @@
 
 #include "saturn_stage_data.h"
 
+#if defined(SATURN_STAGE_GDN) && defined(SATURN_STAGE_ROOM_TEST)
+#undef SATURN_STAGE_GDN
+#endif
+
 static SpriteParts* s_SpriteBanks[0x14];
+#ifdef SATURN_STAGE_GDN
+// stage15: the PS1 stage framework (src/st/stage15) runs the layout entities,
+// with the Saturn enemies and their converted sprites (gdn_entities.py)
+#include "../../st/stage15/stage15.h"
+#include "gdn_entities.h"
+static u_long* s_GdnPalDef[] = {
+    MAKE_PAL_OP(PAL_BULK_COPY, 0),
+    PAL_BULK_(GDN_SPRITE_CLUT_BASE * COLORS_PER_PAL, s_GdnSpritePals,
+              GDN_SPRITE_CLUT_COUNT * COLORS_PER_PAL),
+    PAL_TERMINATE(),
+};
+static u_long* s_Cluts[] = {(u_long*)s_GdnPalDef};
+static GfxBank* s_GfxBanks[] = {GDN_ROOM_GFX_BANKS};
+#else
 static u_long s_EmptyClut[] = {(u_long)-1};
 static u_long* s_Cluts[] = {s_EmptyClut};
 static GfxBank s_EmptyGfxBank = {.kind = GFX_BANK_NONE};
 static GfxBank* s_GfxBanks[] = {&s_EmptyGfxBank};
+#endif
 static RoomDef* s_TileLayers;
 static LayoutEntity* s_CurrentLayout;
 static size_t s_CurrentLayoutCount;
@@ -32,8 +51,14 @@ static void Noop(void) {}
 #ifndef SATURN_STAGE_ROOM_TEST
 #define SATURN_STAGE_BACKDROP_ENTITY (TOTAL_ENTITY_COUNT - 1)
 #define SATURN_STAGE_MASONRY_CLUT_SLOT 0x1FF
+// stage15's EntityUpdates (src/st/stage15/e_init.c) holds these two
+#ifdef SATURN_STAGE_GDN
+#define SATURN_STAGE_ENTITY_FN
+#else
+#define SATURN_STAGE_ENTITY_FN static
+#endif
 static void EntitySaturnStageBackdrop(Entity* self);
-static void EntitySaturnStageMasonry(Entity* self);
+SATURN_STAGE_ENTITY_FN void EntitySaturnStageMasonry(Entity* self);
 
 #define SATURN_STAGE_MASONRY_PIXEL_BYTES (24 * 16 / 2)
 #define SATURN_STAGE_MASONRY_PALETTE_WORDS 16
@@ -42,7 +67,6 @@ static u8 s_SaturnStageMasonryPixels[SATURN_STAGE_MASONRY_PIXEL_BYTES]
 static u16 s_SaturnStageMasonryPalette[SATURN_STAGE_MASONRY_PALETTE_WORDS];
 static u16 s_SaturnStageMasonryTpage;
 static bool s_SaturnStageMasonryReady;
-static bool s_SaturnStageMusicStarted;
 
 static bool SaturnStageLoadMasonry(void) {
     s32 length;
@@ -200,11 +224,13 @@ static s32 SaturnStageCurrentRoom(void) {
     return -1;
 }
 
+#ifndef SATURN_STAGE_GDN
 enum Palettes { PAL_NONE };
 
 // clang-format off
 EInit g_EInitCommon = {ANIMSET_DRA(0), 0x00, 0x00, PAL_NONE, ENEMY_COMMON};
 // clang-format on
+#endif
 u16 g_RedDoorTiles[2][8];
 static u16 s_SaturnStageRedDoorTiles[32];
 static Tilemap s_SaturnStageRedDoorTilemap = {
@@ -280,7 +306,20 @@ static bool SaturnStageBackdropIsActive(void) {
 #define SATURN_STAGE_PAGE_VRAM_W 0x40
 #define SATURN_STAGE_SATURN_W 320
 #define SATURN_STAGE_TO_SATURN_X(x) ((x) * SATURN_STAGE_SATURN_W / DISP_STAGE_W)
-#define SATURN_STAGE_GRID_OPCODE 0x04u
+// Wide view (src/pc/wide.c): the margins past the 256x240 frame. x is in
+// Saturn px, rounded up, so the last column reaches the screen edge.
+#define SATURN_STAGE_WIDE_X                                                    \
+    ((WIDE_X * SATURN_STAGE_SATURN_W + DISP_STAGE_W - 1) / DISP_STAGE_W)
+#define SATURN_STAGE_WIDE_Y WIDE_Y
+
+static s32 SaturnStageFloorDiv(s32 value, s32 divisor) {
+    return value >= 0 ? value / divisor : -((-value + divisor - 1) / divisor);
+}
+
+static s32 SaturnStageWrap(s32 value, s32 size) {
+    value %= size;
+    return value < 0 ? value + size : value;
+}
 
 typedef struct {
     u_long chars[SATURN_STAGE_NATIVE_CHARS_SIZE / sizeof(u_long)];
@@ -295,15 +334,10 @@ typedef struct {
     u16 height;
 } SaturnStageNativeLayer;
 
-typedef struct {
-    O_TAG;
-    u_long code[1];
-} SaturnStageGridCommand;
-
 static SaturnStageNativeLayer s_NativeLayers[SATURN_STAGE_NATIVE_LAYERS];
-static SaturnStageGridCommand s_GridCommands[2][SATURN_STAGE_NATIVE_LAYERS][2];
 static s32 s_NativeRoom = -1;
 static bool s_NativeReady;
+static bool s_GameOverDisk;
 
 static bool SaturnStageLoadNativeLayer(s32 room, s32 layer) {
     SaturnStageNativeLayer* native = &s_NativeLayers[layer];
@@ -423,8 +457,8 @@ static bool SaturnStageLoadNativeRoom(s32 room) {
 
 static void SaturnStageDrawNativeBlock(
     SaturnStageNativeLayer* native, s32 order, s32 mapX, s32 mapY,
-    s32 blockWidth, s32 blockHeight, s32 x0, s32 y0, s32 x1) {
-    POLY_FT4* poly;
+    s32 blockWidth, s32 blockHeight, s32 x0, s32 y0, s32 x1, s32 y1) {
+    POLY_GT4* poly; // a GT4 slot stays GT4: menu and map code reuse it
     u16 pnd;
     u16 character;
     u16 palette;
@@ -437,8 +471,10 @@ static void SaturnStageDrawNativeBlock(
     s32 dx;
     s32 dy;
 
-    if (x1 <= 0 || x0 >= SATURN_STAGE_SATURN_W || y0 <= -blockHeight * 8 ||
-        y0 >= DISP_STAGE_H || g_GpuUsage.gt4 >= MAX_POLY_GT4_COUNT) {
+    if (x1 <= -WIDE_X || x0 >= DISP_STAGE_W + WIDE_X ||
+        y0 <= -blockHeight * 8 - SATURN_STAGE_WIDE_Y ||
+        y0 >= DISP_STAGE_H + SATURN_STAGE_WIDE_Y ||
+        g_GpuUsage.gt4 >= MAX_POLY_GT4_COUNT) {
         return;
     }
     pnd = native->map[2 + mapY * native->width + mapX];
@@ -470,15 +506,18 @@ static void SaturnStageDrawNativeBlock(
     u1 = u0 + blockWidth * SATURN_STAGE_CHAR_SIZE;
     v1 = v0 + blockHeight * SATURN_STAGE_CHAR_SIZE;
 
-    poly = (POLY_FT4*)&g_CurrentBuffer->polyGT4[g_GpuUsage.gt4++];
-    setPolyFT4(poly);
+    poly = &g_CurrentBuffer->polyGT4[g_GpuUsage.gt4++];
+    setPolyGT4(poly);
     setShadeTex(poly, true);
     setSemiTrans(poly, false);
     setRGB0(poly, 0x80, 0x80, 0x80);
-    poly->x0 = poly->x2 = x0 + SATURN_STAGE_TO_SATURN_X(g_cameraOffsetX);
-    poly->x1 = poly->x3 = x1 + SATURN_STAGE_TO_SATURN_X(g_cameraOffsetX);
+    setRGB1(poly, 0x80, 0x80, 0x80);
+    setRGB2(poly, 0x80, 0x80, 0x80);
+    setRGB3(poly, 0x80, 0x80, 0x80);
+    poly->x0 = poly->x2 = x0 + g_cameraOffsetX;
+    poly->x1 = poly->x3 = x1 + g_cameraOffsetX;
     poly->y0 = poly->y1 = y0 + g_cameraOffsetY;
-    poly->y2 = poly->y3 = y0 + blockHeight * 8 + g_cameraOffsetY;
+    poly->y2 = poly->y3 = y1 + g_cameraOffsetY;
     poly->u0 = poly->u2 = u0;
     poly->u1 = poly->u3 = u1;
     poly->v0 = poly->v1 = v0;
@@ -488,27 +527,11 @@ static void SaturnStageDrawNativeBlock(
     AddPrim(&g_CurrentBuffer->ot[order], poly);
 }
 
-static int SaturnStageGridCommandHandler(
-    const u_long* words, int available, void* userdata) {
-    (void)userdata;
-    if (available < 1 ||
-        Psyz_GpuSetHorizontalGrid(words[0] & 0xFFFF, DISP_STAGE_W) < 0) {
-        return 0;
-    }
-    return 1;
-}
-
-static void SaturnStageAddGridCommand(
-    SaturnStageGridCommand* command, s32 order, u32 sourceWidth) {
-    setlen(command, 1);
-    command->code[0] = (SATURN_STAGE_GRID_OPCODE << 24) | sourceWidth;
-    AddPrim(&g_CurrentBuffer->ot[order], command);
-}
-
+// Draws a layer of 8x8 Saturn cells in game px: x is the Saturn x * 256/320.
 static void SaturnStageDrawNativeLayer(s32 layer, s32 order, bool wrap) {
     SaturnStageNativeLayer* native = &s_NativeLayers[layer];
-    SaturnStageGridCommand* grid =
-        s_GridCommands[g_CurrentBuffer == &g_GpuBuffers[0] ? 0 : 1][layer];
+    s32 scrollGame = layer == 1 ? 0 : g_Tilemap.scrollX.i.hi;
+    s32 vw = DISP_STAGE_W + 2 * WIDE_X;
     s32 scrollX = SATURN_STAGE_TO_SATURN_X(g_Tilemap.scrollX.i.hi);
     s32 scrollY = g_Tilemap.scrollY.i.hi;
     s32 startX;
@@ -521,43 +544,90 @@ static void SaturnStageDrawNativeLayer(s32 layer, s32 order, bool wrap) {
     s32 mapY;
     s32 x0;
     s32 y0;
+    s32 x1;
+    s32 y1;
+    // the sky (layer 1) is one Saturn screen: in the wide view stretch it
+    // over the view instead of a repeat with seams at game x 0 and 256
+    bool stretchX = layer == 1 && SATURN_STAGE_WIDE_X &&
+                    native->width * SATURN_STAGE_CHAR_SIZE <= SATURN_STAGE_SATURN_W;
+    bool stretchY = layer == 1 && SATURN_STAGE_WIDE_Y &&
+                    native->height * SATURN_STAGE_CHAR_SIZE <= 256;
 
     if (layer == 1) {
         scrollX = 0;
         scrollY = 10;
     }
     if (wrap) {
-        scrollX %= native->width * SATURN_STAGE_CHAR_SIZE;
-        scrollY %= native->height * SATURN_STAGE_CHAR_SIZE;
-        if (scrollX < 0) {
-            scrollX += native->width * SATURN_STAGE_CHAR_SIZE;
-        }
-        if (scrollY < 0) {
-            scrollY += native->height * SATURN_STAGE_CHAR_SIZE;
-        }
+        scrollX =
+            SaturnStageWrap(scrollX, native->width * SATURN_STAGE_CHAR_SIZE);
+        scrollY =
+            SaturnStageWrap(scrollY, native->height * SATURN_STAGE_CHAR_SIZE);
     }
-    SaturnStageAddGridCommand(&grid[1], order, DISP_STAGE_W);
-    startX = scrollX / SATURN_STAGE_CHAR_SIZE;
-    startY = scrollY / SATURN_STAGE_CHAR_SIZE;
-    endX = startX + SATURN_STAGE_SATURN_W / SATURN_STAGE_CHAR_SIZE + 1;
-    endY = startY + DISP_STAGE_H / SATURN_STAGE_CHAR_SIZE;
+    startX = SaturnStageFloorDiv(
+                 scrollX - SATURN_STAGE_WIDE_X, SATURN_STAGE_CHAR_SIZE) -
+             1;
+    startY = SaturnStageFloorDiv(
+        scrollY - SATURN_STAGE_WIDE_Y, SATURN_STAGE_CHAR_SIZE);
+    endX = startX +
+           (SATURN_STAGE_SATURN_W + 2 * SATURN_STAGE_WIDE_X) /
+               SATURN_STAGE_CHAR_SIZE +
+           3;
+    endY = startY +
+           (DISP_STAGE_H + 2 * SATURN_STAGE_WIDE_Y) / SATURN_STAGE_CHAR_SIZE +
+           (SATURN_STAGE_WIDE_Y ? 1 : 0);
+    if (stretchX) {
+        startX = 0;
+        endX = native->width - 1;
+    }
+    if (stretchY) {
+        startY = 0;
+        endY = native->height - 1;
+    }
     for (logicalY = startY; logicalY <= endY; logicalY++) {
-        mapY = wrap ? logicalY % native->height : logicalY;
+        mapY = wrap ? SaturnStageWrap(logicalY, native->height) : logicalY;
         if (mapY < 0 || mapY >= native->height) {
             continue;
         }
         y0 = logicalY * SATURN_STAGE_CHAR_SIZE - scrollY;
+        y1 = y0 + SATURN_STAGE_CHAR_SIZE;
+        if (stretchY) {
+            // rows -scrollY..240-scrollY of the 256 px sky fill the view
+            y0 = y0 * (DISP_STAGE_H + 2 * SATURN_STAGE_WIDE_Y) / DISP_STAGE_H -
+                 SATURN_STAGE_WIDE_Y;
+            y1 = y1 * (DISP_STAGE_H + 2 * SATURN_STAGE_WIDE_Y) / DISP_STAGE_H -
+                 SATURN_STAGE_WIDE_Y;
+        }
         for (logicalX = startX; logicalX <= endX; logicalX++) {
-            mapX = wrap ? logicalX % native->width : logicalX;
+            mapX = wrap ? SaturnStageWrap(logicalX, native->width) : logicalX;
             if (mapX < 0 || mapX >= native->width) {
                 continue;
             }
-            x0 = logicalX * SATURN_STAGE_CHAR_SIZE - scrollX;
-            SaturnStageDrawNativeBlock(native, order, mapX, mapY, 1, 1, x0, y0,
-                                       x0 + SATURN_STAGE_CHAR_SIZE);
+            if (stretchX) {
+                x0 = (logicalX * SATURN_STAGE_CHAR_SIZE - scrollX) * vw /
+                         (native->width * SATURN_STAGE_CHAR_SIZE) -
+                     WIDE_X;
+                x1 = ((logicalX + 1) * SATURN_STAGE_CHAR_SIZE - scrollX) * vw /
+                         (native->width * SATURN_STAGE_CHAR_SIZE) -
+                     WIDE_X;
+            } else {
+                // Cell edges on the map in game px (x * 256 / 320, floor),
+                // moved by the camera in whole game px: a cell keeps its
+                // width (6 or 7 px) at every scroll. A grid applied after the
+                // scroll gave each cell a width that changed with the scroll
+                // phase, so thin art flickered while the camera moved.
+                x0 = SaturnStageFloorDiv(
+                         logicalX * SATURN_STAGE_CHAR_SIZE * DISP_STAGE_W,
+                         SATURN_STAGE_SATURN_W) -
+                     scrollGame;
+                x1 = SaturnStageFloorDiv(
+                         (logicalX + 1) * SATURN_STAGE_CHAR_SIZE * DISP_STAGE_W,
+                         SATURN_STAGE_SATURN_W) -
+                     scrollGame;
+            }
+            SaturnStageDrawNativeBlock(
+                native, order, mapX, mapY, 1, 1, x0, y0, x1, y1);
         }
     }
-    SaturnStageAddGridCommand(&grid[0], order, SATURN_STAGE_SATURN_W);
 }
 
 static void SaturnStageDrawBackScreen(void) {
@@ -578,12 +648,25 @@ static void SaturnStageDrawBackScreen(void) {
     setRGB0(tile, BACKDROP_RED, BACKDROP_GREEN, BACKDROP_BLUE);
     setXY0(tile, g_cameraOffsetX, g_cameraOffsetY);
     setWH(tile, DISP_STAGE_W, DISP_STAGE_H);
+    Wide_Tile(tile);
     AddPrim(&g_CurrentBuffer->ot[BACKDROP_PRIORITY], tile);
 }
 
 static bool SaturnStageRenderNativeLayers(void) {
     s32 room = SaturnStageCurrentRoom();
 
+#ifndef SATURN_STAGE_ROOM_TEST
+    // game over hides the layers (HideAllBackgroundLayers) and loads its own
+    // picture into the VRAM pages of this room. Its music and the title's
+    // are PS1 tracks: give the CD the game's disk again.
+    if (g_GameState == Game_GameOver) {
+        if (!s_GameOverDisk) {
+            Psyz_CdSetDiskPath(g_GameParams.diskPath);
+            s_GameOverDisk = true;
+        }
+        return true;
+    }
+#endif
     if (room < 0) {
         return false;
     }
@@ -642,7 +725,7 @@ static void EntitySaturnStageBackdrop(Entity* self) {
 
 static void EntitySaturnStageDummy(Entity* self) { (void)self; }
 
-static void EntitySaturnStageMasonry(Entity* self) {
+SATURN_STAGE_ENTITY_FN void EntitySaturnStageMasonry(Entity* self) {
     static const s8 offsetsX[3] = {-14, 2, 18};
     Primitive* prim;
     s32 column;
@@ -687,8 +770,184 @@ static void EntitySaturnStageMasonry(Entity* self) {
     }
 }
 
-static void EntitySaturnStageSpecialController(Entity* self) { self->step = 1; }
+SATURN_STAGE_ENTITY_FN void EntitySaturnStageSpecialController(Entity* self) {
+    self->step = 1;
+}
 
+static void SaturnStageInitBackdrop(void) {
+    Entity* backdrop = &g_Entities[SATURN_STAGE_BACKDROP_ENTITY];
+
+    if (backdrop->pfnUpdate != EntitySaturnStageBackdrop) {
+        DestroyEntity(backdrop);
+        backdrop->entityId = 1;
+        backdrop->pfnUpdate = EntitySaturnStageBackdrop;
+    }
+    EntitySaturnStageBackdrop(backdrop);
+}
+
+static void SaturnStageSetCurrentLayout(s32 layoutId) {
+    s_CurrentLayout = layoutId >= 0 && layoutId < LEN(s_SaturnStageObjLayouts)
+                          ? s_SaturnStageObjLayouts[layoutId]
+                          : NULL;
+    s_CurrentLayoutCount =
+        layoutId >= 0 && layoutId < LEN(s_SaturnStageObjLayoutCounts)
+            ? s_SaturnStageObjLayoutCounts[layoutId]
+            : 0;
+}
+
+#ifdef SATURN_STAGE_GDN
+extern PfnEntityUpdate EntityUpdates[];
+extern PfnEntityUpdate* PfnEntityUpdates;
+void Update(void);
+void HitDetection(void);
+void UpdateRoomPosition(void);
+void InitRoomEntities(s32 objLayoutId);
+void UpdateStageEntities(void);
+
+u16 g_GdnSolidTile;
+
+#define GDN_LAYOUTS LEN(s_SaturnStageObjLayouts)
+#define GDN_LAYOUT_MAX 64
+static LayoutEntity s_GdnLayoutX[GDN_LAYOUTS][GDN_LAYOUT_MAX];
+static LayoutEntity s_GdnLayoutY[GDN_LAYOUTS][GDN_LAYOUT_MAX];
+// create_entity.h reads these by name on the PC (pfn_entity_update.h)
+LayoutEntity* entityLayoutHorizontal[GDN_LAYOUTS];
+LayoutEntity* entityLayoutVertical[GDN_LAYOUTS];
+
+// Saturn STAGE_15 entity id -> stage15.h EntityID. The ids without a port
+// (water, Slinger, Thornweed, area name, CD room foreground) stay idle.
+static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
+    switch (saturnId) {
+    case 0x01:
+        return E_BREAKABLE;
+    case 0x05:
+        return E_RED_DOOR;
+    case 0x0F:
+        return saveRoom ? E_SATURN_MASONRY : E_DUMMY_0F;
+    case 0x10:
+        return E_SATURN_CONTROLLER;
+    case 0x11:
+        return E_ID_11;
+    case 0x1E:
+        return E_MOD_DRIP_SPAWNER;
+    case 0x23:
+        return E_MOD_GARGOYLE;
+    case 0x2E:
+        return E_MOD_TREE;
+    case 0x35:
+        return E_MOD_LEAPER_SPAWNER;
+    case 0x3B:
+        return E_MOD_MANEATER;
+    case 0x3D:
+        return E_MOD_GARDENER;
+    case 0x40:
+        return E_MOD_SKBREEDER;
+    case 0x44:
+        return E_MOD_BOSS_CONTROLLER;
+    default:
+        return E_DUMMY_0F;
+    }
+}
+
+// insertion sort: stable, so equal positions keep the Saturn order
+static void SaturnGdnSortLayout(LayoutEntity* list, s32 count, bool byY) {
+    LayoutEntity item;
+    s32 i, j;
+
+    for (i = 1; i < count; i++) {
+        item = list[i];
+        for (j = i; j > 0 && (byY ? list[j - 1].posY > item.posY
+                                  : list[j - 1].posX > item.posX);
+             j--) {
+            list[j] = list[j - 1];
+        }
+        list[j] = item;
+    }
+}
+
+// create_entity.h wants each layout twice, sorted by x and by y, between a
+// 0xFFFE head and a 0xFFFF tail; the converter writes x order alone
+static void SaturnGdnBuildLayouts(void) {
+    const LayoutEntity head = {0xFFFE, 0xFFFE, 0, 0, 0};
+    const LayoutEntity tail = {0xFFFF, 0xFFFF, 0, 0, 0};
+    s32 saveLayout =
+        s_SaturnStageRooms[SATURN_STAGE_SAVE_ROOM].load.objLayoutId;
+    LayoutEntity* src;
+    LayoutEntity* x;
+    s32 count;
+    s32 id;
+    s32 i;
+
+    for (id = 0; id < GDN_LAYOUTS; id++) {
+        src = s_SaturnStageObjLayouts[id];
+        x = s_GdnLayoutX[id];
+        count = 0;
+        for (i = 0; src && i < s_SaturnStageObjLayoutCounts[id] &&
+                    src[i].posX != 0xFFFF && count < GDN_LAYOUT_MAX - 2;
+             i++) {
+            x[1 + count] = src[i];
+            x[1 + count].entityId =
+                (src[i].entityId & ~0x3FF) |
+                SaturnGdnEntityId(src[i].entityId & 0x3FF, id == saveLayout);
+            count++;
+        }
+        SaturnGdnSortLayout(&x[1], count, false);
+        x[0] = head;
+        x[1 + count] = tail;
+        memcpy(s_GdnLayoutY[id], x, (count + 2) * sizeof(LayoutEntity));
+        SaturnGdnSortLayout(&s_GdnLayoutY[id][1], count, true);
+        entityLayoutHorizontal[id] = x;
+        entityLayoutVertical[id] = s_GdnLayoutY[id];
+    }
+}
+
+static void SaturnGdnStart(void) {
+    TileDefinition* tileDef = &s_SaturnStageTileDef;
+    s32 room;
+    s32 i;
+
+    SaturnGdnBuildLayouts();
+    PfnEntityUpdates = EntityUpdates;
+#define X(n, bank) s_SpriteBanks[n] = (SpriteParts*)(bank);
+    GDN_SPRITE_BANKS
+#undef X
+    // the Saturn-only enemy records 400-425 (GAME.PRG, gdn_entities.py)
+    memcpy(&g_api.enemyDefs[GDN_ENEMY_FIRST], s_GdnEnemyDefs,
+           sizeof(s_GdnEnemyDefs));
+    // each ordinary room loads its sprite pages (gfxBanks[room]); the pause
+    // menu reloads the same bank (D_80097904)
+    for (i = 0; i < LEN(s_SaturnStageRooms); i++) {
+        for (room = 0; room < GDN_ROOM_GFX_COUNT; room++) {
+            if (s_SaturnStageRooms[i].left == s_SaturnStageRoomBounds[room][0] &&
+                s_SaturnStageRooms[i].top == s_SaturnStageRoomBounds[room][1] &&
+                s_SaturnStageRooms[i].right ==
+                    s_SaturnStageRoomBounds[room][2] &&
+                s_SaturnStageRooms[i].bottom ==
+                    s_SaturnStageRoomBounds[room][3] &&
+                s_SaturnStageRooms[i].load.tilesetId != 0xFF) {
+                s_SaturnStageRooms[i].load.objGfxId = room + 1;
+            }
+        }
+    }
+    // the boss room's door: a solid tile (its art is not drawn: the native
+    // renderer draws the Saturn planes)
+    for (i = 1; i < 0x1000; i++) {
+        if (tileDef->collision[i] == 3) {
+            g_GdnSolidTile = i;
+            break;
+        }
+    }
+}
+
+static void SaturnStageGdnInitRoomEntities(s32 layoutId) {
+    SaturnStageSetCurrentLayout(layoutId);
+    if (layoutId < 0 || layoutId >= GDN_LAYOUTS) {
+        layoutId = 0;
+    }
+    InitRoomEntities(layoutId);
+    SaturnStageInitBackdrop();
+}
+#else
 static void SaturnStageSyncRoomEntities(void) {
     LayoutEntity* layout;
     Entity* entity;
@@ -707,10 +966,10 @@ static void SaturnStageSyncRoomEntities(void) {
             continue;
         }
         entityId = layout->entityId & 0x3FF;
-        visible = layout->posX >= g_Tilemap.scrollX.i.hi - 64 &&
-                  layout->posX <= g_Tilemap.scrollX.i.hi + 320 &&
-                  layout->posY >= g_Tilemap.scrollY.i.hi - 64 &&
-                  layout->posY <= g_Tilemap.scrollY.i.hi + 288;
+        visible = layout->posX >= g_Tilemap.scrollX.i.hi - 64 - WIDE_X &&
+                  layout->posX <= g_Tilemap.scrollX.i.hi + 320 + WIDE_X &&
+                  layout->posY >= g_Tilemap.scrollY.i.hi - 64 - WIDE_Y &&
+                  layout->posY <= g_Tilemap.scrollY.i.hi + 288 + WIDE_Y;
         entity = &g_Entities[index];
         if (!visible) {
             if (entity->pfnUpdate == EntitySaturnStageDummy ||
@@ -756,10 +1015,6 @@ static void SaturnStageSyncRoomEntities(void) {
 static void SaturnStageUpdate(void) {
     Entity* entity;
 
-    if (!s_SaturnStageMusicStarted) {
-        s_SaturnStageMusicStarted = true;
-        g_api.PlaySfx(SATURN_STAGE_MUSIC);
-    }
     SaturnStageSyncRoomEntities();
     for (entity = &g_Entities[STAGE_ENTITY_START];
          entity < &g_Entities[TOTAL_ENTITY_COUNT]; entity++) {
@@ -802,32 +1057,38 @@ static void SaturnStageInitRoomEntities(s32 layoutId) {
     SaturnStageSyncRoomEntities();
     EntitySaturnStageBackdrop(backdrop);
 }
+#endif // SATURN_STAGE_GDN
 #else
 static void SaturnStageUpdate(void) {}
 static void SaturnStageInitRoomEntities(s32 layoutId) { (void)layoutId; }
 #endif
 
 Overlay g_Overlay = {
+#ifdef SATURN_STAGE_GDN
+    // the PS1 stage framework (src/st/stage15): layouts, hits, enemies
+    .Update = Update,
+    .HitDetection = HitDetection,
+    .UpdateRoomPosition = UpdateRoomPosition,
+    .InitRoomEntities = SaturnStageGdnInitRoomEntities,
+    .UpdateStageEntities = UpdateStageEntities,
+#else
     .Update = SaturnStageUpdate,
     .HitDetection = Noop,
     .UpdateRoomPosition = Noop,
     .InitRoomEntities = SaturnStageInitRoomEntities,
+    .UpdateStageEntities = Noop,
+#endif
     .rooms = s_SaturnStageRooms,
     .spriteBanks = s_SpriteBanks,
     .cluts = s_Cluts,
     .objLayoutHorizontal = s_SaturnStageObjLayouts,
     .tileLayers = s_SaturnStageTileLayers,
     .gfxBanks = s_GfxBanks,
-    .UpdateStageEntities = Noop,
 };
 
 void Psyz_ModuleStart(void* param) {
     Overlay* o = param;
 
-#ifdef SATURN_STAGE_NATIVE_8X8
-    Psyz_GpuRegisterCommandHandler(
-        SATURN_STAGE_GRID_OPCODE, SaturnStageGridCommandHandler, NULL);
-#endif
     s_CurrentLayout = NULL;
     s_CurrentLayoutCount = 0;
     s_TileLayers = g_Overlay.tileLayers;
@@ -836,7 +1097,12 @@ void Psyz_ModuleStart(void* param) {
         ERRORF("could not load Stage 15 graphics");
     }
     SaturnStageConfigureMusic();
-    s_SaturnStageMusicStarted = false;
+    // the engine starts it as stage music: at the stage start and when
+    // the player leaves a save room (5087C.c), as on the PS1
+    g_StageMusicId = SATURN_STAGE_MUSIC;
+    // 224 art rows in each 256-row screen: 16 empty rows at the room top
+    // and bottom (native_room*_layer*.map.bin)
+    g_WideBandTop = g_WideBandBottom = 16;
     s_SaturnStageMasonryReady = SaturnStageLoadMasonry();
     if (s_SaturnStageMasonryReady) {
         s_SaturnStageMasonryTpage = LoadTPage(
@@ -844,20 +1110,21 @@ void Psyz_ModuleStart(void* param) {
         g_ClutIds[SATURN_STAGE_MASONRY_CLUT_SLOT] =
             LoadClut2((u_long*)s_SaturnStageMasonryPalette, 0x3F0, 0xF3);
     }
+#ifdef SATURN_STAGE_GDN
+    SaturnGdnStart();
+#endif
 #endif
 
     memcpy(o, &g_Overlay, sizeof(Overlay));
 #ifdef SATURN_STAGE_NATIVE_8X8
     s_NativeRoom = -1;
     s_NativeReady = false;
+    s_GameOverDisk = false;
     g_PcStageLayerRenderer = SaturnStageRenderNativeLayers;
 #endif
 }
 
 void Psyz_ModuleStop(void) {
-#ifdef SATURN_STAGE_NATIVE_8X8
-    Psyz_GpuRegisterCommandHandler(SATURN_STAGE_GRID_OPCODE, NULL, NULL);
-#endif
 #ifndef SATURN_STAGE_ROOM_TEST
     Psyz_CdSetDiskPath(g_GameParams.diskPath);
 #endif

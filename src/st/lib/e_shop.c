@@ -759,6 +759,297 @@ static const char* D_us_80181310[] = {
     "Sell gem"};
 #endif
 
+#ifdef PLATFORM_PSYZ
+// 16:9 (the port view is always wide): the shop windows reach out to the
+// pause menu's frame (x -64..320, Wide_OnFrame).
+// SHOP_G: how far the item list (stock x 12..244) grows on each side.
+#define SHOP_G (WIDE_X - 9)
+// the collapsed menu label (stock x 6..74) goes to x -64
+#define SHOP_LABEL_X (SHOP_G - 6)
+// the description bar (stock x 8..248) grows to x -64..320; its text keeps
+// its 240 texels and moves with the bar's left edge
+#define SHOP_DESC_W (SHOP_G - 4)
+// The compare window is taller (9 rows): the item list goes 16 up, the
+// description bar 15 down (the scroll arrow under the list stays clear of
+// the compare window).
+#define SHOP_LIST_DY 16
+#define SHOP_DESC_DY 15
+// The compare window. Its prims draw into the list's offscreen page (u =
+// prim x, v = prim y = screen y), and the page shows at x u + SHOP_CMP_D on
+// screen: the window's right edge on x 320. The content is u 36..252 (216
+// texels, in the 256 of the page), v 0x70..0xD6 (below the list's page
+// rows); SHOP_L is the x of its label column.
+#define SHOP_CMP_C 144  // the content centre
+#define SHOP_CMP_HW 108 // the content half width
+#define SHOP_CMP_D (SHOP_G - 16)
+#define SHOP_L (SHOP_CMP_C - SHOP_CMP_HW + 8)
+#define SHOP_CMP_Y0 0x70 // the content top
+#define SHOP_CMP_Y1 0xD6 // the content bottom
+// the 72 stock prims (D_us_80181530), then the tail (ShopResults): a
+// spare cell (once "=") and 3 result digits for each of the 7 value rows,
+// 3 value digits for each stat row, 12 name cells for each stat row
+#define SHOP_CMP_N 72
+#define SHOP_CMP_RES (7 * 4 + 4 * 3 + 4 * 12)
+
+// uk shop words (tools/lang/uk/ua_port.json)
+enum {
+    SHOP_W_MENU = 58, // + the D_us_80181310 row index (0..5)
+    SHOP_W_NUMBER = 64,
+    SHOP_W_GOLD,
+    SHOP_W_SOLD,
+    SHOP_W_HAVE = 71, // the relic is had: stock D_us_80181674[1]
+    SHOP_W_NOT_HAVE,
+    SHOP_W_JEWEL,
+    SHOP_W_MAP,
+    SHOP_W_SCROLL, // + " 1".." 5"
+    SHOP_W_BEST = 76, // the bestiary: + the D_us_801818C0 index, 87 "None"
+    SHOP_W_ELEM = 88, // the bestiary: + the D_us_8018187C index (11 words)
+    SHOP_W_NO_DROPS = 99, // the bestiary: «Здобичі немає»
+};
+
+// uk: a PORT word as shop cells (the 8x8 sheet), with a space and a digit
+// after it if digit, padded with spaces to n cells, or (n = 0) with the
+// FF 00 end of func_us_801B1064. NULL under en, but the status page's
+// words 0..5 (Attack .. Luck, PortWord) are there under en too. Four
+// buffers: a few words may be live at once.
+static const char* ShopWord(int index, int n, int digit) {
+    static char bufs[4][24];
+    static int k;
+    const u8* w = (const u8*)(index < 6 ? PortWord(index) : Lang_Port(index));
+    char* out;
+    s32 i;
+
+    if (!w) {
+        return NULL;
+    }
+    out = bufs[k++ & 3];
+    for (i = 0; i < 20 && w[i] != 0xFF; i++) {
+        out[i] = w[i];
+    }
+    if (digit) {
+        out[i++] = CH(' ');
+        out[i++] = CH('0') + digit;
+    }
+    for (; i < n && i < 22; i++) {
+        out[i] = CH(' ');
+    }
+    if (!n) {
+        out[i++] = 0xFF;
+        out[i] = 0;
+    }
+    return out;
+}
+
+// The shop's text in the menu font: Lang_MenuFont's atlas (VRAM 832, 256,
+// texture page 0x1D), open while the shop is. The 8x8 sheet cell c becomes
+// the atlas's 8x11 cell, SHOP_FONT_DY rows up (the baselines meet), at an
+// 8 texel pitch: the serif letters of the pause menu and the dialogue.
+#define SHOP_FONT_DY 3
+#define SHOP_ATLAS_X 832
+#define SHOP_ATLAS_Y 256
+
+// A text prim's y: the atlas cell starts SHOP_FONT_DY higher. y3 keeps the
+// y0 set here, so ShopCell knows y0 is done.
+static void ShopCellY(Primitive* prim, s32 y) {
+    prim->y0 = y;
+    if (LANG_MENU_FONT_ON()) {
+        prim->y0 -= SHOP_FONT_DY;
+        prim->y3 = prim->y0;
+    }
+}
+
+// A text prim (texture page 0x1E, or 0x1D once converted) shows cell c:
+// the atlas cell while the atlas is open, else the stock sheet cell. A y0
+// the drawer wrote since the last call (not y3) goes SHOP_FONT_DY up.
+static void ShopCell(Primitive* prim, s32 c) {
+    c &= 0xFF;
+    if (LANG_MENU_FONT_ON() && (prim->tpage == 0x1E || prim->tpage == 0x1D)) {
+        if (prim->y0 != prim->y3) {
+            prim->y0 -= SHOP_FONT_DY;
+            prim->y3 = prim->y0;
+        }
+        prim->tpage = 0x1D;
+        prim->u0 = (c & 15) * 8;
+        prim->v0 = (c >> 4) * 11;
+        prim->v1 = 11;
+        return;
+    }
+    if (prim->tpage == 0x1D) { // the atlas is closed
+        prim->tpage = 0x1E;
+        prim->v1 = 8;
+        if (prim->y0 == prim->y3) {
+            prim->y0 += SHOP_FONT_DY;
+            prim->y3 = prim->y0 + 1;
+        }
+    }
+    prim->u0 = (c & 0x0F) << 3;
+    prim->v0 = (c & 0xF0) >> 1;
+}
+#define SHOP_CELL(prim, c) ShopCell(prim, c)
+// a cell y set after the cell code (the bestiary numbers)
+#define SHOP_Y(prim, y) ShopCellY(prim, y)
+
+// The uk word for a func_us_801B0FBC texture (the 8x8 sheet by ASCII: cell
+// + 0x20, 00 end), the stock str under en. centre: the texture's width in
+// VRAM words (4 texels); the word then starts with its x offset in words,
+// like the D_us_80181310 rows.
+static const char* ShopTexWord(int index, const char* str, int centre) {
+    static char buf[24];
+    const char* w = ShopWord(index, 0, 0);
+    s32 i, words = 0;
+    char* out = buf + (centre ? 1 : 0);
+
+    if (!w) {
+        return str;
+    }
+    for (i = 0; (u8)w[i] != 0xFF; i++) {
+        out[i] = w[i] + 0x20;
+        words += w[i] == CH(' ') ? 1 : 2;
+    }
+    out[i] = 0;
+    if (centre) {
+        buf[0] = words < centre ? (centre - words) / 2 : 0;
+    }
+    return buf;
+}
+
+// The item list's content halves (prims 8, 9) after func_us_801B245C opened
+// the frame SHOP_G wider each side (angle: its arg1). Each half keeps its
+// texel width (no stretch) on its frame edge: the left one the names (u
+// 8..0x7C), the right one count and price (u 0x7C..0xE0). Prim 13 fills
+// the gap between them with blank page texels.
+static void ShopSplit(Primitive* prim, u16 angle) {
+    Primitive* left;
+    Primitive* right;
+    s32 i, off, full = 0x74 + SHOP_G - 8;
+
+    for (i = 0; i < 8; i++) {
+        prim = prim->next;
+    }
+    off = (rsin(angle) * full) / 0x1000;
+    left = prim;
+    left->u1 = left->u3 = 0x7C;
+    left->x0 = left->x2 = 0x80 - off;
+    left->x1 = left->x3 = left->x0 + (0x7C - 8) * off / full;
+    right = left->next;
+    right->u0 = right->u2 = 0x7C;
+    right->x1 = right->x3 = 0x80 + off;
+    right->x0 = right->x2 = right->x1 - (0xE0 - 0x7C) * off / full;
+    for (prim = right, i = 9; i < 13 && prim; i++) {
+        prim = prim->next;
+    }
+    if (prim) {
+        prim->x0 = prim->x2 = left->x1;
+        prim->x1 = prim->x3 = right->x0;
+        prim->y0 = prim->y1 = left->y0;
+        prim->y2 = prim->y3 = left->y2;
+        PRED(prim) = left->r0;
+        PGRN(prim) = left->g0;
+        PBLU(prim) = left->b0;
+        prim->drawMode = left->drawMode;
+    }
+}
+#define SHOP_LIST_HW (0x74 + SHOP_G)
+#define SHOP_SPLIT(prim, angle) ShopSplit(prim, angle)
+#define SHOP_CMP_W (SHOP_CMP_HW + 8)
+
+// the description bar (bar 1) grows SHOP_DESC_W each side; its text (bar
+// 0, 240 texels) moves to the bar's left edge
+static void ShopDescX(Primitive* prim, s32 bar) {
+    prim->x0 -= SHOP_DESC_W;
+    prim->x2 -= SHOP_DESC_W;
+    prim->x1 += bar ? SHOP_DESC_W : -SHOP_DESC_W;
+    prim->x3 += bar ? SHOP_DESC_W : -SHOP_DESC_W;
+}
+#define SHOP_DESC_X(prim, bar) ShopDescX(prim, bar)
+
+// The compare window's rows: hand 1, hand 2, DEF, a gap, STR, CON, INT,
+// LCK, Number, GOLD (screen y = page v; the hand rows 12 apart for
+// their 11-row button marks; the 8x11 cells start SHOP_FONT_DY higher)
+enum { R_H1, R_H2, R_DEF, R_STR, R_NUM = 7, R_GOLD };
+static const u8 ShopRowY[] = {0x73, 0x7F, 0x8B, 0x98, 0xA3,
+                              0xAE, 0xB9, 0xC4, 0xCE};
+
+// The compare window's prims 11..82 (D_us_80181530 order): content x from
+// SHOP_L in 8-texel columns, and the row. The names in columns 0..11 (the
+// stat names: ShopResults), the hand marks in 8 and 9, a value in 13..15
+// (stats: ShopResults), the arrow in 17 (1 row up in the stock cells) and
+// the change in 18..20, the result in 22..24 (ShopResults): «16 ↑1 17».
+#define SHOP_ARROW_X 0x88
+static const u8 ShopCmpXR[SHOP_CMP_N][2] = {
+    // clang-format off
+    {0x40, R_H1}, {0x48, R_H1}, {0x40, R_H2}, {0x48, R_H2}, // hand marks
+    {0x00, R_GOLD}, {0x08, R_GOLD}, {0x10, R_GOLD}, {0x18, R_GOLD},
+    {0x88, R_GOLD}, {0x90, R_GOLD}, {0x98, R_GOLD}, {0xA0, R_GOLD},
+    {0xA8, R_GOLD}, {0xB0, R_GOLD}, {0xB8, R_GOLD}, {0xC0, R_GOLD},
+    {0x00, R_NUM}, {0x08, R_NUM}, {0x10, R_NUM}, {0x18, R_NUM}, // Number
+    {0x20, R_NUM}, {0x28, R_NUM}, {0x30, R_NUM}, {0x38, R_NUM},
+    {0x40, R_NUM}, {0xB8, R_NUM}, {0xC0, R_NUM},
+#define SHOP_VALUE_ROW(r) /* 3 digits, arrow, 3 digits */                   \
+    {0x68, r}, {0x70, r}, {0x78, r}, {SHOP_ARROW_X, r},                     \
+    {0x90, r}, {0x98, r}, {0xA0, r}
+    SHOP_VALUE_ROW(R_H1), SHOP_VALUE_ROW(R_H2), SHOP_VALUE_ROW(R_DEF),
+#define SHOP_STAT_ROW(r) /* label 3 (unused), arrow, change 2 */            \
+    {0x00, r}, {0x08, r}, {0x10, r}, {SHOP_ARROW_X, r}, {0x90, r}, {0x98, r}
+    SHOP_STAT_ROW(R_STR), SHOP_STAT_ROW(R_STR + 1),
+    SHOP_STAT_ROW(R_STR + 2), SHOP_STAT_ROW(R_STR + 3),
+    // clang-format on
+};
+
+// a compare prim's place: stock prim j (0..71), or tail prim j - 72
+static void ShopCmpPlace(Primitive* prim, s32 j) {
+    s32 row, x;
+
+    if (j < SHOP_CMP_N) {
+        x = ShopCmpXR[j][0];
+        row = ShopCmpXR[j][1];
+    } else if ((j -= SHOP_CMP_N) < 7 * 4) {
+        row = j / 4; // a spare cell, then 3 result digits
+        x = 0xA8 + (j & 3) * 8;
+    } else if ((j -= 7 * 4) < 4 * 3) {
+        row = R_STR + j / 3; // the value of a stat row
+        x = 0x68 + (j % 3) * 8;
+    } else {
+        j -= 4 * 3; // the name of a stat row
+        row = R_STR + j / 12;
+        x = (j % 12) * 8;
+    }
+    prim->x0 = SHOP_L + x;
+    if (row < R_NUM && x >= 0x68) {
+        prim->x0 += 8; // 2 cells after a 12-letter stat name
+    }
+    ShopCellY(prim, ShopRowY[row] -
+                        (x == SHOP_ARROW_X && !LANG_MENU_FONT_ON()));
+}
+
+// uk: the last 2 cells of «Золото» in the first 2 gold digit prims (gold
+// ends at 999999, so they never show a digit), after the 4 of prims 15..18
+Primitive* func_us_801B3FB4(
+    Primitive* prim, const char* str, u16 length, s32 arg3);
+static void ShopTint(Primitive* prim, u32 rgb);
+static void ShopGold(Primitive* prim) {
+    const char* w = ShopWord(SHOP_W_GOLD, 6, 0);
+
+    if (w) {
+        func_us_801B3FB4(prim, w + 4, 2, 1);
+        prim->x0 = SHOP_L + 0x20;
+        prim->next->x0 = SHOP_L + 0x28;
+        ShopTint(prim, TINT_GOLD);
+        ShopTint(prim->next, TINT_GOLD);
+    }
+}
+#else
+#define SHOP_LABEL_X 0
+#define SHOP_LIST_DY 0
+#define SHOP_DESC_DY 0
+#define SHOP_DESC_X(prim, bar)
+#define SHOP_LIST_HW 0x74
+#define SHOP_SPLIT(prim, angle)
+#define SHOP_CMP_W 0x42
+#define SHOP_CELL(prim, c)
+#define SHOP_Y(prim, y) ((prim)->y0 = (y))
+#endif
+
 static u8 D_us_80181328[] = {4, 0, 5, 1, 4};
 static u8 D_us_80181330[] = {5, 0, 5, 1, 2, 4};
 static u8 D_us_80181338[] = {6, 0, 5, 1, 2, 3, 4};
@@ -998,6 +1289,18 @@ loop:
             ch = 0xBB;
 #endif
         }
+#ifdef PLATFORM_PSYZ
+        if (LANG_MENU_FONT_ON()) { // the atlas's 8x11 cell (ShopCell)
+            u8 c = (u8)ch - 0x20;
+            rect.x = SHOP_ATLAS_X + (c & 15) * 2;
+            rect.y = SHOP_ATLAS_Y + (c >> 4) * 11;
+            rect.w = 2;
+            rect.h = 11;
+            MoveImage(&rect, x, y - SHOP_FONT_DY);
+            x += 2;
+            goto loop;
+        }
+#endif
         rect.x = ((ch & 0x0F) << 1) + 0x380;
         rect.y = ((ch & 0xF0) >> 1) + 0xF0;
         rect.w = 2;
@@ -1086,6 +1389,16 @@ Primitive* func_us_801B1064(
             prim->u0 = (s8)((ch & 0x0F) << 3);
             prim->v0 = (s8)((ch & 0xF0) >> 1);
             prim->drawMode = DRAW_DEFAULT;
+#ifdef PLATFORM_PSYZ
+            if (LANG_MENU_FONT_ON()) { // the atlas cell, no kerning
+                prim->x0 = x;
+                ShopCellY(prim, y);
+                ShopCell(prim, ch);
+                prim = prim->next;
+                x += 8;
+                continue;
+            }
+#endif
             if (ch == CH('i') || ch == CH('l') || ch == CH('f') ||
                 ch == CH('I')) {
                 x--;
@@ -1104,6 +1417,9 @@ Primitive* func_us_801B1064(
             }
         } else {
             x += 4;
+#ifdef PLATFORM_PSYZ
+            x += LANG_MENU_FONT_ON() ? 4 : 0; // a whole cell, as in dialogue
+#endif
         }
 #endif
 
@@ -1180,7 +1496,9 @@ void func_us_801B12D0(Entity* self, u16 arg1) {
     if (arg1 & 1) {
         posY = (g_CurrentEntity->ext.et_801B15C0.unk7C * ((s_3 + 0x18) - s_4)) /
                24;
-        posX = (g_CurrentEntity->ext.et_801B15C0.unk7C * -0x98) / 24;
+        posX = (g_CurrentEntity->ext.et_801B15C0.unk7C *
+                (-0x98 - SHOP_LABEL_X)) /
+               24;
 #endif
     } else {
         posY = (g_CurrentEntity->ext.et_801B15C0.unk7C * ((s_3 + 0x40) - s_4)) /
@@ -1319,6 +1637,11 @@ void func_us_801B15C0(Entity* self) {
     case 1:
         for (i = 0; i < self->ext.et_801B15C0.unk84; i++) {
             ptr = D_us_80181310[self->ext.et_801B15C0.unk88[i]];
+#ifdef PLATFORM_PSYZ
+            // the texture is 0x54 texels (21 words) wide
+            ptr = ShopTexWord(
+                SHOP_W_MENU + self->ext.et_801B15C0.unk88[i], ptr, 21);
+#endif
             tempVar = *ptr++;
             func_us_801B0FBC(ptr, tempVar, 0x108 + i * 16);
         }
@@ -1328,6 +1651,18 @@ void func_us_801B15C0(Entity* self) {
     case 2:
         if (g_CutsceneFlags & 0x200) {
             SetStep(3);
+#ifdef PLATFORM_PSYZ
+            // the shop's text in the menu font (ShopCell) until it closes;
+            // the labels of case 1 again in it
+            LANG_MENU_FONT(1);
+            for (i = 0; i < self->ext.et_801B15C0.unk84; i++) {
+                ptr = ShopTexWord(
+                    SHOP_W_MENU + self->ext.et_801B15C0.unk88[i],
+                    D_us_80181310[self->ext.et_801B15C0.unk88[i]], 21);
+                tempVar = *ptr++;
+                func_us_801B0FBC(ptr, tempVar, 0x108 + i * 16);
+            }
+#endif
             self->ext.et_801B15C0.unk7C = 0;
             self->ext.et_801B15C0.unk7E = 0;
             self->ext.et_801B15C0.unk80 = 0;
@@ -1558,6 +1893,9 @@ void func_us_801B15C0(Entity* self) {
         case 2:
             if (!--self->ext.et_801B15C0.unk7C) {
                 SetStep(7);
+#ifdef PLATFORM_PSYZ
+                LANG_MENU_FONT(0); // the VRAM back (the menu labels stay)
+#endif
                 g_CutsceneFlags |= 0x100;
                 g_PauseAllowed = true;
                 g_unkGraphicsStruct.pauseEnemies = 0;
@@ -1987,7 +2325,11 @@ void func_us_801B2BE4(Entity* self) {
 
     switch (self->step) {
     case 0:
+#ifdef PLATFORM_PSYZ
+        primIndex = g_api.AllocPrimitives(PRIM_G4, 0xE); // 13: ShopSplit
+#else
         primIndex = g_api.AllocPrimitives(PRIM_G4, 0xD);
+#endif
         if (primIndex != -1) {
             InitializeEntity(g_EInitCommon);
             i = 0;
@@ -2004,8 +2346,8 @@ void func_us_801B2BE4(Entity* self) {
                     prim->drawMode = DRAW_HIDE;
                 } else if (i < 8) {
                     prim->x0 = prim->x1 = prim->x2 = prim->x3 = 0x80;
-                    prim->y0 = prim->y1 = 0x18;
-                    prim->y2 = prim->y3 = 0x78;
+                    prim->y0 = prim->y1 = 0x18 - SHOP_LIST_DY;
+                    prim->y2 = prim->y3 = 0x78 - SHOP_LIST_DY;
                     prim->priority = 0x1FA;
                     prim->drawMode = DRAW_HIDE;
                 } else if (i < 10) {
@@ -2020,20 +2362,37 @@ void func_us_801B2BE4(Entity* self) {
                     prim->v0 = prim->v1 = 0xD;
                     prim->v2 = prim->v3 = 0x61;
                     prim->x0 = prim->x1 = prim->x2 = prim->x3 = 0x80;
-                    prim->y0 = prim->y1 = 0x1E;
-                    prim->y2 = prim->y3 = 0x72;
+                    prim->y0 = prim->y1 = 0x1E - SHOP_LIST_DY;
+                    prim->y2 = prim->y3 = 0x72 - SHOP_LIST_DY;
                     prim->priority = 0x1FC;
                     prim->drawMode = DRAW_HIDE;
                 } else if (i == 10) {
                     prim->x0 = prim->x2 = 0x11;
                     prim->x1 = prim->x3 = 0xEF;
-                    prim->y0 = prim->y1 = 0x2B;
-                    prim->y2 = prim->y3 = 0x37;
+#ifdef PLATFORM_PSYZ
+                    prim->x0 = prim->x2 = 0x11 - SHOP_G;
+                    prim->x1 = prim->x3 = 0xEF + SHOP_G;
+#endif
+                    prim->y0 = prim->y1 = 0x2B - SHOP_LIST_DY;
+                    prim->y2 = prim->y3 = 0x37 - SHOP_LIST_DY;
                     PRED(prim) = 0x40;
                     PGRN(prim) = 0x10;
                     PBLU(prim) = 0x10;
                     prim->priority = 0x1FB;
                     prim->drawMode = DRAW_HIDE;
+#ifdef PLATFORM_PSYZ
+                } else if (i == 13) {
+                    // the gap between the content halves (ShopSplit): the
+                    // blank page texels right of the price column
+                    prim->type = PRIM_GT4;
+                    prim->tpage = 0x114;
+                    prim->u0 = prim->u2 = 0xE4;
+                    prim->u1 = prim->u3 = 0xFC;
+                    prim->v0 = prim->v1 = 0xD;
+                    prim->v2 = prim->v3 = 0x61;
+                    prim->priority = 0x1FC;
+                    prim->drawMode = DRAW_HIDE;
+#endif
                 } else {
                     prim->type = PRIM_GT4;
                     prim->tpage = 0x1E;
@@ -2044,7 +2403,7 @@ void func_us_801B2BE4(Entity* self) {
                     prim->v2 = prim->v3 = 0x78 - (i - 11) * 8;
                     prim->x0 = prim->x2 = 0x7C;
                     prim->x1 = prim->x3 = prim->x0 + 8;
-                    prim->y0 = prim->y1 = (i - 11) * 0x60 + 0x14;
+                    prim->y0 = prim->y1 = (i - 11) * 0x60 + 0x14 - SHOP_LIST_DY;
                     prim->y2 = prim->y3 = prim->y0 + 8;
                     prim->priority = 0x1FC;
                     prim->drawMode = DRAW_HIDE;
@@ -2160,7 +2519,9 @@ void func_us_801B2BE4(Entity* self) {
         self->ext.et_801B6F30.unk7E += 0x40;
         prim = &g_PrimBuf[self->primIndex];
         func_us_801B245C(prim, self->ext.et_801B6F30.unk7E,
-                         self->ext.et_801B6F30.unk7C * 2, 0x74, 0x20, 8, 1);
+                         self->ext.et_801B6F30.unk7C * 2, SHOP_LIST_HW, 0x20,
+                         8, 1);
+        SHOP_SPLIT(prim, self->ext.et_801B6F30.unk7E);
         if (self->ext.et_801B6F30.unk7C == 0x10) {
             if (self->params) {
                 SetStep(5);
@@ -2291,7 +2652,7 @@ void func_us_801B2BE4(Entity* self) {
         for (i = 0; i < 10; i++) {
             prim = prim->next;
         }
-        prim->y0 = prim->y1 = (self->ext.et_801B6F30.unk80 * 0xC) + 0x1F;
+        prim->y0 = prim->y1 = (self->ext.et_801B6F30.unk80 * 0xC) + 0x1F - SHOP_LIST_DY;
         prim->y2 = prim->y3 = prim->y0 + 0xC;
         prim->drawMode = DRAW_COLORS;
 
@@ -2386,7 +2747,7 @@ void func_us_801B2BE4(Entity* self) {
         for (i = 0; i < 10; i++) {
             prim = prim->next;
         }
-        prim->y0 = prim->y1 = (self->ext.et_801B6F30.unk80 * 0xC) + 0x1F;
+        prim->y0 = prim->y1 = (self->ext.et_801B6F30.unk80 * 0xC) + 0x1F - SHOP_LIST_DY;
         prim->y2 = prim->y3 = prim->y0 + 0xC;
         prim->drawMode = DRAW_COLORS;
 
@@ -2451,7 +2812,9 @@ void func_us_801B2BE4(Entity* self) {
         self->ext.et_801B6F30.unk7E -= 0x40;
         prim = &g_PrimBuf[self->primIndex];
         func_us_801B245C(prim, self->ext.et_801B6F30.unk7E,
-                         self->ext.et_801B6F30.unk7C * 2, 0x74, 0x20, 8, 1);
+                         self->ext.et_801B6F30.unk7C * 2, SHOP_LIST_HW, 0x20,
+                         8, 1);
+        SHOP_SPLIT(prim, self->ext.et_801B6F30.unk7E);
         if (self->ext.et_801B6F30.unk7C == 1) {
             g_CutsceneFlags &= ~0x400;
         }
@@ -2476,9 +2839,11 @@ Primitive* func_us_801B3EC8(Primitive* prim, u32 number, u16 maxDigits) {
             if (digitValue < 10) {
                 prim->u0 = digitValue * 8;
                 prim->v0 = 8;
+                SHOP_CELL(prim, 0x10 + digitValue);
             } else {
                 prim->u0 = 0x28;
                 prim->v0 = 0x10;
+                SHOP_CELL(prim, 0x25);
             }
             for (i = 0; i < currentDigit; i++) {
                 digitValue *= 10;
@@ -2489,6 +2854,7 @@ Primitive* func_us_801B3EC8(Primitive* prim, u32 number, u16 maxDigits) {
         } else if (hasADigit || currentDigit == 0) {
             prim->u0 = 0;
             prim->v0 = 8;
+            SHOP_CELL(prim, 0x10);
             prim->drawMode = DRAW_DEFAULT;
         } else {
             prim->drawMode = DRAW_HIDE;
@@ -2520,6 +2886,7 @@ Primitive* func_us_801B3FB4(
         ch = *str++;
         prim->u0 = (ch & 0x0F) << 3;
         prim->v0 = (ch & 0xF0) >> 1;
+        SHOP_CELL(prim, ch);
         if (arg3 != 0) {
             prim->drawMode = DRAW_DEFAULT;
         }
@@ -2624,18 +2991,149 @@ Primitive* func_us_801B4194(Primitive* prim) {
     s32 i;
     u16* ptr;
 
+#ifdef PLATFORM_PSYZ
+    // on the label column; «Кількість» takes 9 of the 11 prims
+    const char* w = ShopWord(SHOP_W_NUMBER, 0, 0);
+    prim2 = prim;
+    prim = func_us_801B1064(prim, SHOP_L, ShopRowY[R_NUM],
+                            w ? w : D_us_80181674[0], 0x196);
+    for (; prim2 != prim; prim2 = prim2->next) {
+        ShopTint(prim2, TINT_NUMBER);
+    }
+#else
     prim = func_us_801B1064(prim, 0xAA, 0xB0, D_us_80181674[0], 0x196);
+#endif
     prim2 = prim;
     ptr = D_us_80181684;
     for (i = 0; i < 2; i++) {
         prim2->x0 = *ptr++;
         prim2->y0 = *ptr++;
+#ifdef PLATFORM_PSYZ
+        // the count ends with the gold digits
+        ShopCmpPlace(prim2, 25 + i);
+#endif
         prim2 = prim2->next;
     }
     return prim;
 }
 
+#ifdef PLATFORM_PSYZ
+// texel * c / 0x80 of a white texel, for a solid tile
+static u32 ShopTileRGB(u32 c) {
+    u32 r = (c >> 16 & 0xFF) * 2, g = (c >> 8 & 0xFF) * 2, b = (c & 0xFF) * 2;
+    return (r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 |
+           (b > 255 ? 255 : b);
+}
+
+static void ShopTint(Primitive* prim, u32 rgb) {
+    prim->drawMode |= DRAW_COLORS;
+    prim->r0 = rgb >> 16;
+    prim->g0 = rgb >> 8;
+    prim->b0 = rgb;
+}
+
+// The change d of a stat after its value: the arrow prim then digit prims.
+// The menu's up (red) or down (blue) arrow, or the stock → for none; then
+// |d| left aligned in the arrow's colour, no number for none. Without the
+// menu cells (no language pack) the stock arrows stay.
+static Primitive* ShopDelta(Primitive* prim, s32 d, s32 digits) {
+    s32 cell = d > 0 ? MENU_CELL_UP : MENU_CELL_DOWN;
+    u32 rgb = d > 0 ? TINT_BONUS_UP : TINT_BONUS_DOWN;
+    s16 x = prim->x0 + 8;
+    Primitive* p = prim->next;
+
+    prim->u0 = !d ? 0x20 : d > 0 ? 0x18 : 0x28;
+    prim->v0 = 0x70;
+    prim->drawMode = DRAW_DEFAULT;
+    if (LANG_MENU_FONT_ON()) { // the atlas: the arrow cell itself, tinted
+        ShopCell(prim, !d                       ? 0xE4
+                       : Lang_MenuCellAny(cell) ? cell
+                       : d > 0                  ? 0xE3
+                                                : 0xE5);
+        if (d) {
+            ShopTint(prim, rgb);
+        }
+    } else if (d && Lang_MenuCellAny(cell)) {
+        prim->drawMode = DRAW_HIDE;
+        // the 8x8 row sits on rows 3..10 of the 8x11 cell
+        // on screen: the offscreen page shows SHOP_CMP_D to the right
+        PortMenu_Cell(
+            prim->x0 + SHOP_CMP_D, p->y0 - 3, cell, ShopTileRGB(rgb));
+    }
+    prim = func_us_801B3EC8(p, d < 0 ? -d : d, digits);
+    for (; p != prim; p = p->next) {
+        if (!d) {
+            p->drawMode = DRAW_HIDE;
+        } else if (!(p->drawMode & DRAW_HIDE)) {
+            p->x0 = x;
+            x += 8;
+            ShopTint(p, rgb);
+        }
+    }
+    return prim;
+}
+
+// ATT (prim 10) red, DEF (prim 12, a blank mark cell under the port) blue,
+// the gold label (prims 15..18; uk: ShopGold has its last 2 cells) yellow
+static void ShopLabels(Primitive* prim) {
+    s32 i;
+    for (i = 0; i < 10; i++) {
+        prim = prim->next;
+    }
+    ShopTint(prim, TINT_BONUS_UP);
+    ShopTint(prim->next->next, TINT_BONUS_DOWN);
+    for (i = 0; i < 5; i++) {
+        prim = prim->next;
+    }
+    for (i = 0; i < 4; i++, prim = prim->next) {
+        ShopTint(prim, TINT_GOLD);
+    }
+}
+
+// The tail prims (stats: before and after the buy, 7 rows: hands, DEF,
+// STR..LCK). Rows 0..6: the value after, left aligned in the result column
+// (a spare cell before it). Then the value before of the 4 stat rows,
+// right aligned like the hand values, and their names in full. Nothing in
+// sell mode.
+static void ShopResults(Primitive* prim, const u16* stats, s32 hide) {
+    Primitive* p;
+    const u16* s;
+    s32 i, x;
+
+    for (i = 0; i < 11 + SHOP_CMP_N && prim; i++) {
+        prim = prim->next;
+    }
+    for (i = 0; i < 7 + 4 && prim; i++) {
+        s = stats + (i < 7 ? i : i - 4) * 2;
+        if (i < 7) {
+            prim->drawMode = DRAW_HIDE;
+            prim = prim->next;
+        }
+        p = prim;
+        prim = func_us_801B3EC8(p, i < 7 ? s[1] : s[0], 3);
+        for (x = SHOP_L + 0xB8; p != prim; p = p->next) {
+            if (hide) {
+                p->drawMode = DRAW_HIDE;
+            } else if (i < 7 && !(p->drawMode & DRAW_HIDE)) {
+                p->x0 = x;
+                x += 8;
+            }
+        }
+    }
+    for (i = 0; i < 4 && prim; i++) { // PortWord 2..5: Strength .. Luck
+        p = prim;
+        prim = func_us_801B3FB4(p, ShopWord(2 + i, 12, 0), 12, 1);
+        for (; hide && p != prim; p = p->next) {
+            p->drawMode = DRAW_HIDE;
+        }
+    }
+}
+#endif
+
 void func_us_801B420C(Primitive* prim, Entity* arg1) {
+#ifdef PLATFORM_PSYZ
+    Primitive* prim0 = prim;
+#endif
     u16 index;
     s16 x0;
     s16 x1, y1;
@@ -2655,11 +3153,27 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
     for (i = 0; i < 11; i++) {
         prim = prim->next;
     }
+#ifdef PLATFORM_PSYZ
+    // the hand mark blanks (prim 12: the DEF label), then the gold label in
+    // the font of the moment
+    for (i = 0; i < 4; i++) {
+        prim->drawMode = DRAW_DEFAULT;
+        prim = prim->next;
+    }
+    prim = func_us_801B3FB4(prim, D_us_80181660 + 4, 4, 1);
+#else
     for (i = 0; i < 8; i++) {
         prim->drawMode = DRAW_DEFAULT;
         prim = prim->next;
     }
+#endif
+#ifdef PLATFORM_PSYZ
+    primA = prim;
     prim = func_us_801B3EC8(prim, g_Status.gold, 8);
+    ShopGold(primA);
+#else
+    prim = func_us_801B3EC8(prim, g_Status.gold, 8);
+#endif
     index = arg1->ext.et_801B6F30.unk80 + arg1->ext.et_801B6F30.unk82;
 #if TARGET == TARGET_PSP
     condition = 0;
@@ -2723,6 +3237,14 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
             prim = func_us_801B3EC8(
                 func_us_801B4194(prim), 99 - D_us_801D425C[index], 2);
         } else {
+#ifdef PLATFORM_PSYZ
+            // on the label column: «Не отримано» / «Отримано» under uk
+            j = D_us_801D425C[index] != 0;
+            const char* w =
+                ShopWord(j ? SHOP_W_NOT_HAVE : SHOP_W_HAVE, 0, 0);
+            prim = func_us_801B1064(prim, SHOP_L, ShopRowY[R_NUM],
+                                    w ? w : D_us_80181674[j ? 2 : 1], 0x196);
+#else
             if (D_us_801D425C[index] != 0) {
                 prim =
                     func_us_801B1064(prim, 0x9A, 0xB0, D_us_80181674[2], 0x196);
@@ -2730,6 +3252,7 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
                 prim =
                     func_us_801B1064(prim, 0xB6, 0xB0, D_us_80181674[1], 0x196);
             }
+#endif
         }
     }
     prim = primA;
@@ -2804,6 +3327,12 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
 #endif
         maxDigits = *ptr++;
         prim = func_us_801B3EC8(prim, maxDigits, 3);
+#ifdef PLATFORM_PSYZ
+        if (!arg1->params) {
+            prim = ShopDelta(prim, *ptr - maxDigits, 3);
+            ptr++;
+        } else
+#else
         if (!arg1->params) {
             maxDigits -= *ptr;
             if (maxDigits) {
@@ -2819,7 +3348,9 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
             prim->drawMode = DRAW_DEFAULT;
             prim = prim->next;
             prim = func_us_801B3EC8(prim, *ptr++, 3);
-        } else {
+        } else
+#endif
+        {
             prim->drawMode = DRAW_HIDE;
             prim = prim->next;
             prim->drawMode = DRAW_HIDE;
@@ -2828,7 +3359,8 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
             prim = prim->next;
             prim->drawMode = DRAW_HIDE;
             prim = prim->next;
-#if TARGET == TARGET_PSP
+// sell mode: skip the "after" value too, as PSP does (PSX shows ATT twice)
+#if TARGET == TARGET_PSP || defined(PLATFORM_PSYZ)
             ptr++;
 #endif
         }
@@ -2855,6 +3387,15 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
             }
             prim = primA;
 #endif
+#ifdef PLATFORM_PSYZ
+            if (true) { // every stat row, like the ATT/DEF rows
+                // the names in full: ShopResults
+                for (j = 0; j < 3; j++) {
+                    prim->drawMode = DRAW_HIDE;
+                    prim = prim->next;
+                }
+                prim = ShopDelta(prim, number - maxDigits, 2);
+#else
             if (maxDigits != number) {
                 prim = func_us_801B3FB4(prim, &D_us_80181668[i * 3], 3, 1);
                 if (maxDigits > number) {
@@ -2880,6 +3421,7 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
                 prim->drawMode = DRAW_DEFAULT;
                 prim = prim->next;
                 prim = func_us_801B3EC8(prim, number, maxDigits);
+#endif
             } else {
                 for (j = 0; j < 6; j++) {
                     prim->drawMode = DRAW_HIDE;
@@ -2895,6 +3437,10 @@ void func_us_801B420C(Primitive* prim, Entity* arg1) {
         prim->drawMode = DRAW_HIDE;
         prim = prim->next;
     }
+#ifdef PLATFORM_PSYZ
+    ShopLabels(prim0);
+    ShopResults(prim0, stats, arg1->params);
+#endif
 }
 
 void func_us_801B4830(Entity* self) {
@@ -2907,12 +3453,38 @@ void func_us_801B4830(Entity* self) {
     const char* name;
     Entity* tempEntity;
     u8* unused;
+#ifdef PLATFORM_PSYZ
+    Primitive* prim2;
+#endif
 
     tempEntity = self - 1;
+#ifdef PLATFORM_PSYZ
+    // The hand marks of the compare window in the port's button set, the
+    // live mapping: centred on the two 8x8 cells of each hand label (prims
+    // 11, 12 and 13, 14), 2 rows up (a mark is 11 high). The hand rows are
+    // 12 apart (ShopRowY), so the marks do not touch.
+    if (self->flags & FLAG_HAS_PRIMS) {
+        prim = &g_PrimBuf[self->primIndex];
+        for (i = 0; i < 11 && prim; i++) {
+            prim = prim->next;
+        }
+        for (i = 0; i < 2 && prim && prim->next; i++) {
+            if (!(prim->drawMode & DRAW_HIDE)) {
+                j = g_Settings.buttonConfig[i];
+                PortMenu_Mark(prim->x0 + SHOP_CMP_D +
+                                  (16 - Buttons_Width(j)) / 2,
+                              prim->y0 - 2, j);
+            }
+            prim = prim->next->next;
+        }
+    }
+#endif
     switch (self->step) {
     case 0:
 #if TARGET == TARGET_PSP
         primIndex = g_api.AllocPrimitives(PRIM_SPRT, 0x84);
+#elif defined(PLATFORM_PSYZ)
+        primIndex = g_api.AllocPrimitives(PRIM_SPRT, 0x53 + SHOP_CMP_RES);
 #else
         primIndex = g_api.AllocPrimitives(PRIM_SPRT, 0x53);
 #endif
@@ -2935,8 +3507,16 @@ void func_us_801B4830(Entity* self) {
                 } else if (i < 8) {
                     prim->type = PRIM_G4;
                     prim->x0 = prim->x1 = prim->x2 = prim->x3 = 0xBA;
+#ifdef PLATFORM_PSYZ
+                    prim->x0 = prim->x1 = prim->x2 = prim->x3 =
+                        SHOP_CMP_C + SHOP_CMP_D;
+#endif
                     prim->y0 = prim->y1 = 0x76;
                     prim->y2 = prim->y3 = 0xCA;
+#ifdef PLATFORM_PSYZ
+                    prim->y0 = prim->y1 = SHOP_CMP_Y0 - 3;
+                    prim->y2 = prim->y3 = SHOP_CMP_Y1 + 3;
+#endif
                     prim->priority = 0xBF;
                     prim->drawMode = DRAW_HIDE;
                 } else if (i < 10) {
@@ -2951,8 +3531,20 @@ void func_us_801B4830(Entity* self) {
                     prim->v0 = prim->v1 = 0x7E;
                     prim->v2 = prim->v3 = prim->v0 + 0x44;
                     prim->x0 = prim->x1 = prim->x2 = prim->x3 = 0xBA;
+#ifdef PLATFORM_PSYZ
+                    prim->u0 = prim->u2 = (i - 9) * SHOP_CMP_HW + SHOP_CMP_C;
+                    prim->u1 = prim->u3 = prim->u0 + SHOP_CMP_HW;
+                    prim->x0 = prim->x1 = prim->x2 = prim->x3 =
+                        SHOP_CMP_C + SHOP_CMP_D;
+#endif
                     prim->y0 = prim->y1 = 0x7E;
                     prim->y2 = prim->y3 = 0xC2;
+#ifdef PLATFORM_PSYZ
+                    prim->v0 = prim->v1 = SHOP_CMP_Y0;
+                    prim->v2 = prim->v3 = SHOP_CMP_Y1;
+                    prim->y0 = prim->y1 = SHOP_CMP_Y0;
+                    prim->y2 = prim->y3 = SHOP_CMP_Y1;
+#endif
                     prim->priority = 0xC0;
                     prim->drawMode = DRAW_HIDE;
                 } else if (i == 10) {
@@ -2971,6 +3563,12 @@ void func_us_801B4830(Entity* self) {
                     prim->u1 = 0x24;
                     prim->v1 = 0x20;
                     prim->x0 = 0x80;
+#ifdef PLATFORM_PSYZ
+                    // 64 texels: «Захист» is 48 (8 in from the edge)
+                    func_us_801B11A0(0x60, 0x100, 0x40, 0x20);
+                    prim->u1 = 0x40;
+                    prim->x0 = SHOP_L - 8;
+#endif
                     prim->y0 = 0x7E;
                     prim->priority = 0x11;
                     prim->drawMode = DRAW_HIDE;
@@ -2985,10 +3583,36 @@ void func_us_801B4830(Entity* self) {
                             D_us_80181650[g_Settings.buttonConfig[1]];
                         D_us_80181660[3] =
                             D_us_80181658[g_Settings.buttonConfig[1]];
+#ifdef PLATFORM_PSYZ
+                        // the port draws the marks (below)
+                        D_us_80181660[0] = D_us_80181660[1] = CH(' ');
+                        D_us_80181660[2] = D_us_80181660[3] = CH(' ');
+#endif
+#ifdef PLATFORM_PSYZ
+                        // uk: «Золото», its last 2 cells in prims 19, 20
+                        // (ShopGold)
+                        name = ShopWord(SHOP_W_GOLD, 6, 0);
+                        if (name) {
+                            D_us_80181660[4] = name[0];
+                            D_us_80181660[5] = name[1];
+                            D_us_80181660[6] = name[2];
+                            D_us_80181660[7] = name[3];
+                        } else if (D_us_80181660[5] <= CH('Z')) {
+                            // en: sentence case like the Number label
+                            D_us_80181660[5] += CH('a') - CH('A');
+                            D_us_80181660[6] += CH('a') - CH('A');
+                            D_us_80181660[7] += CH('a') - CH('A');
+                        }
+#endif
                         func_us_801B3FB4(prim, D_us_80181660, 8, 0);
                     }
+#ifdef PLATFORM_PSYZ
+                    ShopCmpPlace(prim, j);
+                    var_s4 += 2;
+#else
                     prim->x0 = *var_s4++ + 0xBA;
                     prim->y0 = *var_s4++ + 0xA0;
+#endif
                     j++;
                     if (g_Settings.buttonConfig[(i - 11) / 2] < 4) {
                         if ((i - 11) & 1) {
@@ -3002,8 +3626,15 @@ void func_us_801B4830(Entity* self) {
                     prim->priority = 0x11;
                     prim->drawMode = DRAW_HIDE;
                 } else {
+#ifdef PLATFORM_PSYZ
+                    ShopCmpPlace(prim, j);
+                    if (j < SHOP_CMP_N) {
+                        var_s4 += 2;
+                    }
+#else
                     prim->x0 = *var_s4++ + 0xBA;
                     prim->y0 = *var_s4++ + 0xA0;
+#endif
                     j++;
                     prim->clut = PAL_UNK_196;
                     prim->tpage = 0x1E;
@@ -3026,6 +3657,26 @@ void func_us_801B4830(Entity* self) {
                 prim = prim->next;
             }
 #endif
+#ifdef PLATFORM_PSYZ
+            // the label texture in two: ATT (rows 0..15) on the first hand
+            // row, DEF (rows 16..31) in prim 12, a blank mark cell, on its
+            // row; the words are 4 rows down in their halves
+            prim = &g_PrimBuf[primIndex];
+            for (i = 0; i < 10; i++) {
+                prim = prim->next;
+            }
+            prim->v1 = 0x10;
+            prim->y0 = ShopRowY[R_H1] - 4;
+            prim2 = prim->next->next;
+            prim2->clut = prim->clut;
+            prim2->tpage = prim->tpage;
+            prim2->u0 = prim->u0;
+            prim2->v0 = 0x10;
+            prim2->u1 = prim->u1;
+            prim2->v1 = 0x10;
+            prim2->x0 = prim->x0;
+            prim2->y0 = ShopRowY[R_DEF] - 4;
+#endif
         }
         break;
 
@@ -3034,6 +3685,9 @@ void func_us_801B4830(Entity* self) {
             unused = g_Pix[0];
             for (i = 0; i < 2; i++) {
                 name = D_us_80181528[i];
+#ifdef PLATFORM_PSYZ
+                name = ShopTexWord(i, name, 0); // PORT 0, 1: Атака, Захист
+#endif
 #if TARGET == TARGET_PSP
                 func_us_801B0FBC(name, 0x17, 0x104 + i * 16);
 #else
@@ -3058,6 +3712,9 @@ void func_us_801B4830(Entity* self) {
                 prim->drawMode = DRAW_DEFAULT;
                 prim = prim->next;
             }
+#ifdef PLATFORM_PSYZ
+            ShopLabels(&g_PrimBuf[self->primIndex]);
+#endif
             SetStep(3);
             self->ext.et_801B6F30.unk7C = 0;
             self->ext.et_801B6F30.unk7E = 0;
@@ -3069,7 +3726,8 @@ void func_us_801B4830(Entity* self) {
         self->ext.et_801B6F30.unk7E += 0x40;
         prim = &g_PrimBuf[self->primIndex];
         func_us_801B245C(prim, self->ext.et_801B6F30.unk7E,
-                         self->ext.et_801B6F30.unk7C * 2, 0x42, 0x18, 0x32, 1);
+                         self->ext.et_801B6F30.unk7C * 2, SHOP_CMP_W, 0x18,
+                         0x32, 1);
         if (self->ext.et_801B6F30.unk7C == 0x10) {
             SetStep(4);
         }
@@ -3090,7 +3748,8 @@ void func_us_801B4830(Entity* self) {
         self->ext.et_801B6F30.unk7E -= 0x40;
         prim = &g_PrimBuf[self->primIndex];
         func_us_801B245C(prim, self->ext.et_801B6F30.unk7E,
-                         self->ext.et_801B6F30.unk7C * 2, 0x42, 0x18, 0x32, 1);
+                         self->ext.et_801B6F30.unk7C * 2, SHOP_CMP_W, 0x18,
+                         0x32, 1);
         if (!self->ext.et_801B6F30.unk7C) {
             for (i = 0; i < 10; i++) {
                 prim = prim->next;
@@ -3116,6 +3775,97 @@ static const char* D_us_8018168C[] = {
     "Basic map of Dracula’s castle", "Contains ””Dark Metamorphosis””",
     "Contains ””Summon Spirit””",    "Contains ””Hellfire””",
     "Contains ””Tetra Spirits””",    "Contains ””Soul Steal””"};
+#endif
+
+#ifdef PLATFORM_PSYZ
+// The description line in the menu font: the 12x16 text (ASCII letters, else
+// Shift-JIS) as atlas cells (Lang_SjisCell) at an 8 texel pitch, from
+// texel 8 of the bar's texture (VRAM 0, 0x180: 240 texels, 22 rows, prim
+// 4). The line goes on in a second strip of SHOP_DESC_W2 texels at
+// SHOP_DESC_V2 (prim 7, right of prim 4 on the wider bar). One ink: the
+// 12x16 font's own (a dash's middle).
+#define SHOP_DESC_V2 0x198
+#define SHOP_DESC_W2 0x80
+#define SHOP_DESC_ROW 6 // the cell's first row in the 22 of the bar
+static void ShopDescLine(const char* str) {
+    static u8 line[22][(0xF0 + SHOP_DESC_W2) / 2];
+    static u8 a[22][0xF0 / 2], b[22][SHOP_DESC_W2 / 2];
+    static s32 ink;
+    RECT r;
+    u8 rows[44];
+    s32 x, y, i, c, ch;
+
+    if (!ink) {
+        const u8* g = (const u8*)g_api.func_80106A28(0x815C, 1);
+        for (i = 0; i < 16 * 6; i++) {
+            ink = MAX(ink, MAX(g[i] & 15, g[i] >> 4));
+        }
+        ink = ink ? ink : 15;
+    }
+    for (y = 0; y < 22; y++) {
+        for (i = 0; i < LEN(line[0]); i++) {
+            line[y][i] = 0;
+        }
+    }
+    for (x = 8; (u8)*str >= 8 && x + 8 <= LEN(line[0]) * 2; x += 8) {
+        ch = (u8)*str++;
+        if (ch == '@') {
+            break;
+        }
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+              ch == ' ')) {
+            ch = ch << 8 | (u8)*str++;
+            if (ch == 0x8168) {
+                str += 2; // the stock ”” pair is one mark
+            }
+        }
+        c = Lang_SjisCell(ch);
+        if (c <= 0) {
+            continue;
+        }
+        Lang_MenuCellRows(c, rows);
+        for (y = 0; y < 11; y++) {
+            for (i = 0; i < 8; i++) {
+                if (rows[y * 4 + i / 2] >> (i & 1) * 4 & 15) {
+                    line[SHOP_DESC_ROW + y][(x + i) / 2] |=
+                        ink << ((x + i) & 1) * 4;
+                }
+            }
+        }
+    }
+    for (y = 0; y < 22; y++) {
+        for (i = 0; i < LEN(a[0]); i++) {
+            a[y][i] = line[y][i];
+        }
+        for (i = 0; i < LEN(b[0]); i++) {
+            b[y][i] = line[y][LEN(a[0]) + i];
+        }
+    }
+    setRECT(&r, 0, 0x180, 0xF0 / 4, 22);
+    LoadImage(&r, (u_long*)a);
+    setRECT(&r, 0, SHOP_DESC_V2, SHOP_DESC_W2 / 4, 22);
+    LoadImage(&r, (u_long*)b);
+}
+
+// prim 7 (the second strip) right of prim 4 (the first), at its scale
+static void ShopDescB(Primitive* prim) {
+    Primitive* b;
+    s32 i;
+
+    for (i = 0; i < 4; i++) {
+        prim = prim->next;
+    }
+    b = prim->next->next->next;
+    b->x0 = prim->x1;
+    b->x2 = prim->x3;
+    b->x1 = prim->x1 + (prim->x1 - prim->x0) * SHOP_DESC_W2 / 0xF0;
+    b->x3 = prim->x3 + (prim->x3 - prim->x2) * SHOP_DESC_W2 / 0xF0;
+    b->y0 = prim->y0;
+    b->y1 = prim->y1;
+    b->y2 = prim->y2;
+    b->y3 = prim->y3;
+    b->drawMode = LANG_MENU_FONT_ON() ? prim->drawMode : DRAW_HIDE;
+}
 #endif
 
 void func_us_801B4ED4(s16 index, u16 arg1) {
@@ -3165,6 +3915,12 @@ void func_us_801B4ED4(s16 index, u16 arg1) {
     }
     unused = &g_Pix[0][0x1000];
     itemId = 2;
+#ifdef PLATFORM_PSYZ
+    if (LANG_MENU_FONT_ON()) {
+        ShopDescLine(desc);
+        return;
+    }
+#endif
     func_us_801B0C40(&g_Pix[0][0x800], desc, 2, 0x184, 0x7E);
 }
 
@@ -3182,7 +3938,11 @@ void func_us_801B5068(Entity* self) {
 #endif
     switch (self->step) {
     case 0:
+#ifdef PLATFORM_PSYZ
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, 8); // 7: ShopDescB
+#else
         primIndex = g_api.AllocPrimitives(PRIM_GT4, 7);
+#endif
         if (primIndex != -1) {
             InitializeEntity(g_EInitCommon);
             i = 0;
@@ -3229,6 +3989,18 @@ void func_us_801B5068(Entity* self) {
                     prim->v2 = prim->v3 = prim->v0 + 0xE;
                     prim->priority = 0xC0;
                     prim->drawMode = DRAW_HIDE;
+#ifdef PLATFORM_PSYZ
+                } else if (i == 7) { // ShopDescB
+                    func_us_801B11A0(0, SHOP_DESC_V2, SHOP_DESC_W2, 0x16);
+                    prim->clut = PAL_UNK_1A1;
+                    prim->tpage = 0x10;
+                    prim->u0 = prim->u2 = 0;
+                    prim->u1 = prim->u3 = SHOP_DESC_W2;
+                    prim->v0 = prim->v1 = SHOP_DESC_V2 & 0xFF;
+                    prim->v2 = prim->v3 = prim->v0 + 0x16;
+                    prim->priority = 0xBE;
+                    prim->drawMode = DRAW_HIDE;
+#endif
                 }
                 prim = prim->next;
             }
@@ -3306,9 +4078,10 @@ void func_us_801B5068(Entity* self) {
             prim->x2 = 8 - offset;
             prim->x1 = 0xF8 - offset;
             prim->x3 = offset + 0xF8;
+            SHOP_DESC_X(prim, i);
             offset = (rsin(self->ext.et_801B6F30.unk7E) * 11) / 0x1000;
-            prim->y0 = prim->y1 = 0xD4 - offset;
-            prim->y2 = prim->y3 = offset + 0xD4;
+            prim->y0 = prim->y1 = 0xD4 + SHOP_DESC_DY - offset;
+            prim->y2 = prim->y3 = offset + 0xD4 + SHOP_DESC_DY;
             if (i) {
                 prim->drawMode =
                     DRAW_DITHERING | DRAW_TPAGE | DRAW_COLORS | DRAW_TRANSP;
@@ -3318,6 +4091,9 @@ void func_us_801B5068(Entity* self) {
             }
             prim = prim->next;
         }
+#endif
+#ifdef PLATFORM_PSYZ
+        ShopDescB(otherPrim);
 #endif
         if (!self->ext.et_801B6F30.unk7C) {
             SetStep(4);
@@ -3369,9 +4145,10 @@ void func_us_801B5068(Entity* self) {
             prim->x2 = 8 - offset;
             prim->x1 = 0xF8 - offset;
             prim->x3 = offset + 0xF8;
+            SHOP_DESC_X(prim, i);
             offset = (rsin(self->ext.et_801B6F30.unk7E) * 11) / 0x1000;
-            prim->y0 = prim->y1 = 0xD4 - offset;
-            prim->y2 = prim->y3 = offset + 0xD4;
+            prim->y0 = prim->y1 = 0xD4 + SHOP_DESC_DY - offset;
+            prim->y2 = prim->y3 = offset + 0xD4 + SHOP_DESC_DY;
             if (i) {
                 prim->drawMode =
                     DRAW_DITHERING | DRAW_TPAGE | DRAW_COLORS | DRAW_TRANSP;
@@ -3381,8 +4158,14 @@ void func_us_801B5068(Entity* self) {
             }
             prim = prim->next;
         }
+#ifdef PLATFORM_PSYZ
+        ShopDescB(otherPrim);
+#endif
         if (!self->ext.et_801B6F30.unk7C) {
             func_us_801B11A0(0, 0x180, 0xF0, 0x16);
+#ifdef PLATFORM_PSYZ
+            func_us_801B11A0(0, SHOP_DESC_V2, SHOP_DESC_W2, 0x16);
+#endif
             DestroyEntity(self);
         }
         break;
@@ -3418,6 +4201,9 @@ void func_us_801B56E4(Entity* self) {
     s16 index;
     s32 count;
     u32 price;
+#ifdef PLATFORM_PSYZ
+    const char* ukName;
+#endif
 
     tempEntity = self - 3;
     switch (self->step) {
@@ -3509,9 +4295,19 @@ void func_us_801B56E4(Entity* self) {
                 break;
             case INVENTORY_RELIC:
                 name = D_us_801816AC[itemId];
+#ifdef PLATFORM_PSYZ
+                ukName = ShopWord(SHOP_W_JEWEL, 0, 0);
+                name = ukName ? ukName : name;
+#endif
                 break;
             case INVENTORY_DOCUMENT:
                 name = D_us_801816B0[itemId];
+#ifdef PLATFORM_PSYZ
+                // D_us_801816B0: the map (0), the scrolls 1..5
+                ukName = itemId ? ShopWord(SHOP_W_SCROLL, 0, itemId)
+                                : ShopWord(SHOP_W_MAP, 0, 0);
+                name = ukName ? ukName : name;
+#endif
                 break;
             default:
                 name = *D_us_80181528;
@@ -3526,6 +4322,7 @@ void func_us_801B56E4(Entity* self) {
                 prim->drawMode = DRAW_DEFAULT;
                 prim->x0 = posX;
                 prim->y0 = posY;
+                SHOP_CELL(prim, CH('x'));
                 prim = prim->next;
                 posX += 8;
                 prim2 = prim;
@@ -3571,6 +4368,10 @@ void func_us_801B56E4(Entity* self) {
                 }
 #if TARGET == TARGET_PSP
                 func_us_801B3FB4(prim2, D_us_801816A4, count, 1);
+#elif defined(PLATFORM_PSYZ)
+                ukName = ShopWord(SHOP_W_SOLD, LEN(D_us_801816A4), 0);
+                func_us_801B3FB4(prim2, ukName ? ukName : D_us_801816A4,
+                                 LEN(D_us_801816A4), 1);
 #else
                 func_us_801B3FB4(prim2, D_us_801816A4, LEN(D_us_801816A4), 1);
 #endif
@@ -3620,6 +4421,7 @@ void func_us_801B56E4(Entity* self) {
             prim->drawMode = DRAW_DEFAULT;
             prim->x0 = posX;
             prim->y0 = posY;
+            SHOP_CELL(prim, CH('x'));
             prim = prim->next;
             posX += 8;
             prim2 = prim;
@@ -3837,7 +4639,8 @@ void func_us_801B6124(Primitive* prim, Entity* arg1) {
             prim =
                 func_us_801B1064(prim, 8, posY, D_us_801816C8[itemIndex], clut);
 #else
-            prim = func_us_801B1064(prim, 8, posY, D_us_801816C8[itemId], clut);
+            prim = func_us_801B1064(
+                prim, 8, posY, LANG_CELL(D_us_801816C8[itemId]), clut);
 #endif
             enemyTactics->category++;
         } else {
@@ -4622,8 +5425,49 @@ static const char* D_us_801818C0[] = {
 static const char* D_us_801818EC = _S("????????");
 static const char* D_us_801818F0 = _S("????");
 
+#ifdef PLATFORM_PSYZ
+#define BEST_NONE 11 // BestWord: "None"
+// uk: the bestiary words of ua_port.json (SHOP_W_BEST + the D_us_801818C0
+// index, BEST_NONE for "None"); en keeps the stock strings
+static const char* BestWord(int k) {
+    const char* w = ShopWord(SHOP_W_BEST + k, 0, 0);
+    return w ? w : k == BEST_NONE ? D_us_8018181C[0] : D_us_801818C0[k];
+}
+#define BEST_WORD(k) BestWord(k)
+#define BEST_NONE_WORD BestWord(BEST_NONE)
+// 16:9: the window grows BEST_G on each side, like the shop's item list
+// (x -64..320), and BEST_DY up and down. Its content draws on screen over
+// the open window (BestShow), not into the 256-texel page: the name and
+// the number on top; the portrait, then the LV, HP and Exp block under it;
+// right of it the resistances (BestResist, a 2x2 grid) and the drops; the
+// description (two lines) at the bottom. A text row's ink is y-3 (й, ї) to y+7 (descenders):
+// rows BEST_ROW apart (2..3 px between them), the next block BEST_NEXT
+// under a row (6..7 px between them).
+#define BEST_G (SHOP_G - 4)
+#define BEST_DY 17
+#define BEST_L (0x18 - BEST_G)  // the content's left edge
+#define BEST_R (0xE8 + BEST_G)  // the content's right edge
+#define BEST_GX (BEST_L + 0x68) // the grid, right of the 96 px portrait
+#define BEST_C2 (BEST_GX + 0x90) // the grid's 2nd column, 18 cells right:
+                                 // 13 cells for "STN, PSN, CUR" (en)
+#define BEST_ROW 13
+#define BEST_NEXT 18
+#define BEST_TOP 0x1C    // the name and the number
+#define BEST_PORT_Y 0x2A // the 112 px portrait
+#define BEST_STAT_Y 0x9E // LV, HP, Exp
+#define BEST_DESC_Y 0xC5 // the description's two lines (ink from y 0xC6)
+#else
+#define BEST_G 0
+#define BEST_DY 0
+#endif
+
 const char* func_us_801B7C94(u16 itemId) {
     const char* name;
+#ifdef PLATFORM_PSYZ
+    if (!itemId) {
+        return BEST_NONE_WORD;
+    }
+#endif
     if (itemId >= 0x80) {
         itemId -= 0x80;
         if (itemId < NUM_HAND_ITEMS) {
@@ -4655,6 +5499,250 @@ Primitive* func_us_801B7D10(Primitive* prim, u16 arg1, s16 posY) {
     return prim;
 }
 
+#ifdef PLATFORM_PSYZ
+static const char BestComma[] = "\x0C\xFF"; // CH(','), the FF 00 end
+
+// the cells of a word (FF end)
+static s32 BestLen(const char* w) {
+    s32 n;
+
+    for (n = 0; (u8)w[n] != 0xFF; n++) {
+    }
+    return n;
+}
+
+// The element words of mask from x0 in a row w px wide, from row y: one
+// space apart (sep: ", "), a new row when a word would pass the row;
+// "None" for none. Draws when pp is set; returns the number of rows.
+static s32 BestElems(
+    Primitive** pp, u16 mask, s16 x0, s16 w, s16 y, s32 sep) {
+    s32 i, n, c, left = 0, rows = 1;
+    s16 x = x0;
+    const char* s;
+
+    if (!(mask & ELEMENT_ALL)) {
+        if (pp) {
+            *pp = func_us_801B1064(*pp, x, y, BEST_NONE_WORD, 0x159);
+        }
+        return 1;
+    }
+    for (i = 0; i < LEN(D_us_801818A8); i++) {
+        left += (mask & D_us_801818A8[i]) != 0;
+    }
+    for (i = 0; i < LEN(D_us_801818A8); i++) {
+        if (!(mask & D_us_801818A8[i])) {
+            continue;
+        }
+        s = ShopWord(SHOP_W_ELEM + i, 0, 0);
+        if (!s) {
+            s = D_us_8018187C[i];
+        }
+        n = BestLen(s);
+        c = sep && --left > 0; // a comma after it
+        if (x > x0 && x + (n + c) * 8 > x0 + w) {
+            x = x0;
+            y += BEST_ROW;
+            rows++;
+        }
+        if (pp) {
+            *pp = func_us_801B1064(*pp, x, y, s, 0x15C);
+            if (c) {
+                *pp = func_us_801B1064(*pp, x + n * 8, y, BestComma, 0x15C);
+            }
+        }
+        x += (n + c + 1) * 8;
+    }
+    return rows;
+}
+
+// Strong VS. | Immune, Weak VS. | Absorb right of the portrait from *py:
+// the values under the label, ", " between them, wrapped inside the cell
+// (column 1 stays 2 cells clear of column 2); *py becomes the next block's y
+static Primitive* BestResist(Primitive* prim, EnemyDef* e, s16* py) {
+    u16 masks[4];
+    s16 xs[2], ws[2];
+    s32 i, c, rows;
+    s16 y = *py;
+
+    masks[0] = e->strengths;
+    masks[1] = e->immunes;
+    masks[2] = e->weaknesses;
+    masks[3] = e->absorbs;
+    xs[0] = BEST_GX;
+    ws[0] = BEST_C2 - BEST_GX - 16;
+    xs[1] = BEST_C2;
+    ws[1] = BEST_R - BEST_C2;
+    for (i = 0; i < 4; i += 2) {
+        rows = MAX(BestElems(NULL, masks[i], 0, ws[0], 0, 1),
+                   BestElems(NULL, masks[i + 1], 0, ws[1], 0, 1));
+        for (c = 0; c < 2; c++) {
+            prim = func_us_801B1064(
+                prim, xs[c], y, BEST_WORD(7 + i + c), 0x196);
+            BestElems(&prim, masks[i + c], xs[c], ws[c], y + BEST_ROW, 1);
+        }
+        y += BEST_ROW * rows + BEST_NEXT;
+    }
+    *py = y;
+    return prim;
+}
+
+// len digit cells of value (or of str), right-aligned to x
+static Primitive* BestNum(
+    Primitive* prim, u32 value, const char* str, s32 len, s16 x, s16 y) {
+    s32 i;
+
+    if (str) {
+        func_us_801B3FB4(prim, str, len, 1);
+    } else {
+        func_us_801B3EC8(prim, value, len);
+    }
+    for (i = 0; i < len; i++) {
+        prim->clut = PAL_UNK_196;
+        prim->x0 = x - (len - i) * 8;
+        SHOP_Y(prim, y);
+        prim = prim->next;
+    }
+    return prim;
+}
+
+// The description (Shift-JIS, '@' a new line) in the menu font's cells like
+// the rest of the page, white, BEST_ROW a line: the stock 12x16 text
+// (shaded, with a shadow) looked smeared. Parsed as ShopDescLine does.
+static Primitive* BestDesc(Primitive* prim, const char* str, s16 y) {
+    s16 x = BEST_L;
+    s32 ch, c;
+
+    while (prim && (u8)*str >= 8) {
+        ch = (u8)*str++;
+        if (ch == '@') {
+            x = BEST_L;
+            y += BEST_ROW;
+            continue;
+        }
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+              ch == ' ')) {
+            ch = ch << 8 | (u8)*str++;
+            if (ch == 0x8168) {
+                str += 2; // the stock ”” pair is one mark
+            }
+        }
+        c = Lang_SjisCell(ch);
+        if (c > 0) {
+            prim->clut = PAL_UNK_196;
+            prim->drawMode = DRAW_DEFAULT;
+            prim->x0 = x;
+            ShopCellY(prim, y);
+            ShopCell(prim, c);
+            prim = prim->next;
+        }
+        x += 8;
+    }
+    return prim;
+}
+
+void func_us_801B7DF8(Primitive* prim, Entity* arg1, s16 enemyId) {
+    EnemyDef* e = &g_api.enemyDefs[enemyId];
+    u8 params = arg1->params;
+    Primitive* p;
+    const char* w;
+    s16 y;
+
+    prim->drawMode = DRAW_DEFAULT; // the portrait
+    prim->x0 = BEST_L;
+    prim->y0 = BEST_PORT_Y;
+    prim = prim->next;
+    // the description: the stock texture only without the menu font
+    prim->drawMode = LANG_MENU_FONT_ON() ? DRAW_HIDE : DRAW_DEFAULT;
+    prim->x0 = BEST_L;
+    prim->y0 = BEST_DESC_Y;
+    prim = prim->next;
+
+    // the name left, the number right
+    prim = func_us_801B1064(prim, BEST_L, BEST_TOP, e->name, 0x196);
+    prim = func_us_801B1064(
+        prim, BEST_R - 0x30, BEST_TOP, BEST_WORD(5), 0x196); // "No."
+    prim = BestNum(prim, params + 1, NULL, 3, BEST_R, BEST_TOP);
+
+    // under the portrait: LV, HP (red, as on the status page), Exp; the
+    // numbers on its right edge
+    y = BEST_STAT_Y;
+    prim = func_us_801B1064(prim, BEST_L, y, BEST_WORD(0), 0x196); // "LV"
+    prim = BestNum(prim, e->level, params ? NULL : D_us_801818C0[6], 2,
+                   BEST_L + 0x60, y); // "??"
+    y += BEST_ROW;
+    p = prim;
+    prim = func_us_801B1064(prim, BEST_L, y, BEST_WORD(1), 0x196); // "HP"
+    for (; p != prim; p = p->next) {
+        ShopTint(p, TINT_HP);
+    }
+    prim = BestNum(prim, e->hitPoints,
+                   e->hitPoints > 9999 ? D_us_801818F0 : NULL, 4,
+                   BEST_L + 0x60, y); // "????"
+    y += BEST_ROW;
+    prim = func_us_801B1064(prim, BEST_L, y, BEST_WORD(3), 0x196); // "Exp"
+    prim = BestNum(prim, e->exp, NULL, 4, BEST_L + 0x60, y);
+
+    y = BEST_TOP + BEST_NEXT;
+    prim = BestResist(prim, e, &y);
+
+    // the drops, one a row; uk: one line for none («Здобичі немає»)
+    w = ShopWord(SHOP_W_NO_DROPS, 0, 0);
+    if (!e->uncommonItemId && !e->rareItemId && w) {
+        prim = func_us_801B1064(prim, BEST_GX, y, w, 0x159);
+    } else {
+        prim = func_us_801B1064(
+            prim, BEST_GX, y, BEST_WORD(4), 0x196); // "Drop Items"
+        if (!e->uncommonItemId && !e->rareItemId) {
+            prim = func_us_801B1064(
+                prim, BEST_GX, y + BEST_ROW, BEST_NONE_WORD, 0x159);
+        }
+    }
+    if (e->uncommonItemId) {
+        y += BEST_ROW;
+        prim = func_us_801B1064(
+            prim, BEST_GX, y, func_us_801B7C94(e->uncommonItemId), 0x196);
+    }
+    if (e->rareItemId) {
+        y += BEST_ROW;
+        prim = func_us_801B1064(
+            prim, BEST_GX, y,
+            g_CastleFlags[(params >> 3) + ENEMY_LIST_RAREDROP_1B0] &
+                    (1 << (params & 7))
+                ? func_us_801B7C94(e->rareItemId)
+                : D_us_801818EC, // "????????"
+            0x196);
+    }
+    if (LANG_MENU_FONT_ON()) {
+        prim = BestDesc(
+            prim, LANG_SJIS(D_us_80180FB4[params]), BEST_DESC_Y + 4);
+    }
+    while (prim != NULL) {
+        prim->drawMode = DRAW_HIDE;
+        prim = prim->next;
+    }
+}
+
+// The content (prims 10 on: portrait, description, text) draws on screen
+// over the window: drawn once the window is open, hidden while it moves.
+static void BestShow(Entity* self, u16 enemyId, s32 show) {
+    Primitive* prim = &g_PrimBuf[self->primIndex];
+    Primitive* p;
+    s32 i;
+
+    for (i = 0; i < 10; i++) {
+        prim = prim->next;
+    }
+    if (show) {
+        func_us_801B7DF8(prim, self, enemyId);
+    }
+    for (p = prim; p != NULL; p = p->next) {
+        p->priority = 0x1FD;
+        if (!show) {
+            p->drawMode = DRAW_HIDE;
+        }
+    }
+}
+#else
 void func_us_801B7DF8(Primitive* prim, Entity* arg1, s16 enemyId) {
     s16 posX, posY;
     s32 i;
@@ -4771,6 +5859,7 @@ void func_us_801B7DF8(Primitive* prim, Entity* arg1, s16 enemyId) {
         prim = prim->next;
     }
 }
+#endif
 
 void func_us_801B8234(Entity* self) {
     Primitive* prim;
@@ -4790,7 +5879,13 @@ void func_us_801B8234(Entity* self) {
 #if TARGET == TARGET_PSP
         primIndex = g_api.AllocPrimitives(PRIM_SPRT, 0xAE);
 #else
+#ifdef PLATFORM_PSYZ
+        // the longer uk words and element names, the description's cells
+        // (BestDesc, up to 57): 12 + about 250 cells
+        primIndex = g_api.AllocPrimitives(PRIM_SPRT, 0x110);
+#else
         primIndex = g_api.AllocPrimitives(PRIM_SPRT, 0x86);
+#endif
 #endif
         if (primIndex != -1) {
             InitializeEntity(g_EInitCommon);
@@ -4809,8 +5904,8 @@ void func_us_801B8234(Entity* self) {
                 } else if (i < 8) {
                     prim->type = PRIM_G4;
                     prim->x0 = prim->x1 = prim->x2 = prim->x3 = 0x80;
-                    prim->y0 = prim->y1 = 0x1E;
-                    prim->y2 = prim->y3 = 0xDE;
+                    prim->y0 = prim->y1 = 0x1E - BEST_DY;
+                    prim->y2 = prim->y3 = 0xDE + BEST_DY;
                     prim->priority = 0x1FA;
                     prim->drawMode = DRAW_HIDE;
 #if TARGET == TARGET_PSP
@@ -4870,8 +5965,8 @@ void func_us_801B8234(Entity* self) {
                     prim->v0 = prim->v1 = 0x26;
                     prim->v2 = prim->v3 = prim->v0 + 0xB0;
                     prim->x0 = prim->x1 = prim->x2 = prim->x3 = 0x80;
-                    prim->y0 = prim->y1 = 0x26;
-                    prim->y2 = prim->y3 = 0xD6;
+                    prim->y0 = prim->y1 = 0x26 - BEST_DY;
+                    prim->y2 = prim->y3 = 0xD6 + BEST_DY;
                     prim->priority = 0x1FC;
                     prim->drawMode = DRAW_HIDE;
                 } else if (i == 10) {
@@ -4939,7 +6034,7 @@ void func_us_801B8234(Entity* self) {
             s3 = D_psp_092A5F40[self->params];
             func_us_801B0C40(pix, s3, 0, 0x1D0, 0x6E);
 #else
-            s3 = D_us_80180FB4[self->params];
+            s3 = LANG_SJIS(D_us_80180FB4[self->params]);
             func_us_801B0C40(pix, s3, 0, 0x1C0, 0x6E);
 #endif
             self->step_s++;
@@ -4947,10 +6042,12 @@ void func_us_801B8234(Entity* self) {
 
         case 4:
             prim = &g_PrimBuf[self->primIndex];
+#ifndef PLATFORM_PSYZ // PSYZ: once the window is open (BestShow)
             for (i = 0; i < 10; i++) {
                 prim = prim->next;
             }
             func_us_801B7DF8(prim, self, enemyId);
+#endif
             self->ext.et_801B6F30.unk7C = 0;
             self->ext.et_801B6F30.unk7E = 0;
             SetStep(2);
@@ -4966,9 +6063,13 @@ void func_us_801B8234(Entity* self) {
                          self->ext.et_801B6F30.unk7C * 2, 0x80, 0x20, 7, 0);
 #else
         func_us_801B245C(prim, self->ext.et_801B6F30.unk7E,
-                         self->ext.et_801B6F30.unk7C * 2, 0x78, 0x20, 7, 0);
+                         self->ext.et_801B6F30.unk7C * 2, 0x78 + BEST_G, 0x20,
+                         7, 0);
 #endif
         if (self->ext.et_801B6F30.unk7C == 0x10) {
+#ifdef PLATFORM_PSYZ
+            BestShow(self, enemyId, 1);
+#endif
             SetStep(3);
         }
         break;
@@ -5009,6 +6110,9 @@ void func_us_801B8234(Entity* self) {
         break;
 
     case 4:
+#ifdef PLATFORM_PSYZ
+        BestShow(self, enemyId, 0);
+#endif
         self->ext.et_801B6F30.unk7E = 0x400;
         self->ext.et_801B6F30.unk7C = 0x10;
         SetStep(5);
@@ -5023,7 +6127,8 @@ void func_us_801B8234(Entity* self) {
                          self->ext.et_801B6F30.unk7C, 0x80, 0x20, 7, 0);
 #else
         func_us_801B245C(prim, self->ext.et_801B6F30.unk7E,
-                         self->ext.et_801B6F30.unk7C, 0x74, 0x20, 7, 0);
+                         self->ext.et_801B6F30.unk7C, 0x74 + BEST_G, 0x20, 7,
+                         0);
 #endif
         if (!self->ext.et_801B6F30.unk7C) {
             SetStep(1);
@@ -5032,6 +6137,9 @@ void func_us_801B8234(Entity* self) {
 
     case 7:
         if ((g_CutsceneFlags & 0x200) == 0) {
+#ifdef PLATFORM_PSYZ
+            BestShow(self, enemyId, 0);
+#endif
             self->ext.et_801B6F30.unk7E = 0x400;
             self->ext.et_801B6F30.unk7C = 0x10;
             self->step++;
@@ -5047,7 +6155,8 @@ void func_us_801B8234(Entity* self) {
                          self->ext.et_801B6F30.unk7C * 2, 0x80, 0x20, 7, 0);
 #else
         func_us_801B245C(prim, self->ext.et_801B6F30.unk7E,
-                         self->ext.et_801B6F30.unk7C * 2, 0x74, 0x20, 7, 0);
+                         self->ext.et_801B6F30.unk7C * 2, 0x74 + BEST_G, 0x20,
+                         7, 0);
 #endif
         if (!self->ext.et_801B6F30.unk7C) {
             g_CutsceneFlags |= 0x400;

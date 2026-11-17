@@ -611,6 +611,11 @@ void func_801ACFBC(s32 port, s32 slot, s32 textId) {
     }
 #else
     func_801B25D4("　", textId + 1);
+#ifdef USE_PLAYER_MARIA
+    if (g_SaveSummary[port].character[slot] == PLAYER_MARIA) {
+        func_801B2608("Maria", textId + 2);
+    } else
+#endif
     if (g_SaveSummary[port].character[slot]) {
         func_801B2608("Richter", textId + 2);
     } else if (g_SaveSummary[port].kind[slot] & SAVE_FLAG_CLEAR) {
@@ -629,8 +634,13 @@ void PrintFileSelectPlaceName(s32 port, s32 slot, s32 y) {
     volatile u32 pad; // !FAKE:
 
     s32 stage = g_SaveSummary[port].stage[slot];
-    DrawString8x8(stage_names[stage].line1, 0xA0, y, 1);
-    DrawString8x8(stage_names[stage].line2, 0xA0, y + 8, 1);
+    // SEL_AREA (table 12) rows: 2 * stage + line
+    DrawString8x8(
+        (u8*)LANG_ROW(12, stage * 2, (const char*)stage_names[stage].line1),
+        0xA0, y, 1);
+    DrawString8x8(
+        (u8*)LANG_ROW(12, stage * 2 + 1, (const char*)stage_names[stage].line2),
+        0xA0, y + 8, 1);
 #endif
 }
 #endif
@@ -847,6 +857,11 @@ void func_801AD66C(void) {
     } else {
         g_PlayableCharacter = PLAYER_ALUCARD;
     }
+#ifdef PLATFORM_PSYZ
+    // cheat CHARACTER: the new game belongs to the character it starts with
+    g_PlayableCharacter = Cheat_Character(g_PlayableCharacter);
+    g_CheatSaveChar = g_PlayableCharacter;
+#endif
 }
 
 void func_801AD78C(void) {
@@ -860,7 +875,7 @@ void func_801AD78C(void) {
 #else
     DrawString8x8(STR_SELECT, 0x134, 0x24, 1);
     DrawString8x8(STR_INPUT, 0x134, 0x34, 1);
-    DrawString8x8(STR_CANCEL, 0x134, 0x44, 1);
+    DrawString8x8(LANG_NAME_DELETE(STR_CANCEL), 0x134, 0x44, 1);
     DrawString8x8(STR_DECIDE, 0x134, 0x54, 1);
 #endif
     DrawString16x16("a b c d e f g h", 0x48, 0x70, 1);
@@ -1298,6 +1313,10 @@ static void func_801AEE74(void) {
     }
 }
 
+#ifdef PLATFORM_PSYZ
+#include "charsel.h"
+#endif
+
 void Update(void) {
     s32 i;
     s32 port;
@@ -1411,6 +1430,12 @@ void Update(void) {
             if (g_pads[0].tapped & PAD_START) {
                 g_api.PlaySfx(SFX_UI_CONFIRM);
                 func_801AD66C();
+#ifdef PLATFORM_PSYZ
+                // PC: the Saturn's Player select comes first (charsel.h)
+                CharselInit();
+                g_GameEngineStep = Upd_Eng_CharSelect;
+                break;
+#endif
                 if (g_PlayableCharacter == PLAYER_ALUCARD) {
                     g_StageId = STAGE_ST0;
                 } else {
@@ -1428,8 +1453,17 @@ void Update(void) {
             }
         }
         break;
+#ifdef PLATFORM_PSYZ
+    case Upd_Eng_CharSelect:
+        CharselUpdate();
+        break;
+#endif
     case Upd_Eng_18:
+#ifdef PLATFORM_PSYZ
+        CharselDraw(); // the only way here: shown while the menu fades out
+#else
         func_801AD78C();
+#endif
         if (func_801ACEC0()) {
             func_801B18F4();
             func_801B19F4();

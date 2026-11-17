@@ -30,6 +30,61 @@ STATIC_PAD_BSS(3);
 #define LAYOUT_OBJ_SLOT 3
 #define LAYOUT_OBJ_PARAMS 4
 
+#if defined(PLATFORM_PSYZ) && (defined(STAGE_IS_ARE) || defined(STAGE_IS_NO2))
+// The two JP-only familiar cards (sotn.ini jp_cards; notes in
+// are/d_prize_drops.c and no2/d_prize_drops.c).
+// jp, the JP/PSP spots: the ARE item drop 7 becomes RELIC_JP_1, the NO2
+// item drop 12 becomes RELIC_SWORD_CARD, the NO2 RELIC_SWORD_CARD orb
+// becomes the other JP card.
+// extra: every US pickup stays, each card is an orb DX px from the pickup
+// it would replace (ARE drop 7, the NO2 RELIC_SWORD_CARD orb).
+#define JP_CARD_DX_ARE 40
+#define JP_CARD_DX_NO2 (-40)
+void CreateEntityFromEntity(u16 entityId, Entity* source, Entity* entity);
+static void JpCards_Extra(Entity* src, s32 relic, s16 dx) {
+    Entity* e;
+    for (e = &g_Entities[STAGE_ENTITY_START]; e < &g_Entities[TOTAL_ENTITY_COUNT];
+         e++) {
+        if (e->entityId == E_RELIC_ORB && e->params == relic) {
+            return; // the source came back into range: the orb is still there
+        }
+    }
+    e = AllocEntity(&g_Entities[160], &g_Entities[192]);
+    if (e) {
+        CreateEntityFromEntity(E_RELIC_ORB, src, e);
+        e->posX.i.hi += dx;
+        e->params = relic;
+    }
+}
+
+static void JpCards_OnLayout(Entity* entity) {
+#if defined(STAGE_IS_ARE)
+    if (entity->entityId == E_PERSISTENT_ITEM_DROP && entity->params == 7) {
+        if (g_JpCards == JP_CARDS_JP) {
+            entity->entityId = E_RELIC_ORB;
+            entity->params = RELIC_JP_1;
+        } else if (g_JpCards == JP_CARDS_EXTRA) {
+            JpCards_Extra(entity, RELIC_JP_1, JP_CARD_DX_ARE);
+        }
+    }
+#else
+    if (g_JpCards == JP_CARDS_JP && entity->entityId == E_PERSISTENT_ITEM_DROP &&
+        entity->params == 12) {
+        entity->entityId = E_RELIC_ORB;
+        entity->params = RELIC_SWORD_CARD;
+    } else if (entity->entityId == E_RELIC_ORB &&
+               entity->params == RELIC_SWORD_CARD) {
+        if (g_JpCards == JP_CARDS_JP) {
+            entity->params = RELIC_JP_0;
+        } else if (g_JpCards == JP_CARDS_EXTRA) {
+            JpCards_Extra(entity, RELIC_JP_0, JP_CARD_DX_NO2);
+        }
+    }
+#endif
+    entity->pfnUpdate = PfnEntityUpdates[entity->entityId - 1];
+}
+#endif
+
 void CreateEntityFromLayout(Entity* entity, LayoutEntity* initDesc) {
     Tilemap* tilemap;
 
@@ -43,6 +98,9 @@ void CreateEntityFromLayout(Entity* entity, LayoutEntity* initDesc) {
     entity->params = initDesc->params;
     entity->entityRoomIndex = initDesc->entityRoomIndex >> 8;
     entity->unk68 = (initDesc->entityId >> 0xA) & 7;
+#if defined(PLATFORM_PSYZ) && (defined(STAGE_IS_ARE) || defined(STAGE_IS_NO2))
+    JpCards_OnLayout(entity);
+#endif
 }
 
 void CreateEntityWhenInVerticalRange(LayoutEntity* obj) {
@@ -54,8 +112,8 @@ void CreateEntityWhenInVerticalRange(LayoutEntity* obj) {
 
     tilemap = &g_Tilemap;
     posY = tilemap->scrollY.i.hi;
-    yClose = posY - 0x40;
-    yFar = posY + 0x120;
+    yClose = posY - 0x40 - WIDE_Y;
+    yFar = posY + 0x120 + WIDE_Y;
     if (yClose < 0) {
         yClose = 0;
     }
@@ -91,8 +149,8 @@ void CreateEntityWhenInHorizontalRange(LayoutEntity* obj) {
 
     tilemap = &g_Tilemap;
     posX = tilemap->scrollX.i.hi;
-    xClose = posX - 0x40;
-    xFar = posX + 0x140;
+    xClose = posX - 0x40 - WIDE_X;
+    xFar = posX + 0x140 + WIDE_X;
     if (xClose < 0) {
         xClose = 0;
     }
@@ -435,8 +493,8 @@ void InitRoomEntities(s32 objLayoutId) {
                    g_LayoutObjVertical[LAYOUT_OBJ_POS_X]);
     }
     temp = tilemap->scrollX.i.hi;
-    i = temp - 64;
-    rightEdge = temp + 320;
+    i = temp - 64 - WIDE_X;
+    rightEdge = temp + 320 + WIDE_X;
 
     if (i < 0) {
         i = 0;
@@ -447,7 +505,7 @@ void InitRoomEntities(s32 objLayoutId) {
     FindFirstEntityToTheRight(i);
     CreateEntitiesToTheRight(rightEdge);
     temp = tilemap->scrollY.i.hi;
-    i = temp + 288;
+    i = temp + 288 + WIDE_Y;
     FindFirstEntityAbove(i);
 }
 
@@ -462,10 +520,10 @@ void UpdateRoomPosition(void) {
     if (g_ScrollDeltaX != 0) {
         tmp = tilemap->scrollX.i.hi;
         if (g_ScrollDeltaX > 0) {
-            tmp += 320;
+            tmp += 320 + WIDE_X;
             CreateEntitiesToTheRight(tmp);
         } else {
-            tmp -= 64;
+            tmp -= 64 + WIDE_X;
             CreateEntitiesToTheLeft(tmp);
         }
     }
@@ -473,10 +531,10 @@ void UpdateRoomPosition(void) {
     if (g_ScrollDeltaY != 0) {
         tmp = tilemap->scrollY.i.hi;
         if (g_ScrollDeltaY > 0) {
-            tmp += 288;
+            tmp += 288 + WIDE_Y;
             CreateEntitiesAbove(tmp);
         } else {
-            tmp -= 64;
+            tmp -= 64 + WIDE_Y;
             CreateEntitiesBelow(tmp);
         }
     }

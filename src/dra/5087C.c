@@ -339,6 +339,40 @@ s32 SetNextRoomToLoad(u32 x, u32 y) {
     }
 }
 
+#ifdef PLATFORM_PSYZ
+#include "../pc/wide.h"
+
+// Wide view camera: the original follow and clamp rules, with the scroll
+// range widened so the whole view stays inside the room. A room smaller than
+// the view is centred. The player screen position is always derived from the
+// world position, because the scroll is no longer page aligned at room load.
+static void WideCamera(void) {
+    s32 lo, hi, scroll;
+
+    Wide_ScrollRange(g_Tilemap.x, g_Tilemap.width, 256, g_WideX, 0, 256, &lo,
+                     &hi);
+    scroll = g_PlayerX - g_unkGraphicsStruct.unk14;
+    if (scroll < lo) {
+        scroll = lo;
+    } else if (scroll > hi) {
+        scroll = hi;
+    }
+    g_Tilemap.scrollX.i.hi = scroll;
+    PLAYER.posX.i.hi = g_PlayerX - scroll;
+
+    Wide_BandRange(g_Tilemap.y, g_Tilemap.height, 240, g_WideY, 4, 252,
+                   g_WideBandTop, g_WideBandBottom, &lo, &hi);
+    scroll = Wide_FollowY(g_Tilemap.scrollY.i.hi, g_PlayerY, lo, hi,
+                          g_Tilemap.y, g_unkGraphicsStruct.unk24 != 0);
+    g_Tilemap.scrollY.i.hi = scroll;
+    PLAYER.posY.i.hi = g_PlayerY - scroll;
+    // the art rows on the screen: the clip hides the empty band of a room
+    // shorter than the view
+    Wide_BandClip(g_Tilemap.y + g_WideBandTop - scroll,
+                  g_Tilemap.height - g_WideBandBottom - scroll);
+}
+#endif
+
 s32 func_800F0CD8(s32 arg0) {
     s32 var_s0;
     s32 ret;
@@ -435,6 +469,14 @@ s32 func_800F0CD8(s32 arg0) {
         }
     }
 block_25:
+#ifdef PLATFORM_PSYZ
+    // The room hand-off above needs no change: pos + scroll is world + 256
+    // and the room load keeps only the low 8 bits, so any scroll works.
+    if (g_WideX || g_WideY) {
+        WideCamera();
+        return 0;
+    }
+#endif
     if (g_PlayerX < g_Tilemap.x + g_unkGraphicsStruct.unk14) {
         if (arg0 && g_Tilemap.hSize != 1) {
             if (g_Tilemap.x + g_unkGraphicsStruct.unk14 <
@@ -547,6 +589,13 @@ void func_800F14CC(void) {
     s32 temp_a1;
     s32 newY;
 
+#ifdef PLATFORM_PSYZ
+    if (g_WarpTarget.active) {
+        // cheat teleport: own room and position, no teleport table row
+        D_801375BC.def = &Cheat_WarpRoom()->load;
+        return;
+    }
+#endif
     if (D_8003C730 == 1) {
         PLAYER.posX.i.hi = 0x80;
         PLAYER.posY.i.hi = 0xA4;
@@ -607,6 +656,11 @@ s32 func_800F16D0(void) {
     s32 stageId;
     RoomTeleport* tele;
 
+#ifdef PLATFORM_PSYZ
+    if (g_WarpTarget.active) {
+        return g_WarpTarget.stage; // cheat teleport
+    }
+#endif
     if (D_8003C730 != 0)
         return g_StageId;
     else if (D_80097C98 == 4)
@@ -1283,13 +1337,24 @@ void RunMainEngine(void) {
         g_cameraOffsetY = 0;
         func_800F14CC();
         LoadRoomLayer(D_801375BC.def->tileLayoutId);
+#ifdef PLATFORM_PSYZ
+        // before the gfx loads; the cell as D_8009791C gets it below
+        PortMenu_OnRoom(D_801375BC.def,
+                        g_Tilemap.left + (PLAYER.posX.i.hi >> 8),
+                        g_Tilemap.top + (PLAYER.posY.i.hi >> 8));
+#endif
         if (D_8003C708.flags & FLAG_UNK_20) {
             LoadGfxAsync(ANIMSET_DRA(3));
         }
         if (D_8003C708.flags & FLAG_UNK_40) {
             LoadGfxAsync(ANIMSET_DRA(4));
         }
+#ifdef PLATFORM_PSYZ
+        currentMusicId = g_StageMusicId ? g_StageMusicId
+                                        : g_StagesLba[g_StageId].musicId;
+#else
         currentMusicId = g_StagesLba[g_StageId].musicId;
+#endif
 #if VERSION == VER_JP12
         if (g_StageId == STAGE_NO3) {
             if (D_8003C730 == 0) {
@@ -1311,6 +1376,14 @@ void RunMainEngine(void) {
             (D_8003C730 == 0) && !(D_8003C708.flags & FLAG_UNK_20)) {
             PlaySfx(currentMusicId);
         }
+#ifdef PLATFORM_PSYZ
+        // cheat APPLY NOW reloads with D_8003C730 = 3 after MuteSound
+        if (Cheat_TakeMusicRestart() && !(D_8003C708.flags & FLAG_UNK_20)) {
+            PlaySfx(currentMusicId);
+            fprintf(stderr, "[cheat] apply character: music %X\n",
+                    currentMusicId);
+        }
+#endif
         stopMusicFlag = false;
         func_800EA538(2);
         if (D_801375BC.def->tilesetId != 0) {
@@ -1758,7 +1831,12 @@ void RunMainEngine(void) {
                 }
                 break;
             } else if (stopMusicFlag != 0) {
+#ifdef PLATFORM_PSYZ
+                currentMusicId = g_StageMusicId ? g_StageMusicId
+                                                : g_StagesLba[g_StageId].musicId;
+#else
                 currentMusicId = g_StagesLba[g_StageId].musicId;
+#endif
                 if (g_unkGraphicsStruct.D_800973FC != 1) {
                     PlaySfx(SET_STOP_MUSIC);
                     if (func_80131F68()) {
@@ -1781,6 +1859,9 @@ void RunMainEngine(void) {
                 D_8009791C.x = g_Tilemap.left + (g_PlayerX >> 8);
                 D_8009791C.y = g_Tilemap.top + (g_PlayerY >> 8);
             }
+#ifdef PLATFORM_PSYZ
+            PortMenu_OnRoom(D_801375BC.def, D_8009791C.x, D_8009791C.y);
+#endif
             D_8013759C = PLAYER.posX.val;
             D_801375A0 = PLAYER.posY.val;
             PLAYER.posX.i.hi = D_801375BC.pos.x + g_Tilemap.scrollX.i.hi;

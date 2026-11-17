@@ -131,9 +131,16 @@ AnimateEntityFrame* g_SubweaponAnimPrizeDrop[] = {
 #endif
 };
 
-#if TARGET == TARGET_PSP && STAGE != STAGE_ST0
+#if (TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)) && STAGE != STAGE_ST0
+// Maria's animal from a pickup (14..22) and the pickup of an animal (0..4)
 static u16 maria_subweapons_idx[] = {1, 2, 4, 3, 0, 0, 0, 0, 0};
 static u16 maria_subweapons_id[] = {19, 14, 15, 17, 16};
+#if TARGET != TARGET_PSP
+void func_psp_090E4C90(void); // 5F60C.c: the HUD copy of her second slot
+#endif
+#endif
+
+#if TARGET == TARGET_PSP && STAGE != STAGE_ST0
 static AnimateEntityFrame D_psp_09246398[] = {
     POSE(5, 0xA1, 0), POSE(5, 0xA2, 0), POSE(5, 0xA3, 0),
     POSE(5, 0xA4, 0), POSE(5, 0xA5, 0), POSE(5, 0xA6, 0),
@@ -311,7 +318,7 @@ void func_801937BC(void) {}
 void UnusedDestroyCurrentEntity(void) { DestroyEntity(g_CurrentEntity); }
 #endif
 
-#if TARGET == TARGET_PSP && STAGE != STAGE_ST0
+#if (TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)) && STAGE != STAGE_ST0
 #include "collect_subweapon_psp.h"
 #else
 #include "collect_subweapon.h"
@@ -413,7 +420,7 @@ void EntityPrizeDrop(Entity* self) {
             itemId = self->params = 0;
         }
 
-#if TARGET == TARGET_PSP && STAGE != STAGE_ST0
+#if (TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)) && STAGE != STAGE_ST0
         if (g_PlayableCharacter == PLAYER_MARIA && itemId >= 0xE &&
             itemId < 23) {
             switch (itemId) {
@@ -569,7 +576,7 @@ void EntityPrizeDrop(Entity* self) {
         switch (self->step_s) {
         case 0:
             self->animCurFrame = 0;
-#if TARGET == TARGET_PSP && STAGE != STAGE_ST0
+#if (TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)) && STAGE != STAGE_ST0
             if (itemId >= 14 && itemId < 23) {
                 s32 subWeaponId;
                 if (g_PlayableCharacter == PLAYER_MARIA) {

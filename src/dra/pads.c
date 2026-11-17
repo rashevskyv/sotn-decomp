@@ -79,6 +79,11 @@ void ReadPads(void) {
         } else {
             pad->pressed = padData >> 0x10;
         }
+#ifdef PLATFORM_PSYZ
+        if (i == 0) {
+            pad->pressed = PortMenu_Pad(pad->pressed);
+        }
+#endif
 
         pad->tapped = (pad->pressed ^ pad->previous) & pad->pressed;
     }

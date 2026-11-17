@@ -58,6 +58,9 @@ static void printHelp(void) {
     printf("  --replay-and-exit  quit automatically once the replay or demo "
            "ends\n");
     printf("  --replay-fast      disable frame limit during replay or demo\n");
+    printf("  --editor           serve the tile editor page on port 8080\n");
+    printf("  --wide <scale>     16:9 wide view at this integer scale\n");
+    printf("  --ini <file>       settings file as sotn.ini on the Switch\n");
     printf("  --help             show this help message\n");
 }
 static void printAllowedParams(const char* allowedValues[], int n) {
@@ -157,6 +160,12 @@ static bool parseArgs(
             outParams->exitAfterReplay = true;
         } else if (strcmp(argv[i], "--replay-fast") == 0) {
             outParams->replayBoundlessFramerate = true;
+        } else if (strcmp(argv[i], "--editor") == 0) {
+            g_EditorOn = 1;
+        } else if (strcmp(argv[i], "--wide") == 0 && i + 1 < argc) {
+            Wide_Config(atoi(argv[++i]));
+        } else if (strcmp(argv[i], "--ini") == 0 && i + 1 < argc) {
+            Wide_LoadIni(argv[++i]); // the Switch sotn.ini, for tests
         } else {
             printf("argument %s not recognized", argv[i]);
             return false;
@@ -165,12 +174,53 @@ static bool parseArgs(
     return true;
 }
 
+// The button names of the pause menus (Button config, the ATT and DEF
+// marks of Equip) as the Switch shows them: the face buttons by position
+// (sdl3_common.h: Square = west = Y, Circle = east = A, Cross = south = B,
+// Triangle = north = X), R2 = ZR, L1 = L, R1 = R, L2 = ZL. On the Switch
+// always; on PC with SOTN_SWITCH_MARKS=1, for screenshots.
+static void SwitchMarks(void) {
+    extern u8 g_ChButtons[8], g_ChButtons2[4];
+    static const char first[] = "YABXZLRZ", second[] = "R  L";
+    int i;
+#ifndef __SWITCH__
+    const char* env = getenv("SOTN_SWITCH_MARKS");
+    if (!env || strcmp(env, "1")) {
+        return;
+    }
+#endif
+    for (i = 0; i < 8; i++) {
+        g_ChButtons[i] = CH(first[i]);
+    }
+    for (i = 0; i < 4; i++) {
+        g_ChButtons2[i] = CH(second[i]);
+    }
+}
+
 int Main(int argc, char* argv[]) {
     struct InitGameParams params;
+#ifdef __SWITCH__
+    const char* Switch_Init(void);
+    const char* cue = Switch_Init();
+#endif
+    fprintf(stderr, "[boot] sotn-native %s\n", SOTN_VERSION);
     if (!parseArgs(&params, argc, argv)) {
         printHelp();
         return -1;
     }
+#ifdef __SWITCH__
+    if (!params.diskPath) {
+        params.diskPath = cue;
+    }
+    if (!params.spawnPoint && g_IniSpawn[0]) {
+        bool ok = SpawnPoint_StageForName(g_IniSpawn) >= 0;
+        fprintf(stderr, "[boot] spawn %s: %s\n", g_IniSpawn,
+                ok ? "ok" : "unknown name, normal start");
+        if (ok) {
+            params.spawnPoint = g_IniSpawn;
+        }
+    }
+#endif
     if (params.stage < 0 && params.spawnPoint != NULL) {
         params.stage = SpawnPoint_StageForName(params.spawnPoint);
     }
@@ -178,6 +228,8 @@ int Main(int argc, char* argv[]) {
     if (!InitGame(&params)) {
         return -1;
     }
+    Lang_Init();
+    SwitchMarks();
     MainGame();
     ResetGame();
     if (params.replayPath && Replay_DidDrift()) {

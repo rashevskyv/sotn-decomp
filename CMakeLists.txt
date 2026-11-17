@@ -41,7 +41,9 @@ endforeach()
 add_custom_target(sotn_runtime_data ALL DEPENDS ${SOTN_RUNTIME_DATA_FILES})
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    set(CMAKE_BUILD_TYPE Debug)
+    if(NOT NINTENDO_SWITCH) # the Switch build is too slow without -O2
+        set(CMAKE_BUILD_TYPE Debug)
+    endif()
     if(ENABLE_ASAN)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
@@ -77,6 +79,10 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=switch-outside-range")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=switch-unreachable")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=builtin-declaration-mismatch")
+    # newer GCC (devkitA64 GCC 16, Linux GCC 13+) reports false positives on
+    # PS1 pointer math; keep them as warnings
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=stringop-overflow")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=stringop-overread")
 endif()
 
 if(MSVC)
@@ -94,8 +100,15 @@ endif()
 
 # prevent sotn_str binary type conflicts when working with containers
 set(SOTN_STR_TARGET_DIR "${CMAKE_BINARY_DIR}/sotn_str")
+# sotn_str runs on the build machine: a cross toolchain changes
+# CMAKE_EXECUTABLE_SUFFIX (.elf for the Switch), the host suffix does not.
+if(CMAKE_HOST_WIN32)
+    set(SOTN_HOST_EXE_SUFFIX ".exe")
+else()
+    set(SOTN_HOST_EXE_SUFFIX "")
+endif()
 set(SOTN_STR_BIN
-    "${SOTN_STR_TARGET_DIR}/release/sotn_str${CMAKE_EXECUTABLE_SUFFIX}")
+    "${SOTN_STR_TARGET_DIR}/release/sotn_str${SOTN_HOST_EXE_SUFFIX}")
 add_custom_command(
     OUTPUT "${SOTN_STR_BIN}"
     COMMAND ${CMAKE_COMMAND} -E env
@@ -110,7 +123,17 @@ add_custom_command(
     COMMENT "Building host sotn_str")
 add_custom_target(sotn_str_host DEPENDS "${SOTN_STR_BIN}")
 
-if(ENABLE_SATURN_STAGES)
+# PSP Maria, a third playable character. Her data is only on the PSP disc:
+# make extract_disk_pspeu (or 7z x sotn.pspeu.iso ...PSPBIN/maria.bin).
+set(MARIA_BIN
+    "${CMAKE_SOURCE_DIR}/disks/pspeu/PSP_GAME/USRDIR/res/ps/PSPBIN/maria.bin")
+if(EXISTS "${MARIA_BIN}")
+    option(USE_PLAYER_MARIA "PSP Maria as a playable character" ON)
+else()
+    option(USE_PLAYER_MARIA "PSP Maria as a playable character" OFF)
+endif()
+
+if(ENABLE_SATURN_STAGES OR USE_PLAYER_MARIA)
     find_program(GO_BIN go REQUIRED)
     file(GLOB_RECURSE SATURN_ASSETS_SOURCES CONFIGURE_DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/saturn/assets/src/*.rs")
@@ -122,7 +145,7 @@ if(ENABLE_SATURN_STAGES)
     set(SATURN_ASSETS_TARGET_DIR
         "${CMAKE_BINARY_DIR}/saturn_assets")
     set(SATURN_ASSETS_BIN
-        "${SATURN_ASSETS_TARGET_DIR}/release/saturn-assets${CMAKE_EXECUTABLE_SUFFIX}")
+        "${SATURN_ASSETS_TARGET_DIR}/release/saturn-assets${SOTN_HOST_EXE_SUFFIX}")
     add_custom_command(
         OUTPUT "${SATURN_ASSETS_BIN}"
         COMMAND ${CMAKE_COMMAND} -E env
@@ -137,7 +160,7 @@ if(ENABLE_SATURN_STAGES)
         VERBATIM
         COMMENT "Building Rust Saturn asset tool")
     set(SOTN_ASSETS_HOST_BIN
-        "${CMAKE_BINARY_DIR}/sotn_assets_host/sotn-assets${CMAKE_EXECUTABLE_SUFFIX}")
+        "${CMAKE_BINARY_DIR}/sotn_assets_host/sotn-assets${SOTN_HOST_EXE_SUFFIX}")
     add_custom_command(
         OUTPUT "${SOTN_ASSETS_HOST_BIN}"
         COMMAND ${CMAKE_COMMAND} -E env
@@ -222,6 +245,14 @@ set(SOURCE_FILES_PC
     src/pc/servant_pc.c
     src/pc/stages/overlay.c
     src/pc/weapon_pc.c
+    src/pc/wide.c
+    src/pc/port_menu.c
+    src/pc/buttons.c
+    src/pc/voice.c
+    src/pc/lang.c
+    src/pc/cheats.c
+    src/pc/apron.c
+    src/pc/editor_net.c
 )
 
 set(SOURCE_FILES_DRA
@@ -2101,6 +2132,330 @@ SET(SOURCE_FILES_BOSS_RBO7
     src/boss/rbo7/bss.c
 )
 
+SET(SOURCE_FILES_BOSS_BO6
+    src/pc/bosses/boss_bo6.c
+    src/boss/bo6/collision.c
+    src/boss/bo6/create_entity.c
+    src/boss/bo6/cutscene.c
+    src/boss/bo6/d_prize_drops.c
+    src/boss/bo6/e_breakable.c
+    src/boss/bo6/e_collect.c
+    src/boss/bo6/e_cutscene_actors.c
+    src/boss/bo6/e_init.c
+    src/boss/bo6/e_life_up.c
+    src/boss/bo6/e_lock_camera.c
+    src/boss/bo6/e_misc.c
+    src/boss/bo6/e_particles.c
+    src/boss/bo6/e_red_door.c
+    src/boss/bo6/e_red_door_tiles.c
+    src/boss/bo6/e_room_bg.c
+    src/boss/bo6/e_room_fg.c
+    src/boss/bo6/e_stage_name.c
+    src/boss/bo6/graphics_banks.c
+    src/boss/bo6/header.c
+    src/boss/bo6/layers.c
+    src/boss/bo6/palette_def.c
+    src/boss/bo6/popup.c
+    src/boss/bo6/prim_helpers.c
+    src/boss/bo6/richter.c
+    src/boss/bo6/sprite_banks.c
+    src/boss/bo6/st_common.c
+    src/boss/bo6/st_update.c
+    src/boss/bo6/unused.c
+    src/boss/bo6/us_39144.c
+    src/boss/bo6/us_3E79C.c
+    src/boss/bo6/gen/e_laydef.c
+    src/boss/bo6/gen/e_layout.c
+    src/boss/bo6/gen/rooms.c
+)
+
+SET(SOURCE_FILES_BOSS_RBO6
+    src/pc/bosses/boss_rbo6.c
+    src/boss/rbo6/collision.c
+    src/boss/rbo6/create_entity.c
+    src/boss/rbo6/d_prize_drops.c
+    src/boss/rbo6/e_breakable.c
+    src/boss/rbo6/e_collect.c
+    src/boss/rbo6/e_cutscene_dialogue.c
+    src/boss/rbo6/e_cutscene_faders.c
+    src/boss/rbo6/e_dracula.c
+    src/boss/rbo6/e_init.c
+    src/boss/rbo6/e_lock_camera.c
+    src/boss/rbo6/e_misc.c
+    src/boss/rbo6/e_particles.c
+    src/boss/rbo6/e_red_door.c
+    src/boss/rbo6/e_red_door_tiles.c
+    src/boss/rbo6/e_room_bg.c
+    src/boss/rbo6/e_room_fg.c
+    src/boss/rbo6/e_stage_name.c
+    src/boss/rbo6/graphics_banks.c
+    src/boss/rbo6/header.c
+    src/boss/rbo6/layers.c
+    src/boss/rbo6/palette_def.c
+    src/boss/rbo6/popup.c
+    src/boss/rbo6/prim_helpers.c
+    src/boss/rbo6/sprite_banks.c
+    src/boss/rbo6/st_common.c
+    src/boss/rbo6/st_update.c
+    src/boss/rbo6/stage_data.c
+    src/boss/rbo6/tilemaps.c
+    src/boss/rbo6/unk_1D7C4.c
+    src/boss/rbo6/unk_24530.c
+    src/boss/rbo6/unk_30D68.c
+    src/boss/rbo6/unk_31738.c
+    src/boss/rbo6/gen/e_laydef.c
+    src/boss/rbo6/gen/e_layout.c
+    src/boss/rbo6/gen/rooms.c
+    src/boss/rbo6/gen/us/sprites.c
+)
+
+SET(SOURCE_FILES_BOSS_BO0
+    src/pc/bosses/boss_bo0.c
+    src/boss/bo0/3053C.c
+    src/boss/bo0/34DA4.c
+    src/boss/bo0/372E8.c
+    src/boss/bo0/bss.c
+    src/boss/bo0/create_entity.c
+    src/boss/bo0/d_prize_drops.c
+    src/boss/bo0/e_background_house.c
+    src/boss/bo0/e_bloody_zombie.c
+    src/boss/bo0/e_boss_doors.c
+    src/boss/bo0/e_breakable.c
+    src/boss/bo0/e_chair.c
+    src/boss/bo0/e_collect.c
+    src/boss/bo0/e_init.c
+    src/boss/bo0/e_laser_attack.c
+    src/boss/bo0/e_life_up.c
+    src/boss/bo0/e_lock_camera.c
+    src/boss/bo0/e_marionette.c
+    src/boss/bo0/e_misc.c
+    src/boss/bo0/e_normal_form.c
+    src/boss/bo0/e_olrox_drool.c
+    src/boss/bo0/e_owl_knight.c
+    src/boss/bo0/e_particles.c
+    src/boss/bo0/e_prisoner.c
+    src/boss/bo0/e_red_door.c
+    src/boss/bo0/e_red_door_tiles.c
+    src/boss/bo0/e_room_bg.c
+    src/boss/bo0/e_room_fg.c
+    src/boss/bo0/e_sealed_door.c
+    src/boss/bo0/e_secrets.c
+    src/boss/bo0/e_skelerang.c
+    src/boss/bo0/e_spikes.c
+    src/boss/bo0/e_stage_name.c
+    src/boss/bo0/e_true_form.c
+    src/boss/bo0/graphics_banks.c
+    src/boss/bo0/header.c
+    src/boss/bo0/layers.c
+    src/boss/bo0/no2_bg.c
+    src/boss/bo0/palette_def.c
+    src/boss/bo0/palettes.c
+    src/boss/bo0/popup.c
+    src/boss/bo0/prim_helpers.c
+    src/boss/bo0/sprite_banks.c
+    src/boss/bo0/st_collision.c
+    src/boss/bo0/st_common.c
+    src/boss/bo0/st_update.c
+    src/boss/bo0/stage_data.c
+    src/boss/bo0/tilemaps.c
+    src/boss/bo0/gen/e_laydef.c
+    src/boss/bo0/gen/e_layout.c
+    src/boss/bo0/gen/rooms.c
+    src/boss/bo0/gen/sprites.c
+)
+
+SET(SOURCE_FILES_BOSS_RBO8
+    src/pc/bosses/boss_rbo8.c
+    src/boss/rbo8/header.c
+    src/boss/rbo8/sprite_banks.c
+    src/boss/rbo8/layers.c
+    src/boss/rbo8/graphics_banks.c
+    src/boss/rbo8/gen/e_laydef.c
+    src/boss/rbo8/e_init.c
+    src/boss/rbo8/d_g__red_door_tiles.c
+    src/boss/rbo8/e_lock_camera.c
+    src/boss/rbo8/d_prize_drops.c
+    src/boss/rbo8/d_pc_data.c
+    src/boss/rbo8/unk_151E8.c
+    src/boss/rbo8/unk_1546C.c
+    src/boss/rbo8/e_blade.c
+    src/boss/rbo8/unk_15868.c
+    src/boss/rbo8/st_update.c
+    src/boss/rbo8/collision.c
+    src/boss/rbo8/create_entity.c
+    src/boss/rbo8/e_red_door.c
+    src/boss/rbo8/st_common.c
+    src/boss/rbo8/e_collect.c
+    src/boss/rbo8/e_misc.c
+    src/boss/rbo8/e_stage_name.c
+    src/boss/rbo8/e_particles.c
+    src/boss/rbo8/e_room_fg.c
+    src/boss/rbo8/gen/rooms.c
+    src/boss/rbo8/e_life_up.c
+    src/boss/rbo8/gen/e_layout.c
+    src/boss/rbo8/stage_data.c
+    src/boss/rbo8/tilemaps.c
+    src/boss/rbo8/gen/us/sprites.c
+    src/boss/rbo8/popup.c
+    src/boss/rbo8/giantbro_helpers.c
+    src/boss/rbo8/prim_helpers.c
+    src/boss/rbo8/bss.c
+)
+
+SET(SOURCE_FILES_BOSS_BO2
+    src/pc/bosses/boss_bo2.c
+    src/boss/bo2/background_block_init.c
+    src/boss/bo2/collision.c
+    src/boss/bo2/create_entity.c
+    src/boss/bo2/d_prize_drops.c
+    src/boss/bo2/e_boss_doors.c
+    src/boss/bo2/e_boss_torch.c
+    src/boss/bo2/e_collect.c
+    src/boss/bo2/e_cutscene_dialogue.c
+    src/boss/bo2/e_init.c
+    src/boss/bo2/e_life_up.c
+    src/boss/bo2/e_lock_camera.c
+    src/boss/bo2/e_misc.c
+    src/boss/bo2/e_particles.c
+    src/boss/bo2/e_red_door.c
+    src/boss/bo2/e_red_door_tiles.c
+    src/boss/bo2/e_room_fg.c
+    src/boss/bo2/e_stage_name.c
+    src/boss/bo2/gen/e_laydef.c
+    src/boss/bo2/gen/e_layout.c
+    src/boss/bo2/gen/rooms.c
+    src/boss/bo2/gen/us/sprites.c
+    src/boss/bo2/graphics_banks.c
+    src/boss/bo2/header.c
+    src/boss/bo2/layers.c
+    src/boss/bo2/palette_def.c
+    src/boss/bo2/popup.c
+    src/boss/bo2/prim_helpers.c
+    src/boss/bo2/sprite_banks.c
+    src/boss/bo2/st_common.c
+    src/boss/bo2/st_update.c
+    src/boss/bo2/stage_data.c
+    src/boss/bo2/unk_22258.c
+    src/boss/bo2/unk_224DC.c
+    src/boss/bo2/unk_26EF8.c
+    src/boss/bo2/unk_337D0.c
+)
+
+SET(SOURCE_FILES_BOSS_RBO2
+    src/pc/bosses/boss_rbo2.c
+    src/boss/rbo2/header.c
+    src/boss/rbo2/sprite_banks.c
+    src/boss/rbo2/palette_def.c
+    src/boss/rbo2/layers.c
+    src/boss/rbo2/graphics_banks.c
+    src/boss/rbo2/gen/e_laydef.c
+    src/boss/rbo2/e_init.c
+    src/boss/rbo2/background_block_init.c
+    src/boss/rbo2/e_red_door_tiles.c
+    src/boss/rbo2/e_lock_camera.c
+    src/boss/rbo2/d_prize_drops.c
+    src/boss/rbo2/unk_1B000.c
+    src/boss/rbo2/unk_1B284.c
+    src/boss/rbo2/e_debug_cerberus_gate.c
+    src/boss/rbo2/e_cutscene_dialogue.c
+    src/boss/rbo2/e_cutscene_actors.c
+    src/boss/rbo2/func_us_801a17c8.c
+    src/boss/rbo2/st_update.c
+    src/boss/rbo2/collision.c
+    src/boss/rbo2/create_entity.c
+    src/boss/rbo2/e_red_door.c
+    src/boss/rbo2/st_common.c
+    src/boss/rbo2/e_collect.c
+    src/boss/rbo2/e_misc.c
+    src/boss/rbo2/e_stage_name.c
+    src/boss/rbo2/e_particles.c
+    src/boss/rbo2/e_room_fg.c
+    src/boss/rbo2/gen/rooms.c
+    src/boss/rbo2/e_life_up.c
+    src/boss/rbo2/gen/e_layout.c
+    src/boss/rbo2/stage_data.c
+    src/boss/rbo2/tilemaps.c
+    src/boss/rbo2/gen/us/sprites.c
+    src/boss/rbo2/popup.c
+    src/boss/rbo2/prim_helpers.c
+)
+
+SET(SOURCE_FILES_BOSS_RBO1
+    src/pc/bosses/boss_rbo1.c
+    src/boss/rbo1/header.c
+    src/boss/rbo1/sprite_banks.c
+    src/boss/rbo1/palette_def.c
+    src/boss/rbo1/layers.c
+    src/boss/rbo1/graphics_banks.c
+    src/boss/rbo1/gen/e_laydef.c
+    src/boss/rbo1/e_init.c
+    src/boss/rbo1/background_block_init.c
+    src/boss/rbo1/e_red_door_tiles.c
+    src/boss/rbo1/e_lock_camera.c
+    src/boss/rbo1/e_boss_room.c
+    src/boss/rbo1/d_prize_drops.c
+    src/boss/rbo1/st_update.c
+    src/boss/rbo1/collision.c
+    src/boss/rbo1/e_red_door.c
+    src/boss/rbo1/st_common.c
+    src/boss/rbo1/e_collect.c
+    src/boss/rbo1/e_misc.c
+    src/boss/rbo1/e_particles.c
+    src/boss/rbo1/e_room_fg.c
+    src/boss/rbo1/gen/rooms.c
+    src/boss/rbo1/e_life_up.c
+    src/boss/rbo1/gen/e_layout.c
+    src/boss/rbo1/stage_data.c
+    src/boss/rbo1/pal_unk.c
+    src/boss/rbo1/tilemaps.c
+    src/boss/rbo1/gen/us/sprites.c
+    src/boss/rbo1/unk_11FD8.c
+    src/boss/rbo1/unk_12274.c
+    src/boss/rbo1/create_entity.c
+    src/boss/rbo1/e_stage_name.c
+    src/boss/rbo1/popup.c
+    src/boss/rbo1/prim_helpers.c
+    src/boss/rbo1/bss.c
+)
+
+SET(SOURCE_FILES_BOSS_BO7
+    src/pc/bosses/boss_bo7.c
+    src/boss/bo7/background_block_init.c
+    src/boss/bo7/collision.c
+    src/boss/bo7/create_entity.c
+    src/boss/bo7/d_prize_drops.c
+    src/boss/bo7/e_breakable_wall.c
+    src/boss/bo7/e_collect.c
+    src/boss/bo7/e_debug_cerberus_gate.c
+    src/boss/bo7/e_demon_switch_wall.c
+    src/boss/bo7/e_init.c
+    src/boss/bo7/e_life_up.c
+    src/boss/bo7/e_lock_camera.c
+    src/boss/bo7/e_misc.c
+    src/boss/bo7/e_particles.c
+    src/boss/bo7/e_red_door.c
+    src/boss/bo7/e_red_door_tiles.c
+    src/boss/bo7/e_room_fg.c
+    src/boss/bo7/e_stage_name.c
+    src/boss/bo7/gen/e_laydef.c
+    src/boss/bo7/gen/e_layout.c
+    src/boss/bo7/gen/rooms.c
+    src/boss/bo7/gen/us/sprites.c
+    src/boss/bo7/graphics_banks.c
+    src/boss/bo7/header.c
+    src/boss/bo7/layers.c
+    src/boss/bo7/palette_def.c
+    src/boss/bo7/popup.c
+    src/boss/bo7/prim_helpers.c
+    src/boss/bo7/sprite_banks.c
+    src/boss/bo7/st_common.c
+    src/boss/bo7/st_update.c
+    src/boss/bo7/stage_data.c
+    src/boss/bo7/unk_12FBC.c
+    src/boss/bo7/unk_13258.c
+    src/boss/bo7/unk_14CE0.c
+)
+
 set(SOURCE_FILES_BOSS_RBO5
     src/pc/bosses/boss_rbo5.c
     src/boss/rbo5/header.c
@@ -2384,13 +2739,70 @@ set(SOURCE_FILES_CORE
     ${SOURCE_FILES_RIC}
 )
 if(USE_PLAYER_MARIA)
+    if(NOT EXISTS "${MARIA_BIN}")
+        message(FATAL_ERROR "USE_PLAYER_MARIA needs ${MARIA_BIN}")
+    endif()
     add_compile_definitions(USE_PLAYER_MARIA)
     list(APPEND SOURCE_FILES_CORE
         ${SOURCE_FILES_MARIA}
         src/pc/pl_maria.c)
+    # her gen/*.h headers, made from maria.bin in the build dir (not in git)
+    set(MARIA_GEN_DIR "${CMAKE_BINARY_DIR}/maria")
+    add_custom_command(
+        OUTPUT "${MARIA_GEN_DIR}/gen/maria.h"
+        COMMAND sh tools/maria_gen.sh "${SOTN_ASSETS_HOST_BIN}" "${MARIA_GEN_DIR}"
+        DEPENDS "${SOTN_ASSETS_HOST_BIN}" "${MARIA_BIN}"
+                tools/maria_gen.sh config/assets.pspeu.yaml
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        VERBATIM
+        COMMENT "Maria headers from the PSP disc")
+    set_source_files_properties(${SOURCE_FILES_MARIA} PROPERTIES
+        INCLUDE_DIRECTORIES "${MARIA_GEN_DIR}"
+        OBJECT_DEPENDS "${MARIA_GEN_DIR}/gen/maria.h")
+    # her voices: tools/maria-sfx packs sd_mar2.spk (PSP disc) into the
+    # layout of Richter's bank SD_RIH.VH/VB; pl_maria.c embeds the result
+    set(MARIA_SPK "${CMAKE_SOURCE_DIR}/disks/pspeu/PSP_GAME/USRDIR/res/ps/snd_e/SE/sd_mar2.spk")
+    if(NOT EXISTS "${MARIA_SPK}")
+        message(FATAL_ERROR "USE_PLAYER_MARIA needs ${MARIA_SPK}")
+    endif()
+    set(MARIA_SFX_DIR "${MARIA_GEN_DIR}/sfx")
+    add_custom_command(
+        OUTPUT "${MARIA_SFX_DIR}/maria_vo.h"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${MARIA_SFX_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E env
+            "CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/maria-sfx"
+            "${CARGO_BIN}" run -q --release
+            --manifest-path "${CMAKE_SOURCE_DIR}/tools/maria-sfx/Cargo.toml"
+            -- build "${MARIA_SPK}" "${MARIA_SFX_DIR}"
+        COMMAND sh -c "cd \"$0\" && xxd -i SD_RIH.VH > maria_vo.h && xxd -i SD_RIH.VB >> maria_vo.h"
+            "${MARIA_SFX_DIR}"
+        DEPENDS "${MARIA_SPK}"
+                "${CMAKE_SOURCE_DIR}/tools/maria-sfx/Cargo.toml"
+                "${CMAKE_SOURCE_DIR}/tools/maria-sfx/src/main.rs"
+        VERBATIM
+        COMMENT "Maria voice bank from sd_mar2.spk")
+    set_source_files_properties(src/pc/pl_maria.c PROPERTIES
+        INCLUDE_DIRECTORIES "${MARIA_GEN_DIR}"
+        OBJECT_DEPENDS "${MARIA_SFX_DIR}/maria_vo.h")
 endif()
 
 add_subdirectory(tools/psyz/psyz)
+
+# the port version: the NACP and the boot line of the log
+set(SOTN_VERSION "0.8.33")
+set_source_files_properties(src/pc/main.c PROPERTIES
+    COMPILE_DEFINITIONS "SOTN_VERSION=\"${SOTN_VERSION}\"")
+
+if(NINTENDO_SWITCH)
+    # the game data is copied to the SD card next to the NRO. Not
+    # switch/sotn: other SOTN ports already use that folder.
+    set(SOTN_SWITCH_DIR "sdmc:/switch/sotn-native")
+    set(SOTN_RUNTIME_DATA_DIR "${SOTN_SWITCH_DIR}/data")
+    list(APPEND SOURCE_FILES_PC src/pc/switch.c src/pc/switch_crash.c
+        src/pc/switch_nx.c)
+    set_source_files_properties(src/pc/switch.c PROPERTIES
+        COMPILE_DEFINITIONS "SWITCH_DIR=\"${SOTN_SWITCH_DIR}\"")
+endif()
 
 add_executable(${PROJECT_NAME}
     ${SOURCE_FILES_PC}
@@ -2428,6 +2840,116 @@ endif()
 
 psyz_exports(${PROJECT_NAME})
 
+# Castle room table for the teleport map and the editor page. It is built
+# from the git-ignored assets into the build dir and never enters git.
+find_program(SOTN_PYTHON3 python3)
+if(NOT SOTN_PYTHON3)
+    set(SOTN_PYTHON3 python3)
+endif()
+set(SOTN_GEN_DIR "${CMAKE_BINARY_DIR}/gen")
+file(GLOB SOTN_CASTLE_ROOMS CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/assets/st/*/rooms.json"
+    "${CMAKE_SOURCE_DIR}/assets/st/*/*/rooms.json"
+    "${CMAKE_SOURCE_DIR}/assets/boss/*/rooms.json"
+    "${CMAKE_SOURCE_DIR}/disks/us/F_MAP.BIN")
+# Saturn builds add the Saturn stage rooms, read from the disc PRGs
+set(SOTN_CASTLE_SATURN "")
+if(ENABLE_SATURN_STAGES)
+    set(SOTN_CASTLE_SATURN "${CMAKE_SOURCE_DIR}/disks/saturn")
+endif()
+add_custom_command(
+    OUTPUT "${SOTN_GEN_DIR}/castle_data.c"
+    COMMAND "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/editor/export_castle.py"
+        "${CMAKE_SOURCE_DIR}/assets" "${SOTN_GEN_DIR}/castle_data.c"
+        ${SOTN_CASTLE_SATURN}
+    DEPENDS tools/editor/export_castle.py ${SOTN_CASTLE_ROOMS}
+    VERBATIM)
+# Apron patches (data/apron/*.txt, tile numbers only) and the editor page,
+# built into the program as text.
+file(GLOB SOTN_APRON_FILES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/data/apron/*.txt")
+add_custom_command(
+    OUTPUT "${SOTN_GEN_DIR}/apron_data.c"
+    COMMAND "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/editor/bake_apron.py"
+        "${SOTN_GEN_DIR}/apron_data.c" g_ApronBaked ${SOTN_APRON_FILES}
+    DEPENDS tools/editor/bake_apron.py ${SOTN_APRON_FILES}
+    VERBATIM)
+add_custom_command(
+    OUTPUT "${SOTN_GEN_DIR}/editor_page.c"
+    COMMAND "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/editor/bake_apron.py"
+        "${SOTN_GEN_DIR}/editor_page.c" g_EditorPage
+        "${CMAKE_SOURCE_DIR}/tools/editor/index.html"
+    DEPENDS tools/editor/bake_apron.py tools/editor/index.html
+    VERBATIM)
+# The Ukrainian runtime pack (tools/lang, formats in tools/lang/FORMAT.md).
+# It is made from the owner's Xbox 360 mod and the Picoripi plugin, so it is
+# built into the build dir and into the program, never into git. With an
+# input missing the pack is empty and language = uk falls back to English.
+set(SOTN_LANG_XBLA "$ENV{SOTN_LANG_XBLA}" CACHE PATH "sotn_xbla folder of the Xbox 360 translation")
+set(SOTN_LANG_PICORIPI "$ENV{SOTN_LANG_PICORIPI}" CACHE PATH "Picoripi castlevania_sotn_xbla plugin folder")
+set(SOTN_LANG_MEDIA "$ENV{SOTN_LANG_MEDIA}" CACHE PATH "MEDIA folder of the Xbox 360 uk mod")
+file(GLOB SOTN_LANG_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/tools/lang/uk/*"
+    "${CMAKE_SOURCE_DIR}/tools/lang/fonts/*")
+add_custom_command(
+    OUTPUT "${SOTN_GEN_DIR}/lang_pack_uk.c"
+    COMMAND "${CMAKE_COMMAND}" -E env
+        "SOTN_DATA_ROOT=${CMAKE_SOURCE_DIR}"
+        "SOTN_LANG_XBLA=${SOTN_LANG_XBLA}"
+        "SOTN_LANG_PICORIPI=${SOTN_LANG_PICORIPI}"
+        "SOTN_LANG_MEDIA=${SOTN_LANG_MEDIA}"
+        "SOTN_LANG_OUT=${CMAKE_BINARY_DIR}/lang/uk"
+        "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/lang/sotn_lang.py" pack
+        --c "${SOTN_GEN_DIR}/lang_pack_uk.c"
+    DEPENDS tools/lang/sotn_lang.py tools/lang/serif_latin.py ${SOTN_LANG_FILES}
+    VERBATIM)
+target_sources(${PROJECT_NAME} PRIVATE "${SOTN_GEN_DIR}/castle_data.c"
+    "${SOTN_GEN_DIR}/apron_data.c" "${SOTN_GEN_DIR}/editor_page.c"
+    "${SOTN_GEN_DIR}/lang_pack_uk.c")
+# The Ukrainian pictures (art.bin) follow every LoadImage: src/pc/lang.c.
+target_link_options(${PROJECT_NAME} PRIVATE -Wl,--wrap=LoadImage)
+# The English names of the two Saturn familiars come from the PSP English
+# menu table (make extract_disk_pspeu, or 7z x sotn.pspeu.iso ...PSPBIN/dra.bin;
+# not in git). Without dra.bin they keep the Japanese names of the US data.
+set(PSP_DRA_BIN
+    "${CMAKE_SOURCE_DIR}/disks/pspeu/PSP_GAME/USRDIR/res/ps/PSPBIN/dra.bin")
+if(EXISTS "${PSP_DRA_BIN}")
+    set(PSP_NAMES_H "${SOTN_GEN_DIR}/psp_familiar_names.h")
+    add_custom_command(
+        OUTPUT "${PSP_NAMES_H}"
+        COMMAND "${SOTN_PYTHON3}" tools/psp_familiar_names.py
+            "${PSP_DRA_BIN}" src/config_us.h "${PSP_NAMES_H}"
+        DEPENDS "${PSP_DRA_BIN}" tools/psp_familiar_names.py
+                tools/lang/sotn_lang.py src/config_us.h
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        VERBATIM
+        COMMENT "Familiar names from the PSP disc")
+    set_source_files_properties(src/dra/menu.c PROPERTIES
+        INCLUDE_DIRECTORIES "${SOTN_GEN_DIR}"
+        COMPILE_DEFINITIONS SOTN_PSP_FAMILIAR_NAMES
+        OBJECT_DEPENDS "${PSP_NAMES_H}")
+endif()
+
+# PC copies of overlay data that is still raw asm on PSX (tools/pcdata, from
+# sotn-vita). They hold disc bytes, so they are generated from disks/us into
+# the build dir and never enter git. sotn_pcdata(var src/boss/bo6/x.c ...)
+# sets var to the generated files.
+function(sotn_pcdata out)
+    set(_files "")
+    foreach(rel IN LISTS ARGN)
+        set(_o "${SOTN_GEN_DIR}/pcdata/${rel}")
+        add_custom_command(
+            OUTPUT "${_o}"
+            COMMAND "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/pcdata/pcdata.py"
+                --root "${CMAKE_SOURCE_DIR}" generate
+                "${CMAKE_SOURCE_DIR}/tools/pcdata/${rel}.in" "${_o}"
+            COMMAND "${CMAKE_COMMAND}" -E touch "${_o}"
+            DEPENDS tools/pcdata/pcdata.py tools/pcdata/${rel}.in
+            VERBATIM)
+        list(APPEND _files "${_o}")
+    endforeach()
+    set(${out} ${_files} PARENT_SCOPE)
+endfunction()
+
 function(add_overlay name)
     psyz_add_module(${name} SOURCES ${ARGN} HOST ${PROJECT_NAME})
     set(_target ${name})
@@ -2450,6 +2972,7 @@ function(add_overlay name)
         _internal_version_us
         __psyz
         OVERLAY_BUILD
+        VERSION_PC # selects the PC C bodies of functions still asm on PSX
     )
 
     if(NOT MSVC AND NOT APPLE)
@@ -2462,6 +2985,34 @@ function(add_overlay name)
 endfunction()
 
 add_overlay(sel ${SOURCE_FILES_STAGE_SEL})
+# The Player select art (src/st/sel/charsel.h): the portraits from the
+# owner's art in SOTN_CHARSEL_ART (else the Saturn's), the Saturn's header
+# and gothic names. It is Konami's art: made into the build dir, never into
+# git. The frame is drawn by tools/saturn/charsel_frame.py.
+set(SOTN_CHARSEL_ART "$ENV{SOTN_CHARSEL_ART}" CACHE PATH
+    "folder of the owner's select screen portraits; empty: the Saturn's")
+set(_charsel_disc "${CMAKE_SOURCE_DIR}/disks/saturn")
+set(_charsel_h "${SOTN_GEN_DIR}/charsel/charsel_gfx.h")
+set(_charsel_deps tools/saturn/charsel_gfx.py tools/saturn/charsel_frame.py
+    tools/saturn/tile_dumper.py)
+foreach(_f TITLE.PRG TITLE.CHR TITLE.MAP)
+    if(EXISTS "${_charsel_disc}/${_f}")
+        list(APPEND _charsel_deps "${_charsel_disc}/${_f}")
+    endif()
+endforeach()
+if(SOTN_CHARSEL_ART)
+    file(GLOB _charsel_art "${SOTN_CHARSEL_ART}/*.png" "${SOTN_CHARSEL_ART}/*.webp")
+    list(APPEND _charsel_deps ${_charsel_art})
+endif()
+add_custom_command(
+    OUTPUT "${_charsel_h}"
+    COMMAND "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/saturn/charsel_gfx.py"
+        "${_charsel_disc}" "${SOTN_CHARSEL_ART}" "${_charsel_h}"
+    DEPENDS ${_charsel_deps}
+    VERBATIM)
+add_custom_target(charsel_gfx DEPENDS "${_charsel_h}")
+add_dependencies(sel charsel_gfx)
+target_include_directories(sel PRIVATE "${SOTN_GEN_DIR}/charsel")
 add_overlay(no0 ${SOURCE_FILES_STAGE_NO0})
 add_overlay(no1 ${SOURCE_FILES_STAGE_NO1})
 add_overlay(lib ${SOURCE_FILES_STAGE_LIB})
@@ -2499,7 +3050,67 @@ add_overlay(rnz0 ${SOURCE_FILES_STAGE_RNZ0})
 add_overlay(rnz1 ${SOURCE_FILES_STAGE_RNZ1})
 add_overlay(rwrp ${SOURCE_FILES_STAGE_RWRP})
 add_overlay(rbo7 ${SOURCE_FILES_BOSS_RBO7})
+add_overlay(rbo6 ${SOURCE_FILES_BOSS_RBO6})
+add_overlay(bo0 ${SOURCE_FILES_BOSS_BO0})
+sotn_pcdata(RBO8_PCDATA src/boss/rbo8/palette_def.c)
+add_overlay(rbo8 ${SOURCE_FILES_BOSS_RBO8} ${RBO8_PCDATA})
+sotn_pcdata(BO2_PCDATA src/boss/bo2/d_pc_data.c)
+add_overlay(bo2 ${SOURCE_FILES_BOSS_BO2} ${BO2_PCDATA})
+add_overlay(rbo2 ${SOURCE_FILES_BOSS_RBO2})
+add_overlay(rbo1 ${SOURCE_FILES_BOSS_RBO1})
+add_overlay(bo7 ${SOURCE_FILES_BOSS_BO7})
+sotn_pcdata(BO6_PCDATA src/boss/bo6/d_pc_data.c src/boss/bo6/d_pc_sprites.c
+    src/boss/bo6/d_pc_bss.c)
+add_overlay(bo6 ${SOURCE_FILES_BOSS_BO6} ${BO6_PCDATA})
 add_overlay(rbo5 ${SOURCE_FILES_BOSS_RBO5})
+set(SOURCE_FILES_BOSS_BO4
+    src/pc/bosses/boss_bo4.c
+    src/boss/bo4/background_block_init.c
+    src/boss/bo4/bss.c
+    src/boss/bo4/collision.c
+    src/boss/bo4/create_entity.c
+    src/boss/bo4/d_prize_drops.c
+    src/boss/bo4/doors.c
+    src/boss/bo4/dop_anim.c
+    src/boss/bo4/dop_collision.c
+    src/boss/bo4/doppleganger.c
+    src/boss/bo4/doppleganger_anim.c
+    src/boss/bo4/e_breakable.c
+    src/boss/bo4/e_collect.c
+    src/boss/bo4/e_init.c
+    src/boss/bo4/e_life_up.c
+    src/boss/bo4/e_lock_camera.c
+    src/boss/bo4/e_misc.c
+    src/boss/bo4/e_particles.c
+    src/boss/bo4/e_red_door.c
+    src/boss/bo4/e_red_door_tiles.c
+    src/boss/bo4/e_room_bg.c
+    src/boss/bo4/e_room_fg.c
+    src/boss/bo4/e_stage_name.c
+    src/boss/bo4/graphics_banks.c
+    src/boss/bo4/header.c
+    src/boss/bo4/layers.c
+    src/boss/bo4/palette_def.c
+    src/boss/bo4/popup.c
+    src/boss/bo4/prim_helpers.c
+    src/boss/bo4/sprite_banks.c
+    src/boss/bo4/spritesheets.c
+    src/boss/bo4/st_common.c
+    src/boss/bo4/st_update.c
+    src/boss/bo4/stage_data.c
+    src/boss/bo4/unk_365FC.c
+    src/boss/bo4/unk_45648.c
+    src/boss/bo4/unk_46040.c
+    src/boss/bo4/unk_465F0.c
+    src/boss/bo4/unk_49A6C.c
+    src/boss/bo4/unk_50D4C.c
+    src/boss/bo4/gen/e_laydef.c
+    src/boss/bo4/gen/e_layout.c
+    src/boss/bo4/gen/rooms.c
+)
+# the Doppleganger sprite tables and unarmed animations are still raw on PSX
+sotn_pcdata(BO4_PCDATA src/boss/bo4/d_pc_sprites.c)
+add_overlay(bo4 ${SOURCE_FILES_BOSS_BO4} ${BO4_PCDATA})
 add_overlay(rbo4 ${SOURCE_FILES_BOSS_RBO4})
 add_overlay(rbo3 ${SOURCE_FILES_BOSS_RBO3})
 add_overlay(rbo0 ${SOURCE_FILES_BOSS_RBO0})
@@ -2605,14 +3216,25 @@ if(ENABLE_SATURN_STAGES)
 
     target_sources(${PROJECT_NAME} PRIVATE src/pc/room_teleport.c)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_SATURN_STAGES)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
-        PC_ASSET_OVERRIDE_DIR="${SATURN_STITCH_DIR}/disks/us")
+    # Switch: no host path in the NRO. The six stitched F_*.BIN replace the
+    # retail files in sdmc:/switch/sotn-native/data/ST/<STAGE>/ on deploy.
+    if(NOT NINTENDO_SWITCH)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE
+            PC_ASSET_OVERRIDE_DIR="${SATURN_STITCH_DIR}/disks/us")
+    endif()
 endif()
 
-foreach(id 000 002 007 008 010 012 034 035 037 040 041 043 045 046 050 051 052)
-    add_overlay(w0_${id} src/weapon/w_init.c src/weapon/right_hand.c src/weapon/w_${id}.c)
+# All 59 weapons. 41 of them use data that is still raw on PSX
+# (g_WeaponCluts and D_<addr> tables). Their typed PC copy is generated from
+# disks/us by tools/pcdata/src/pc/weapons/w_NNN.c.in (no disc data in git).
+foreach(id 000 001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028 029 030 031 032 033 034 035 036 037 038 039 040 041 042 043 044 045 046 047 048 049 050 051 052 053 054 055 056 057 058)
+    set(_data "")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/tools/pcdata/src/pc/weapons/w_${id}.c.in")
+        sotn_pcdata(_data src/pc/weapons/w_${id}.c)
+    endif()
+    add_overlay(w0_${id} src/weapon/w_init.c src/weapon/right_hand.c src/weapon/w_${id}.c ${_data})
     target_compile_definitions(${w0_${id}_COMPILE_TARGET} PRIVATE WEAPON0)
-    add_overlay(w1_${id} src/weapon/w_init.c src/weapon/left_hand.c src/weapon/w_${id}.c)
+    add_overlay(w1_${id} src/weapon/w_init.c src/weapon/left_hand.c src/weapon/w_${id}.c ${_data})
     target_compile_definitions(${w1_${id}_COMPILE_TARGET} PRIVATE WEAPON1)
 endforeach()
 
@@ -2626,4 +3248,17 @@ add_overlay(tt_006 ${SOURCE_FILES_TT_006})
 
 if(ENABLE_SATURN_STAGES)
     include(cmake/saturn_stages.cmake)
+endif()
+
+option(SOTN_FRAME_STATS "Log fps and busy ms per frame to stderr" ${NINTENDO_SWITCH})
+if(SOTN_FRAME_STATS)
+    target_compile_definitions(psyz PRIVATE PSYZ_FRAME_STATS)
+endif()
+
+if(NINTENDO_SWITCH)
+    nx_generate_nacp(sotn.nacp
+        NAME "Castlevania: SOTN"
+        AUTHOR "sotn-decomp"
+        VERSION "${SOTN_VERSION}")
+    nx_create_nro(${PROJECT_NAME} NACP sotn.nacp)
 endif()

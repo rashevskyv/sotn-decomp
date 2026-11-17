@@ -36,7 +36,9 @@ void EntityTransparentWater(Entity* self) {
     case 0:
         InitializeEntity(g_EInitInteractable);
         self->ext.transparentWater.unk80 = 4;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 16);
+        // the wide view (up to 960 px) needs up to 28 tiles; the fill loop
+        // has no NULL check
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(16, 32));
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -88,8 +90,11 @@ void EntityTransparentWater(Entity* self) {
     AnimateEntity(transWaterAnim, self);
 
     prim_xPos = -1 * g_Tilemap.scrollX.i.hi % TILE_WIDTH;
+    // wide view: whole tiles more on each side keep the texture phase
 #if !defined(INVERTED_STAGE)
-    prim_xPos += 0x130;
+    prim_xPos += 0x130 + (WIDE_X + TILE_WIDTH - 1) / TILE_WIDTH * TILE_WIDTH;
+#else
+    prim_xPos -= (WIDE_X + TILE_WIDTH - 1) / TILE_WIDTH * TILE_WIDTH;
 #endif
     if (self->params) {
         prim_xPos = 0x60 + PARAM_OFFSET;
@@ -102,9 +107,9 @@ void EntityTransparentWater(Entity* self) {
     selfY = self->posY.i.hi;
     prim = self->ext.transparentWater.prim;
 #ifdef INVERTED_STAGE
-    while (prim_xPos < 0x100) {
+    while (prim_xPos < 0x100 + WIDE_X) {
 #else
-    while (prim_xPos > 0) {
+    while (prim_xPos > -WIDE_X) {
 #endif
         prim->u0 = prim->u2 = uCoord;
         prim->u1 = prim->u3 = uCoord + TILE_WIDTH;

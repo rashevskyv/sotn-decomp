@@ -18,9 +18,12 @@ extern LayoutEntity** g_pStObjLayoutVertical;
 
 extern u8 cutscene_cen_alucard[];
 extern u8 cutscene_cen_maria[];
+extern u8 cutscene_data[];
 
 static void InitCutscenePc(void) {
     static const CutsceneSymbolRange symbols[] = {
+        // the script: only for the Ukrainian swap (cutscene_pc.c)
+        {cutscene_data, 0x801813f0, 0x1658 - 0x13f0},
         {cutscene_cen_alucard, 0x80181f40, 0xd80},
         {cutscene_cen_maria, 0x80182cc0, 0xd80},
     };

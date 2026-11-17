@@ -1,0 +1,827 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- SOTN native editor page. The game serves it (src/pc/editor_net.c) and
+     all data: no game graphics are in this file. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOTN editor</title>
+<style>
+:root { --bg:#14161c; --panel:#1e2129; --line:#343846; --text:#e4e6ec;
+        --dim:#9aa0ae; --accent:#e0b040; --bad:#ff7a60; --good:#7ad37a; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+       font:14px/1.4 system-ui, sans-serif; }
+header { display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+         padding:8px 12px; background:var(--panel);
+         border-bottom:1px solid var(--line); }
+header b { color:var(--accent); }
+button, select { background:#2a2e3a; color:var(--text);
+                 border:1px solid var(--line); border-radius:6px;
+                 padding:6px 10px; font:inherit; cursor:pointer; }
+button.on { background:#4a3f18; border-color:var(--accent); }
+button:disabled { opacity:.5; cursor:default; }
+#status { color:var(--dim); flex:1 1 300px; }
+#msg { min-height:1.4em; padding:4px 12px; }
+#msg.bad { color:var(--bad); } #msg.good { color:var(--good); }
+.tab { display:none; } .tab.show { display:block; }
+.bar { display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+       padding:6px 12px; }
+#mapc { width:100%; height:70vh; display:block; touch-action:none;
+        background:#0b0c10; }
+#choose { padding:0 12px; display:flex; gap:6px; flex-wrap:wrap; }
+.roomlay { display:flex; gap:8px; align-items:flex-start; padding:0 12px 12px; }
+#roomwrap { flex:1 1 0; min-width:0; height:66vh; overflow:auto; background:#0b0c10;
+            border:1px solid var(--line); }
+#roomstack { position:relative; display:inline-block; line-height:0; }
+#roomc { display:block; image-rendering:pixelated; }
+#ovc { position:absolute; left:0; top:0; pointer-events:none; }
+#palcol { flex:0 0 280px; }
+#palwrap { height:calc(66vh - 20px); overflow:auto; background:#0b0c10;
+           border:1px solid var(--line); }
+#palc { display:block; image-rendering:pixelated; }
+#sel { width:32px; height:32px; image-rendering:pixelated;
+       border:1px solid var(--line); }
+small { color:var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <b>SOTN editor</b>
+  <span id="status">connecting...</span>
+  <button data-tab="map" class="on">Map</button>
+  <button data-tab="room">Room</button>
+</header>
+<div class="bar" id="cheats"></div>
+<div id="msg"></div>
+
+<section class="tab show" id="tab-map">
+  <div class="bar">
+    <button id="castle">Normal castle</button>
+    <button id="zin">Zoom +</button><button id="zout">Zoom -</button>
+    <button id="center">Player</button>
+    <small>Tap a room to teleport. Drag to pan, pinch or wheel to zoom.</small>
+  </div>
+  <div id="choose"></div>
+  <canvas id="mapc"></canvas>
+</section>
+
+<section class="tab" id="tab-room">
+  <div class="bar">
+    <button id="lfg" class="on">Front (fg)</button><button id="lbg">Back (bg)</button>
+    <button id="tpaint" class="on">Paint</button><button id="terase">Erase</button>
+    <button id="tpick">Pick</button><button id="tselect">Select</button>
+    <canvas id="sel" width="16" height="16"></canvas><span id="selname">-</span>
+    <button id="rzin">Zoom +</button><button id="rzout">Zoom -</button><small id="zlevel">100%</small>
+    <button id="save" disabled>Save</button><button id="reload">Reload</button>
+  </div>
+  <div class="bar">
+    <button id="ccopy">Copy</button><button id="cpaste">Paste</button>
+    <button id="cfh">Flip H</button><button id="cfv">Flip V</button>
+    <button id="cclear">Clear</button>
+    <button id="cundo" disabled>Undo</button><button id="credo" disabled>Redo</button>
+  </div>
+  <div class="bar"><small id="roominfo">Paint outside the room frame. The
+    game shows the apron after Save.</small></div>
+  <div class="bar"><small id="help">Wheel: zoom. Right, middle or Space+drag: pan.
+    Alt+click: pick tile. Shift+drag or Select: rectangle. Ctrl+C, Ctrl+V (click to
+    place), H / V: flip, Del: clear, Ctrl+Z, Ctrl+Y: undo, redo. Flip moves tile
+    positions only: the tile format has no flip bit.</small></div>
+  <div class="roomlay">
+    <div id="roomwrap"><div id="roomstack"><canvas id="roomc"></canvas><canvas id="ovc"></canvas></div></div>
+    <div id="palcol">
+      <small>Stage tiles (tiles of this room first). Click to select.</small>
+      <div id="palwrap"><canvas id="palc"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+let state = null, castle = null;
+
+function msg(t, kind) { const m = $("#msg"); m.textContent = t || "";
+                        m.className = kind || ""; }
+
+// ---- tabs, state, cheats -------------------------------------------------
+document.querySelectorAll("header button[data-tab]").forEach(b =>
+  b.onclick = () => {
+    document.querySelectorAll("header button[data-tab]").forEach(x =>
+      x.classList.toggle("on", x === b));
+    document.querySelectorAll(".tab").forEach(x =>
+      x.classList.toggle("show", x.id === "tab-" + b.dataset.tab));
+    if (b.dataset.tab === "room") loadRoom(); else drawMap();
+  });
+
+const CHEATS = [["refill", "HP MP hearts"], ["invincible", "No damage"],
+                ["walls", "Mist walls"], ["items", "All items"],
+                ["skip_prologue", "Skip prologue"]];
+for (const [k, label] of CHEATS) {
+  const b = document.createElement("button");
+  b.textContent = label; b.id = "c-" + k;
+  b.onclick = async () => {
+    const on = b.classList.contains("on") ? 0 : 1;
+    const r = await fetch(`/cheat?name=${k}&on=${on}`, {method: "POST"});
+    showState(await r.json());
+  };
+  $("#cheats").appendChild(b);
+}
+
+function stageName(id) {
+  if (!castle) return "?";
+  const s = castle.stages.find(s => s[0] === id);
+  return s ? s[1] : "?";
+}
+
+function showState(s) {
+  const old = state; state = s;
+  $("#status").textContent =
+    `${s.name} (stage ${s.stage}) layer ${s.layer} room cell ` +
+    `${s.room[0]},${s.room[1]}-${s.room[2]},${s.room[3]}  HP ${s.hp}  ` +
+    (s.canWarp ? "teleport ready" : "no teleport: " + s.reason);
+  for (const [k] of CHEATS) $("#c-" + k).classList.toggle("on", !!s.cheats[k]);
+  if (!old || old.stage !== s.stage || old.cell[0] !== s.cell[0] ||
+      old.cell[1] !== s.cell[1]) drawMap();
+  if (old && (old.stage !== s.stage || old.layer !== s.layer) &&
+      $("#tab-room").classList.contains("show") && !dirty) loadRoom();
+}
+
+async function poll() {
+  try { showState(await (await fetch("/state")).json()); }
+  catch (e) { $("#status").textContent = "no connection to the game"; }
+  setTimeout(poll, 1000);
+}
+
+// ---- castle map ------------------------------------------------------------
+const mapc = $("#mapc"), mctx = mapc.getContext("2d");
+let inv = 0, view = {z: 10, ox: 0, oy: 0}, cursor = null;
+
+function color(stage) {
+  const h = ((stage & 0x1F) * 47 + (stage >> 6) * 23) % 360;
+  return `hsl(${h} 45% 45%)`;
+}
+
+function fitMap() {
+  const r = mapc.getBoundingClientRect();
+  mapc.width = r.width * devicePixelRatio; mapc.height = r.height * devicePixelRatio;
+}
+
+function centerOn(cx, cy) {
+  view.ox = mapc.width / 2 - (cx + 0.5) * view.z;
+  view.oy = mapc.height / 2 - (cy + 0.5) * view.z;
+}
+
+function playerCell() {
+  if (!state) return null;
+  return [state.cell[0], state.cell[1]];
+}
+
+function drawMap() {
+  if (!castle) return;
+  fitMap();
+  const W = mapc.width, H = mapc.height, z = view.z;
+  mctx.fillStyle = "#0b0c10"; mctx.fillRect(0, 0, W, H);
+  const gap = z >= 6 ? 1 : 0;
+  for (const r of castle.rooms) {
+    if ((r[0] & 0x20) !== inv) continue;
+    const x = view.ox + r[2] * z, y = view.oy + r[3] * z;
+    const w = (r[4] - r[2] + 1) * z - gap, h = (r[5] - r[3] + 1) * z - gap;
+    if (x > W || y > H || x + w < 0 || y + h < 0) continue;
+    const here = state && state.stage === r[0] && state.cell[0] >= r[2] &&
+      state.cell[0] <= r[4] && state.cell[1] >= r[3] && state.cell[1] <= r[5];
+    mctx.fillStyle = here ? "#ffffff" : color(r[0]);
+    mctx.fillRect(x, y, w, h);
+  }
+  if (z >= 24) {
+    const fs = Math.min(14, z / 3) * devicePixelRatio;
+    mctx.font = `${fs}px sans-serif`; mctx.fillStyle = "#000";
+    // one label per area: a room that shares cells with a labelled room
+    // adds its stage to that label ("NO3/NP3"); each label is clipped to
+    // its room, so no two labels draw over each other
+    const G = [];
+    for (const r of castle.rooms) {
+      if ((r[0] & 0x20) !== inv) continue;
+      const name = stageName(r[0]);
+      const g = G.find(g => r[2] <= g.r[4] && g.r[2] <= r[4] &&
+                            r[3] <= g.r[5] && g.r[3] <= r[5]);
+      if (g) { if (!g.names.includes(name)) g.names.push(name); }
+      else G.push({r, names: [name]});
+    }
+    for (const g of G) {
+      const r = g.r, x = view.ox + r[2] * z, y = view.oy + r[3] * z;
+      const w = (r[4] - r[2] + 1) * z - gap;
+      if (x > W || y > H || x + w < 0) continue;
+      mctx.save();
+      mctx.beginPath(); mctx.rect(x, y, w, (r[5] - r[3] + 1) * z); mctx.clip();
+      mctx.fillText(g.names.join("/"), x + 3, y + z / 2.5);
+      mctx.restore();
+    }
+  }
+  if (cursor) {
+    mctx.strokeStyle = "#ffd000"; mctx.lineWidth = 2;
+    mctx.strokeRect(view.ox + cursor[0] * z, view.oy + cursor[1] * z, z, z);
+  }
+}
+
+function owners(cx, cy) {
+  return castle.rooms.filter(r => (r[0] & 0x20) === inv && cx >= r[2] &&
+    cx <= r[4] && cy >= r[3] && cy <= r[5]);
+}
+
+async function warp(r, cx, cy) {
+  $("#choose").innerHTML = "";
+  const q = `stage=${r[0]}&room=${r[1]}&cx=${cx}&cy=${cy}`;
+  const res = await (await fetch("/warp?" + q, {method: "POST"})).json();
+  if (res.ok) msg(`Teleport to ${stageName(r[0])} room ${r[1]}`, "good");
+  else msg("Teleport refused: " + res.error, "bad");
+}
+
+function tapMap(px, py) {
+  const cx = Math.floor((px - view.ox) / view.z);
+  const cy = Math.floor((py - view.oy) / view.z);
+  if (cx < 0 || cy < 0 || cx > 63 || cy > 63) return;
+  cursor = [cx, cy]; drawMap();
+  const o = owners(cx, cy), box = $("#choose");
+  box.innerHTML = "";
+  if (!o.length) { msg("No room in this cell"); return; }
+  if (o.length === 1) { warp(o[0], cx, cy); return; }
+  msg("This cell has more than one room. Pick one:");
+  for (const r of o) {
+    const b = document.createElement("button");
+    b.textContent = `${stageName(r[0])} room ${r[1]}`;
+    b.onclick = () => warp(r, cx, cy);
+    box.appendChild(b);
+  }
+}
+
+function zoomAt(f, px, py) {
+  const nz = Math.max(3, Math.min(80, view.z * f));
+  view.ox = px - (px - view.ox) * nz / view.z;
+  view.oy = py - (py - view.oy) * nz / view.z;
+  view.z = nz; drawMap();
+}
+
+// pointer gestures: one finger pans (or taps), two fingers pinch
+const pts = new Map();
+let moved = false, pinch = 0, start = [0, 0];
+function canvasXY(e) {
+  const r = mapc.getBoundingClientRect();
+  return [(e.clientX - r.left) * devicePixelRatio,
+          (e.clientY - r.top) * devicePixelRatio];
+}
+mapc.addEventListener("pointerdown", e => {
+  mapc.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId, canvasXY(e));
+  if (pts.size === 1) { moved = false; start = canvasXY(e); }
+  if (pts.size === 2) { moved = true; pinch = 0; }
+});
+mapc.addEventListener("pointermove", e => {
+  if (!pts.has(e.pointerId)) return;
+  const p = canvasXY(e), q = pts.get(e.pointerId);
+  if (pts.size === 1) {
+    if (Math.hypot(p[0] - start[0], p[1] - start[1]) > 6 * devicePixelRatio)
+      moved = true;
+    if (!moved) return;
+    view.ox += p[0] - q[0]; view.oy += p[1] - q[1];
+    pts.set(e.pointerId, p); drawMap(); return;
+  }
+  pts.set(e.pointerId, p);
+  const [a, b] = [...pts.values()];
+  const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+  if (pinch) zoomAt(d / pinch, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+  pinch = d;
+});
+function up(e) {
+  if (!pts.has(e.pointerId)) return;
+  const p = pts.get(e.pointerId);
+  pts.delete(e.pointerId);
+  if (pts.size === 0 && !moved) tapMap(p[0], p[1]);
+  if (pts.size < 2) pinch = 0;
+}
+mapc.addEventListener("pointerup", up);
+mapc.addEventListener("pointercancel", e => { pts.delete(e.pointerId); moved = true; });
+mapc.addEventListener("wheel", e => {
+  e.preventDefault(); const p = canvasXY(e);
+  zoomAt(e.deltaY < 0 ? 1.2 : 1 / 1.2, p[0], p[1]);
+}, {passive: false});
+$("#zin").onclick = () => zoomAt(1.3, mapc.width / 2, mapc.height / 2);
+$("#zout").onclick = () => zoomAt(1 / 1.3, mapc.width / 2, mapc.height / 2);
+$("#castle").onclick = () => {
+  inv ^= 0x20;
+  $("#castle").textContent = inv ? "Inverted castle" : "Normal castle";
+  $("#choose").innerHTML = ""; cursor = null; drawMap();
+};
+$("#center").onclick = () => {
+  if (!state) return;
+  if ((state.stage & 0x20) !== inv && stageName(state.stage) !== "?")
+    $("#castle").onclick();
+  fitMap(); centerOn(state.cell[0], state.cell[1]); drawMap();
+};
+addEventListener("resize", drawMap);
+
+// ---- room, tiles, apron ---------------------------------------------------
+const PAL_COLS = 8, PAL_S = 32; // palette grid: tiles per row, px per tile
+const ZOOMS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4]; // 16 * zoom stays whole px
+let room = null, gfx = null, gfxStage = -1, layer = 0, tool = "paint";
+let selTile = 0, hoverTile = 0, zoomR = 1, patch = new Map(), dirty = false;
+let savedText = "", undo = [], redo = [];
+let sel = null, clip = null, pasting = false, pasteAt = null, hover = null;
+let spaceDown = false, drag = null, palList = [];
+const tileCache = new Map();
+
+function parseRoom(buf) {
+  const h = new Uint16Array(buf, 0, 16);
+  if (h[0] !== 0x5253) throw new Error("bad room.bin");
+  let o = 32;
+  const L = [];
+  for (let i = 0; i < 2; i++) {
+    const w = h[4 + i * 2], ht = h[5 + i * 2];
+    L.push({w, h: ht, flags: h[8 + i], tiles: new Uint16Array(buf, o, w * ht)});
+    o += w * ht * 2;
+  }
+  for (let i = 0; i < 2; i++) {
+    L[i].page = new Uint8Array(buf, o, 4096);
+    L[i].gfx = new Uint8Array(buf, o + 4096, 4096);
+    L[i].clut = new Uint8Array(buf, o + 8192, 4096);
+    o += 12288;
+  }
+  return {stage: h[2], layer: h[3], ax: h[10], ay: h[11], L};
+}
+
+// one 16x16 tile, decoded from the VRAM copy (4 bpp) and the palettes
+function tileCanvas(li, t) {
+  const key = room.stage + ":" + li + ":" + t;
+  if (tileCache.has(key)) return tileCache.get(key);
+  const Ld = room.L[li], c = document.createElement("canvas");
+  c.width = c.height = 16;
+  const img = c.getContext("2d").createImageData(16, 16);
+  const tp = Ld.page[t] + 8, gi = Ld.gfx[t];
+  const pal = (Ld.clut[t] + (Ld.flags & 0x200 ? 0x100 : 0)) * 16;
+  const vx = (tp & 15) * 64 - 512, vy = ((tp >> 4) & 1) * 256 + (gi & 0xF0);
+  const u0 = (gi & 0xF) * 16;
+  if (vx >= 0 && vx < 512 && t > 0 && t < 4096) {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const u = u0 + x;
+      const hw = gfx.vram[(vy + y) * 512 + vx + (u >> 2)];
+      const col = gfx.clut[pal + ((hw >> ((u & 3) * 4)) & 15)];
+      if (!col) continue;
+      const i = (y * 16 + x) * 4;
+      img.data[i] = (col & 31) * 255 / 31;
+      img.data[i + 1] = ((col >> 5) & 31) * 255 / 31;
+      img.data[i + 2] = ((col >> 10) & 31) * 255 / 31;
+      img.data[i + 3] = 255;
+    }
+  }
+  c.getContext("2d").putImageData(img, 0, 0);
+  tileCache.set(key, c);
+  return c;
+}
+
+function parsePatch(text) {
+  const m = new Map();
+  let key = null;
+  for (const line of text.split("\n")) {
+    const l = line.replace(/#.*/, "").trim();
+    let r;
+    if ((r = l.match(/^L\s+(\d+)\s+(fg|bg)/))) {
+      key = r[1] + " " + r[2];
+      if (!m.has(key)) m.set(key, new Map());
+    } else if (key && (r = l.match(/^(-?\d+)\s+(-?\d+)\s+([0-9a-fA-F]+)/))) {
+      m.get(key).set(r[1] + "," + r[2], parseInt(r[3], 16));
+    }
+  }
+  return m;
+}
+
+function patchText() {
+  let s = "# sotn apron v1\n";
+  for (const [key, cells] of [...patch.entries()].sort()) {
+    if (!cells.size) continue;
+    s += "L " + key + "\n";
+    for (const [xy, t] of cells) s += xy.replace(",", " ") + " " +
+      t.toString(16).toUpperCase().padStart(4, "0") + "\n";
+  }
+  return s;
+}
+
+function layerKey() { return room.layer + " " + (layer ? "bg" : "fg"); }
+function inRoom(x, y) {
+  const Ld = room.L[layer];
+  return x >= 0 && y >= 0 && x < Ld.w && y < Ld.h;
+}
+// the apron: outside the room frame, inside the margin
+function inApron(x, y) {
+  const Ld = room.L[layer];
+  return !inRoom(x, y) && x >= -room.ax && y >= -room.ay &&
+    x < Ld.w + room.ax && y < Ld.h + room.ay;
+}
+// the tile of a cell: the room layout inside, the patch outside, 0 = none
+function cellTile(x, y) {
+  if (inRoom(x, y)) return room.L[layer].tiles[y * room.L[layer].w + x];
+  return (patch.get(layerKey()) || new Map()).get(x + "," + y) || 0;
+}
+// the one writer: returns false (no change) for cells inside the room or
+// outside the margin. Tile 0 deletes the entry (the game draws no tile there).
+function setCell(x, y, t) {
+  if (!inApron(x, y)) return false;
+  const key = layerKey();
+  if (!patch.has(key)) patch.set(key, new Map());
+  if (t) patch.get(key).set(x + "," + y, t);
+  else patch.get(key).delete(x + "," + y);
+  return true;
+}
+function rectOf(a, b) {
+  return {x0: Math.min(a[0], b[0]), y0: Math.min(a[1], b[1]),
+          x1: Math.max(a[0], b[0]), y1: Math.max(a[1], b[1])};
+}
+function skippedMsg(n) {
+  if (n) msg(`${n} cell(s) inside the room were not changed. The apron is outside the white frame.`, "bad");
+}
+
+// ---- undo / redo: whole patch texts -------------------------------------
+function afterEdit() {
+  dirty = patchText() !== savedText;
+  $("#save").disabled = !dirty;
+  $("#cundo").disabled = !undo.length;
+  $("#credo").disabled = !redo.length;
+  drawRoom();
+}
+// call with the patch text from before a change
+function edit(before) {
+  if (patchText() === before) return;
+  undo.push(before);
+  if (undo.length > 200) undo.shift();
+  redo = [];
+  afterEdit();
+}
+function undoStep() {
+  if (!undo.length) return;
+  redo.push(patchText()); patch = parsePatch(undo.pop()); afterEdit();
+}
+function redoStep() {
+  if (!redo.length) return;
+  undo.push(patchText()); patch = parsePatch(redo.pop()); afterEdit();
+}
+
+async function loadRoom() {
+  if (dirty && !confirm("Drop the changes that are not saved?")) return;
+  try {
+    const st = await (await fetch("/state")).json();
+    if (gfxStage !== st.stage || !gfx) {
+      const b = await (await fetch("/gfx.bin")).arrayBuffer();
+      gfx = {vram: new Uint16Array(b, 0, 512 * 512),
+             clut: new Uint16Array(b, 512 * 512 * 2, 0x3000)};
+      gfxStage = st.stage; tileCache.clear();
+    }
+    room = parseRoom(await (await fetch("/room.bin")).arrayBuffer());
+    tileCache.clear();
+    patch = parsePatch(await (await fetch("/patch")).text());
+    savedText = patchText(); undo = []; redo = [];
+    sel = null; pasting = false; hover = null;
+    if (clip && clip.stage !== room.stage) clip = null;
+    $("#roominfo").textContent = `${stageName(room.stage)} layer ` +
+      `${room.layer}: fg ${room.L[0].w}x${room.L[0].h}, bg ` +
+      `${room.L[1].w}x${room.L[1].h} tiles. Paint outside the white frame.`;
+    if (stageName(room.stage) === "?")
+      msg("This stage has no apron file (not a castle stage).", "bad");
+    afterEdit(); drawPalette();
+  } catch (e) { msg("Room load failed: " + e.message, "bad"); }
+}
+
+function drawRoom() {
+  if (!room) return;
+  const c = $("#roomc"), ctx = c.getContext("2d"), Ld = room.L[layer];
+  const ax = room.ax, ay = room.ay, s = 16 * zoomR;
+  if (!Ld.w) { c.width = c.height = 0; drawOverlay(); msg("This layer is empty."); return; }
+  c.width = (Ld.w + 2 * ax) * s; c.height = (Ld.h + 2 * ay) * s;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#101218"; ctx.fillRect(0, 0, c.width, c.height);
+  const other = room.L[1 - layer];
+  // the other layer, dimmed, when it has the same size
+  if (other.w === Ld.w && other.h === Ld.h) {
+    ctx.globalAlpha = 0.35;
+    for (let y = 0; y < Ld.h; y++) for (let x = 0; x < Ld.w; x++) {
+      const t = other.tiles[y * other.w + x];
+      if (t) ctx.drawImage(tileCanvas(1 - layer, t), (x + ax) * s, (y + ay) * s, s, s);
+    }
+    ctx.globalAlpha = 1;
+  }
+  for (let y = 0; y < Ld.h; y++) for (let x = 0; x < Ld.w; x++) {
+    const t = Ld.tiles[y * Ld.w + x];
+    if (t) ctx.drawImage(tileCanvas(layer, t), (x + ax) * s, (y + ay) * s, s, s);
+  }
+  const cells = patch.get(layerKey());
+  if (cells) for (const [xy, t] of cells) {
+    const [x, y] = xy.split(",").map(Number);
+    if (t) ctx.drawImage(tileCanvas(layer, t), (x + ax) * s, (y + ay) * s, s, s);
+  }
+  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+  ctx.strokeRect(ax * s, ay * s, Ld.w * s, Ld.h * s);
+  // one screen (256x240 px = 16x15 tiles) at the top-left of the room
+  ctx.strokeStyle = "rgba(255,208,0,.5)"; ctx.setLineDash([6, 4]);
+  for (let y = 0; y < Ld.h; y += 16) for (let x = 0; x < Ld.w; x += 16)
+    ctx.strokeRect((x + ax) * s, (y + ay) * s, 16 * s, 16 * s);
+  ctx.setLineDash([]);
+  drawOverlay();
+}
+
+// hover, selection and paste preview: on their own canvas, no room redraw
+function drawOverlay() {
+  const c = $("#roomc"), o = $("#ovc"), ctx = o.getContext("2d");
+  o.width = c.width; o.height = c.height;
+  if (!room || !room.L[layer].w) return;
+  const ax = room.ax, ay = room.ay, s = 16 * zoomR;
+  const box = (x, y, w, h) => ctx.strokeRect((x + ax) * s, (y + ay) * s, w * s, h * s);
+  ctx.lineWidth = 2;
+  if (sel) {
+    ctx.strokeStyle = "#ffd000"; ctx.setLineDash([4, 3]);
+    box(sel.x0, sel.y0, sel.x1 - sel.x0 + 1, sel.y1 - sel.y0 + 1);
+    ctx.setLineDash([]);
+  }
+  if (pasting && clip && pasteAt) {
+    ctx.globalAlpha = 0.6;
+    clip.t.forEach((t, i) => {
+      if (t) ctx.drawImage(tileCanvas(layer, t), (pasteAt[0] + i % clip.w + ax) * s,
+                           (pasteAt[1] + Math.floor(i / clip.w) + ay) * s, s, s);
+    });
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#5ad1ff"; box(pasteAt[0], pasteAt[1], clip.w, clip.h);
+  }
+  if (hover) { ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1; box(hover[0], hover[1], 1, 1); }
+}
+
+function drawPalette() {
+  if (!room) return;
+  const Ld = room.L[layer], seen = new Set(), list = [];
+  const add = t => {
+    const k = Ld.page[t] + "," + Ld.gfx[t] + "," + Ld.clut[t];
+    if (t > 0 && !seen.has(k)) { seen.add(k); list.push(t); }
+  };
+  for (const t of Ld.tiles) add(t);
+  for (let t = 1; t < 4096; t++) if (Ld.page[t] || Ld.gfx[t] || Ld.clut[t]) add(t);
+  palList = list;
+  const c = $("#palc"), ctx = c.getContext("2d"), s = PAL_S;
+  c.width = PAL_COLS * s; c.height = Math.max(1, Math.ceil(list.length / PAL_COLS)) * s;
+  ctx.imageSmoothingEnabled = false;
+  const outline = (x, y, col) => {
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, s - 2, s - 2);
+  };
+  list.forEach((t, i) => {
+    const x = (i % PAL_COLS) * s, y = Math.floor(i / PAL_COLS) * s;
+    ctx.drawImage(tileCanvas(layer, t), x, y, s, s);
+    if (t === selTile) outline(x, y, "#ffd000");
+    if (t === hoverTile) outline(x, y, "#5ad1ff");
+  });
+}
+
+// scroll the palette (its own box) so the tile is in view
+function scrollPalTo(t) {
+  const i = palList.indexOf(t), wrap = $("#palwrap");
+  if (i < 0) return;
+  const top = Math.floor(i / PAL_COLS) * PAL_S, bot = top + PAL_S;
+  if (top < wrap.scrollTop) wrap.scrollTop = top;
+  else if (bot > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = bot - wrap.clientHeight;
+}
+
+function select(t) {
+  selTile = t;
+  const c = $("#sel").getContext("2d");
+  c.clearRect(0, 0, 16, 16);
+  if (t) c.drawImage(tileCanvas(layer, t), 0, 0);
+  $("#selname").textContent = t ? "tile " + t.toString(16).toUpperCase() : "-";
+  drawPalette();
+}
+
+$("#palc").onclick = e => {
+  const r = e.target.getBoundingClientRect(), s = PAL_S;
+  const i = Math.floor((e.clientY - r.top) / s) * PAL_COLS + Math.floor((e.clientX - r.left) / s);
+  if (palList[i]) { select(palList[i]); setTool("paint"); }
+};
+
+const TOOLS = ["paint", "erase", "pick", "select"];
+function setTool(t) {
+  tool = t;
+  for (const k of TOOLS) $("#t" + k).classList.toggle("on", k === t);
+}
+for (const k of TOOLS) $("#t" + k).onclick = () => setTool(k);
+function setLayer(l) {
+  layer = l; sel = null; pasting = false; hoverTile = 0;
+  $("#lfg").classList.toggle("on", !l); $("#lbg").classList.toggle("on", !!l);
+  selTile = 0; select(0); drawRoom();
+}
+$("#lfg").onclick = () => setLayer(0);
+$("#lbg").onclick = () => setLayer(1);
+$("#reload").onclick = loadRoom;
+
+// zoom keeps the point under the mouse (or the view centre) in place
+function zoomTo(z, cx, cy) {
+  const wrap = $("#roomwrap"), r = wrap.getBoundingClientRect();
+  if (cx == null) { cx = r.left + r.width / 2; cy = r.top + r.height / 2; }
+  const px = cx - r.left + wrap.scrollLeft, py = cy - r.top + wrap.scrollTop, k = z / zoomR;
+  zoomR = z; drawRoom();
+  wrap.scrollLeft = px * k - (cx - r.left); wrap.scrollTop = py * k - (cy - r.top);
+  $("#zlevel").textContent = Math.round(zoomR * 100) + "%";
+}
+function zoomStep(d, cx, cy) {
+  const i = ZOOMS.indexOf(zoomR), ni = Math.max(0, Math.min(ZOOMS.length - 1, i + d));
+  if (ni !== i) zoomTo(ZOOMS[ni], cx, cy);
+}
+$("#rzin").onclick = () => zoomStep(1);
+$("#rzout").onclick = () => zoomStep(-1);
+$("#roomwrap").addEventListener("wheel", e => {
+  if (!room) return;
+  e.preventDefault(); zoomStep(e.deltaY < 0 ? 1 : -1, e.clientX, e.clientY);
+}, {passive: false});
+
+// cell under the mouse (layer coordinates, may be outside the apron)
+function cellOf(e) {
+  const r = $("#roomc").getBoundingClientRect(), s = 16 * zoomR;
+  return [Math.floor((e.clientX - r.left) / s) - room.ax,
+          Math.floor((e.clientY - r.top) / s) - room.ay];
+}
+
+// hover: the palette shows the tile under the mouse
+function setHover(c) {
+  const moved = !(c && hover ? c[0] === hover[0] && c[1] === hover[1] : c === hover);
+  hover = c;
+  if (pasting && c) pasteAt = c;
+  if (!moved) return;
+  const t = c && room ? cellTile(c[0], c[1]) : 0;
+  if (t !== hoverTile) { hoverTile = t; drawPalette(); scrollPalTo(t); }
+  drawOverlay();
+}
+
+function pickAt(c) {
+  const t = cellTile(c[0], c[1]);
+  if (t) { select(t); setTool("paint"); }
+}
+
+// ---- selection, clipboard, flip, clear, paste ----------------------------
+function copySel() {
+  if (!sel) { msg("Select tiles first (Select tool or Shift+drag)."); return; }
+  const w = sel.x1 - sel.x0 + 1, h = sel.y1 - sel.y0 + 1, t = [];
+  for (let y = sel.y0; y <= sel.y1; y++) for (let x = sel.x0; x <= sel.x1; x++)
+    t.push(cellTile(x, y));
+  clip = {stage: room.stage, layer, w, h, t};
+  msg(`Copied ${w} x ${h} tiles. Ctrl+V, then click to place.`, "good");
+}
+
+function startPaste() {
+  if (!clip) { msg("Copy tiles first (Ctrl+C)."); return; }
+  if (clip.layer !== layer) { msg("Paste into the layer you copied from."); return; }
+  pasting = true; pasteAt = hover || pasteAt || [0, 0];
+  msg("Click to place the paste. Esc cancels.");
+  drawOverlay();
+}
+
+function doPaste(x0, y0) {
+  const before = patchText();
+  let skip = 0;
+  clip.t.forEach((t, i) => {
+    const x = x0 + i % clip.w, y = y0 + Math.floor(i / clip.w);
+    if (!setCell(x, y, t) && inRoom(x, y)) skip++;
+  });
+  pasting = false;
+  sel = {x0: x0, y0: y0, x1: x0 + clip.w - 1, y1: y0 + clip.h - 1};
+  edit(before); skippedMsg(skip);
+}
+
+function flipArr(t, w, h, horiz) {
+  const o = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
+    o.push(horiz ? t[y * w + (w - 1 - x)] : t[(h - 1 - y) * w + x]);
+  return o;
+}
+
+// flip the clipboard while the paste preview is on, else the selection
+function flipSel(horiz) {
+  if (pasting && clip) { clip.t = flipArr(clip.t, clip.w, clip.h, horiz); drawOverlay(); return; }
+  if (!sel) { msg("Select tiles first (Select tool or Shift+drag)."); return; }
+  const before = patchText(), w = sel.x1 - sel.x0 + 1, h = sel.y1 - sel.y0 + 1, t = [];
+  for (let y = sel.y0; y <= sel.y1; y++) for (let x = sel.x0; x <= sel.x1; x++)
+    t.push(cellTile(x, y));
+  const f = flipArr(t, w, h, horiz);
+  let skip = 0;
+  f.forEach((v, i) => {
+    const x = sel.x0 + i % w, y = sel.y0 + Math.floor(i / w);
+    if (!setCell(x, y, v) && inRoom(x, y)) skip++;
+  });
+  edit(before); skippedMsg(skip);
+}
+
+function clearSel() {
+  if (!sel) return;
+  const before = patchText();
+  let skip = 0;
+  for (let y = sel.y0; y <= sel.y1; y++) for (let x = sel.x0; x <= sel.x1; x++)
+    if (!setCell(x, y, 0) && inRoom(x, y)) skip++;
+  edit(before); skippedMsg(skip);
+}
+
+// ---- pointer: paint, select, pan, pick, paste ----------------------------
+const wrap = $("#roomwrap");
+const roomc = $("#roomc");
+roomc.addEventListener("mousedown", e => { if (e.button === 1) e.preventDefault(); });
+roomc.addEventListener("pointerdown", e => {
+  if (!room) return;
+  const c = cellOf(e);
+  try { roomc.setPointerCapture(e.pointerId); } catch (_) {}
+  if (e.button === 1 || e.button === 2 || spaceDown) {
+    drag = {kind: "pan", x: e.clientX, y: e.clientY, sl: wrap.scrollLeft, st: wrap.scrollTop};
+    e.preventDefault();
+  } else if (e.button !== 0) {
+    return;
+  } else if (e.altKey) {
+    pickAt(c);
+  } else if (pasting) {
+    doPaste(c[0], c[1]);
+  } else if (tool === "pick") {
+    pickAt(c);
+  } else if (tool === "select" || e.shiftKey) {
+    drag = {kind: "select", a: c};
+    sel = rectOf(c, c); drawOverlay();
+  } else {
+    if (inRoom(c[0], c[1])) { msg("Inside the room: the apron is outside the white frame."); return; }
+    if (!inApron(c[0], c[1])) return;
+    if (tool === "paint" && !selTile) { msg("Select a tile first."); return; }
+    drag = {kind: "paint", before: patchText(), last: c.join(",")};
+    setCell(c[0], c[1], tool === "erase" ? 0 : selTile); drawRoom();
+  }
+});
+roomc.addEventListener("pointermove", e => {
+  if (!room) return;
+  const c = cellOf(e);
+  if (!drag) { setHover(c); if (pasting) drawOverlay(); return; }
+  if (drag.kind === "pan") {
+    wrap.scrollLeft = drag.sl - (e.clientX - drag.x);
+    wrap.scrollTop = drag.st - (e.clientY - drag.y);
+    return;
+  }
+  setHover(c);
+  if (drag.kind === "select") { sel = rectOf(drag.a, c); drawOverlay(); }
+  else if (drag.kind === "paint" && c.join(",") !== drag.last && inApron(c[0], c[1])) {
+    drag.last = c.join(",");
+    setCell(c[0], c[1], tool === "erase" ? 0 : selTile); drawRoom();
+  }
+});
+roomc.addEventListener("pointerleave", () => { if (!drag) setHover(null); });
+function endDrag() {
+  if (drag && drag.kind === "paint") edit(drag.before);
+  drag = null;
+}
+addEventListener("pointerup", endDrag);
+addEventListener("pointercancel", endDrag);
+roomc.addEventListener("contextmenu", e => e.preventDefault());
+
+// ---- keys (Room tab only) -------------------------------------------------
+addEventListener("keydown", e => {
+  if (!$("#tab-room").classList.contains("show")) return;
+  if (e.code === "Space") { spaceDown = true; e.preventDefault(); return; }
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (mod && k === "z") e.shiftKey ? redoStep() : undoStep();
+  else if (mod && k === "y") redoStep();
+  else if (mod && k === "c") copySel();
+  else if (mod && k === "v") startPaste();
+  else if (mod) return;
+  else if (k === "delete") clearSel();
+  else if (k === "escape") { pasting = false; sel = null; drawOverlay(); }
+  else if (k === "h") flipSel(true);
+  else if (k === "v") flipSel(false);
+  else return;
+  e.preventDefault();
+});
+addEventListener("keyup", e => { if (e.code === "Space") { spaceDown = false; e.preventDefault(); } });
+addEventListener("blur", () => { spaceDown = false; });
+
+// ---- buttons ----------------------------------------------------------------
+$("#ccopy").onclick = copySel;
+$("#cpaste").onclick = startPaste;
+$("#cfh").onclick = () => flipSel(true);
+$("#cfv").onclick = () => flipSel(false);
+$("#cclear").onclick = clearSel;
+$("#cundo").onclick = undoStep;
+$("#credo").onclick = redoStep;
+
+$("#save").onclick = async () => {
+  const text = patchText();
+  const res = await (await fetch("/patch", {method: "POST", body: text})).json();
+  if (res.ok) { savedText = text; afterEdit();
+                msg("Saved. The game shows the apron now.", "good"); }
+  else msg("Save failed: " + res.error, "bad");
+};
+
+(async () => {
+  castle = await (await fetch("/castle.json")).json();
+  if (!castle.rooms.length) msg("This build has no castle data.", "bad");
+  await poll();
+  fitMap();
+  if (state) { inv = state.stage & 0x20;
+    $("#castle").textContent = inv ? "Inverted castle" : "Normal castle";
+    centerOn(state.cell[0], state.cell[1]); }
+  drawMap();
+})();
+</script>
+</body>
+</html>

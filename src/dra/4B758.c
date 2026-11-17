@@ -182,7 +182,8 @@ void RenderEntities(void) {
         r->flipX = entity->facingLeft << 1;
         r->x = entity->posX.i.hi + g_cameraOffsetX;
         r->y = entity->posY.i.hi + g_cameraOffsetY;
-        if (r->x < -512 || r->x > 512 || r->y < -512 || r->y > 512) {
+        if (r->x < -512 - WIDE_X || r->x > 512 + WIDE_X ||
+            r->y < -512 - WIDE_Y || r->y > 512 + WIDE_Y) {
             continue;
         }
         pose = r->animCurFrame & 0x7FFF;
@@ -678,7 +679,8 @@ void RenderEntitiesPSP(void) {
         r->flipX = entity->facingLeft << 1;
         r->x = entity->posX.i.hi + g_cameraOffsetX;
         r->y = entity->posY.i.hi + g_cameraOffsetY;
-        if (r->x < -512 || r->x > 512 || r->y < -512 || r->y > 512) {
+        if (r->x < -512 - WIDE_X || r->x > 512 + WIDE_X ||
+            r->y < -512 - WIDE_Y || r->y > 512 + WIDE_Y) {
             continue;
         }
         pose = r->animCurFrame & 0x7FFF;

@@ -43,10 +43,10 @@ void EntityStageTitleFadeout(Entity* self) {
             prim = prim->next;
         }
         prim = self->ext.stageTitleCard.prim;
-        prim->x0 = prim->x2 = 0;
-        prim->x1 = prim->x3 = 0x100;
-        prim->y0 = prim->y1 = 0;
-        prim->y2 = prim->y3 = 0xF0;
+        prim->x0 = prim->x2 = -WIDE_X;
+        prim->x1 = prim->x3 = 0x100 + WIDE_X;
+        prim->y0 = prim->y1 = -WIDE_Y;
+        prim->y2 = prim->y3 = 0xF0 + WIDE_Y;
         prim->r0 = prim->g0 = prim->b0 = 0;
         LOW(prim->r1) = LOW(prim->r0);
         LOW(prim->r2) = LOW(prim->r0);
@@ -70,10 +70,10 @@ void EntityStageTitleFadeout(Entity* self) {
         prim = prim->next;
         prim->priority = 0xC0;
         prim->drawMode = DRAW_DEFAULT;
-        prim->x0 = prim->x2 = 0;
-        prim->x1 = prim->x3 = 0x100;
-        prim->y0 = prim->y1 = 0;
-        prim->y2 = prim->y3 = 0xF0;
+        prim->x0 = prim->x2 = -WIDE_X;
+        prim->x1 = prim->x3 = 0x100 + WIDE_X;
+        prim->y0 = prim->y1 = -WIDE_Y;
+        prim->y2 = prim->y3 = 0xF0 + WIDE_Y;
         prim->r0 = prim->g0 = prim->b0 = 0;
         LOW(prim->r1) = LOW(prim->r0);
         LOW(prim->r2) = LOW(prim->r0);
@@ -116,8 +116,8 @@ void EntityStageTitleFadeout(Entity* self) {
     case 5:
         prim = self->ext.stageTitleCard.prim;
         while (prim) {
-            prim->y0 = prim->y1 = 0;
-            prim->y2 = prim->y3 = 0xF0;
+            prim->y0 = prim->y1 = -WIDE_Y;
+            prim->y2 = prim->y3 = 0xF0 + WIDE_Y;
             prim->priority = 0xB0;
             prim->drawMode =
                 DRAW_UNK_40 | DRAW_TPAGE | DRAW_COLORS | DRAW_TRANSP;
@@ -128,7 +128,7 @@ void EntityStageTitleFadeout(Entity* self) {
             prim = prim->next;
         }
         prim = self->ext.stageTitleCard.prim;
-        prim->x0 = prim->x2 = 0;
+        prim->x0 = prim->x2 = -WIDE_X;
         prim = prim->next;
 
         prim->r0 = prim->g0 = prim->b0 = 255;
@@ -137,7 +137,7 @@ void EntityStageTitleFadeout(Entity* self) {
         LOW(prim->r3) = LOW(prim->r1);
         prim = prim->next;
 
-        prim->x1 = prim->x3 = 0x100;
+        prim->x1 = prim->x3 = 0x100 + WIDE_X;
         prim = prim->next;
 
         prim->r0 = prim->g0 = prim->b0 = 0;
@@ -178,7 +178,7 @@ void EntityStageTitleFadeout(Entity* self) {
         prim->x0 = prim->x2 = var_s2 - 0x40;
         prim = prim->next;
 
-        if ((var_s1 < -0x40) && (var_s2 > 0x140)) {
+        if ((var_s1 < -0x40 - WIDE_X) && (var_s2 > 0x140 + WIDE_X)) {
 
             for (prim = self->ext.stageTitleCard.prim; prim != NULL;
                  prim = prim->next) {

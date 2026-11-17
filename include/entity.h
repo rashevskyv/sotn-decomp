@@ -525,6 +525,11 @@ typedef struct {
     s16 unk7E;
     s32 unk80;
     s16 pad[21];
+#ifdef PLATFORM_64BIT
+    // DRA writes the item id to ET_Weapon.equipId, which is 12 bytes
+    // further on 64-bit hosts (two pointers before it)
+    s16 _align_food[6];
+#endif
     s16 foodId;
 } ET_Food;
 
@@ -4427,11 +4432,11 @@ typedef struct {
     /* 0xA0 */ s16 timer;
     /* 0xA2 */ u16 : 16;
     /* 0xA4 */ struct Entity* next;
-    /* 0xA8 */ u8 : 8;
+    /* 0xA8 */ u8 unkA8;
     /* 0xA9 */ u8 unkA9;
     /* 0xAA */ u8 : 8;
     /* 0xAB */ u8 : 8;
-    /* 0xAC */ u8 : 8;
+    /* 0xAC */ u8 unkAC;
     /* 0xAD */ u8 scaleIndex;
 } ET_OlroxLaser;
 

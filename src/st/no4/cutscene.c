@@ -671,7 +671,7 @@ void EntityCutscene(Entity* self) {
         };
         buffer_2 = nextByte;
 #else
-        MoveImage(&rect, g_Dialogue.nextCharX, vCoord);
+        LANG_DIALOGUE_GLYPH(&rect, g_Dialogue.nextCharX, vCoord);
         g_Dialogue.nextCharX += 2;
 #endif
         break;

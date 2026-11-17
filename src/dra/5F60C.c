@@ -101,7 +101,7 @@ void func_800FF708(s32 equipType, s32 slot) {
 char* g_LuckCode = "x-x!v''q";
 char* g_AxeArmorCode = "axearmor";
 
-#if TARGET == TARGET_PSP
+#if TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)
 extern s32 D_psp_091CDC80;
 extern s32 D_psp_091CDC88;
 #endif
@@ -125,6 +125,11 @@ void InitStatsAndGear(bool isDeathTakingItems) {
         UpdateCapePalette();
         return;
     }
+#ifdef USE_PLAYER_MARIA
+    if (!isDeathTakingItems) {
+        Maria_ResetStash(); // pl_maria.c; Death keeps it
+    }
+#endif
 
     if (isDeathTakingItems == true) {
         if (g_Status.equipment[LEFT_HAND_SLOT] == ITEM_ALUCARD_SWORD) {
@@ -255,7 +260,7 @@ void InitStatsAndGear(bool isDeathTakingItems) {
         g_Status.statsBase[STAT_INT] = 10;
         g_Status.statsBase[STAT_LCK] = 10;
         g_Status.gold = 0;
-#if TARGET == TARGET_PSP
+#if TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)
         g_Status.D_80097C40 = 0;
 #endif
         g_Status.equipment[LEFT_HAND_SLOT] = ITEM_EMPTY_HAND;
@@ -620,10 +625,20 @@ void InitStatsAndGear(bool isDeathTakingItems) {
 
 static PlayerHud g_PlayerHud;
 
-#if TARGET == TARGET_PSP
+#if TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)
 #define RIC_HUD_NUM_SPRITES 10
 #else
 #define RIC_HUD_NUM_SPRITES 9
+#endif
+
+#ifdef PLATFORM_PSYZ
+void Hud_GetPrims(s32* index1, s32* index2) {
+    *index1 = g_PlayerHud.primIndex1;
+    // only the Richter HUD (DrawRichterHud) has the second chain
+    *index2 = (g_StageId == STAGE_ST0 || g_PlayableCharacter != PLAYER_ALUCARD)
+                  ? g_PlayerHud.primIndex2
+                  : -1;
+}
 #endif
 
 void DrawRichterHud(void) {
@@ -703,8 +718,8 @@ void DrawRichterHud(void) {
     prim->drawMode = DRAW_ABSPOS;
     prim = prim->next;
 
-    // Extra HUD sprite on PSP! Should identify what this is.
-#if TARGET == TARGET_PSP
+    // Extra HUD sprite on PSP: Maria's second subweapon icon
+#if TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)
     SetTexturedPrimRect(prim, 18, 38, 8, 8, 0, 0);
     prim->tpage = 0x1B;
     prim->clut = 0x102;
@@ -744,20 +759,33 @@ RicSubwpnIconParams g_ricSubwpnIcons[] = {
     {0x008, 0x00D, 0x018, 0x010, 0x0A8, 0x0D0, 0x01E, 0x17F},
     {0x008, 0x006, 0x018, 0x018, 0x080, 0x0D8, 0x01E, 0x17F}};
 
-#if TARGET == TARGET_PSP
-
+#if TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)
+// Maria's subweapon icons, indexed by g_Status.subWeapon
 RicSubwpnIconParams D_psp_09147418[] = {
     {0x00C, 0x009, 0x010, 0x017, 0x098, 0x0D8, 0x01E, 0x17F},
     {0x00C, 0x007, 0x00F, 0x017, 0x0D0, 0x0C0, 0x01E, 0x17F},
     {0x005, 0x009, 0x01F, 0x017, 0x0E0, 0x0B0, 0x01E, 0x17F},
     {0x005, 0x009, 0x01F, 0x017, 0x0E0, 0x0C8, 0x01E, 0x17F},
     {0x004, 0x000, 0x01F, 0x01F, 0x0E0, 0x0E0, 0x01E, 0x17F}};
+#endif
 
+#if TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)
+
+#if TARGET == TARGET_PSP
 // Appears that the data might have just been an array of s32.
 // But that's much harder to read. This macro takes the pointer
 // and index, and treats it as if it was S32 for the sake of indexing.
 // For pointer p and index i, returns &p[i]
 #define PTR_CVT(p, i) &(((s32*)p)[(i) * (sizeof(*p) / sizeof(s32*))])
+#define F2U(x) (x)
+#else
+// PC: a pointer is 8 bytes on 64-bit, so index the table itself
+#define PTR_CVT(p, i) (&(p)[i])
+// a negative float to u32: MIPS wraps it, AArch64 makes it 0
+#define F2U(x) ((s32)(x))
+float func_psp_089260AC(float); // sin (pl_maria.c)
+float func_psp_089260D0(float); // cos
+#endif
 
 Primitive* func_psp_090E4828(Primitive* prim) {
     RicSubwpnIconParams* ptr;
@@ -875,9 +903,9 @@ Primitive* func_psp_090E4CD0(Primitive* prim) {
         sp1C = 6.0f * sp14;
         sp18 = 0.9f - (0.099999994f * sp10);
 
-        temp_s1 = -127.0f + (63.5f * sp10);
+        temp_s1 = F2U(-127.0f + (63.5f * sp10));
 
-        temp_s0 = -127.0f - (63.5f * sp10);
+        temp_s0 = F2U(-127.0f - (63.5f * sp10));
 
         D_psp_091474B8++;
         if (D_psp_091474B8 >= 10) {
@@ -1103,7 +1131,7 @@ void DrawRichterHudSubweapon(void) {
     prim->drawMode = altPrim->drawMode;
     prim = prim->next;
 
-#if TARGET == TARGET_PSP
+#if TARGET == TARGET_PSP || defined(USE_PLAYER_MARIA)
 
     if (g_PlayableCharacter == PLAYER_MARIA) {
         prim = func_psp_090E4CD0(prim);

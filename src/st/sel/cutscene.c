@@ -43,6 +43,8 @@ static const char* actor_names[] = {_S("Alucard"), _S("Maria"), _S("Richter")};
 u8 SetCutsceneScript(u8* script) {
     Primitive* prim;
 
+    script = LANG_SCRIPT(script); // the rebuilt Ukrainian script
+
 #ifdef FIX_UB
     // BUG! the code below walks 8 primitives, the last one is out of bounds
     g_Dialogue.primIndex[2] = g_api.AllocPrimitives(PRIM_SPRT, 8);
@@ -512,7 +514,7 @@ void EntityCutscene(Entity* self) {
         rect->w = 2;
         rect->h = 8;
         y = g_Dialogue.nextCharY * 12 + 0x180;
-        MoveImage(rect, g_Dialogue.nextCharX, y);
+        LANG_DIALOGUE_GLYPH(rect, g_Dialogue.nextCharX, y);
         g_Dialogue.nextCharX += 2;
 #endif
         break;

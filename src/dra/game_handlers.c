@@ -275,6 +275,11 @@ void ApplySoundMode(void) {
 }
 
 void func_800E4970(void) {
+#ifdef PLATFORM_PSYZ
+    // cheat: the intro video of a new game ends here and loads ST0; with
+    // the cheat it loads NO3, as the end of the prologue does
+    Cheat_SkipPrologue();
+#endif
     SetGameState(Game_NowLoading);
     g_GameStep = NowLoading_2;
     ClearBackbuffer();
@@ -1311,6 +1316,12 @@ s32 func_800E6300(void) {
 
     for (i = 0; i < LEN(g_Status.relics); i++) {
         s32 servantId = g_RelicDefs[i].unk0C;
+#ifdef PLATFORM_PSYZ
+        // jp_cards = off: a card in the save stays, but does nothing
+        if (JP_RELICS_HIDDEN && (i == RELIC_JP_0 || i == RELIC_JP_1)) {
+            continue;
+        }
+#endif
         if (servantId > 0 && g_Status.relics[i] & RELIC_FLAG_ACTIVE) {
             return servantId;
         }

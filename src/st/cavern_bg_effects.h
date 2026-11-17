@@ -54,7 +54,7 @@ void func_us_801C12B0(Entity* self) {
         InitializeEntity(g_EInitInteractable);
         self->animSet = 0;
         self->ext.et_801C12B0.unk80 = 4;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 16);
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(16, 32));
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -82,13 +82,17 @@ void func_us_801C12B0(Entity* self) {
     AnimateEntity(D_us_80181144, self);
     i = (self->params >> 8) & 0xFF;
     ptr = &water_surface_lines[(self->params & 0xFF) * 5];
-    scrollX = g_Tilemap.scrollX.i.hi - 0x10;
+    // wide view: the window grows by the margins (0 in 4:3)
+    scrollX = g_Tilemap.scrollX.i.hi - 0x10 - WIDE_X;
     scrollY = g_Tilemap.scrollY.i.hi;
-    xOffset = scrollX + 0x120;
+    xOffset = scrollX + 0x120 + 2 * WIDE_X;
     var_s5 = &D_us_8018112C[self->animCurFrame * 4];
     var_s8 = var_s5[1];
 
     for (; i > 0; i--) {
+        if (WIDE_NO_PRIM(prim)) {
+            break;
+        }
         var_s3 = *ptr++;
         var_s2 = var_s3 + *ptr++;
         if (scrollX >= var_s2 || xOffset < var_s3) {
@@ -97,7 +101,8 @@ void func_us_801C12B0(Entity* self) {
         }
 
         var_s6 = *ptr++;
-        if (scrollY - 4 > var_s6 || var_s6 > scrollY + 0xE0) {
+        if (scrollY - 4 - WIDE_Y > var_s6 ||
+            var_s6 > scrollY + 0xE0 + WIDE_Y) {
             ptr += 2;
             // This fixes a bunch of registers on PSP
             // It should mean the else below is not necessary but
@@ -120,7 +125,7 @@ void func_us_801C12B0(Entity* self) {
                 var_s4 = (u32)var_s3 % 126;
             }
             var_s2 -= var_s3;
-            var_s3 -= scrollX + 0x10;
+            var_s3 -= scrollX + 0x10 + WIDE_X;
             var_s4 += var_s5[0];
             do {
                 prim->u0 = prim->u2 = var_s4;
@@ -140,7 +145,7 @@ void func_us_801C12B0(Entity* self) {
                 prim->y2 = prim->y3 = var_s6 + 1;
                 prim->drawMode = DRAW_TPAGE | DRAW_UNK02 | DRAW_TRANSP;
                 prim = prim->next;
-            } while (var_s2 != 0);
+            } while (var_s2 != 0 && !WIDE_NO_PRIM(prim));
         }
     }
 
@@ -185,7 +190,7 @@ void func_us_801C15F8(Entity* self) {
         InitializeEntity(g_EInitInteractable);
         self->animSet = 0;
         self->ext.et_801C12B0.unk80 = 4;
-        primIndex = g_api.AllocPrimitives(PRIM_TILE, 16);
+        primIndex = g_api.AllocPrimitives(PRIM_TILE, WIDE_POOL(16, 32));
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -211,12 +216,15 @@ void func_us_801C15F8(Entity* self) {
     prim = self->ext.et_801C12B0.prim;
     ptr = &water_tile_rects[(self->params & 0xFF) * 4];
     i = (self->params >> 8) & 0xFF;
-    scrollX = g_Tilemap.scrollX.i.hi - 0x10;
-    scrollY = g_Tilemap.scrollY.i.hi - 0x10;
-    xOffset = scrollX + 0x120;
-    yOffset = scrollY + 0x100;
+    scrollX = g_Tilemap.scrollX.i.hi - 0x10 - WIDE_X;
+    scrollY = g_Tilemap.scrollY.i.hi - 0x10 - WIDE_Y;
+    xOffset = scrollX + 0x120 + 2 * WIDE_X;
+    yOffset = scrollY + 0x100 + 2 * WIDE_Y;
 
     for (; i > 0; i--) {
+        if (WIDE_NO_PRIM(prim)) {
+            break;
+        }
         var_s3 = *ptr++;
         var_s2 = var_s3 + *ptr++;
         if (scrollX >= var_s2 || xOffset < var_s3) {
@@ -235,7 +243,7 @@ void func_us_801C15F8(Entity* self) {
             }
 
             var_s2 -= var_s3;
-            var_s3 -= scrollX + 0x10;
+            var_s3 -= scrollX + 0x10 + WIDE_X;
 
             if (var_s5 < scrollY) {
                 var_s5 = scrollY;
@@ -245,7 +253,26 @@ void func_us_801C15F8(Entity* self) {
                 var_s4 = yOffset;
             }
             var_s4 -= var_s5;
-            var_s5 -= scrollY + 0x10;
+            var_s5 -= scrollY + 0x10 + WIDE_Y;
+#ifdef PLATFORM_PSYZ
+            // Rows of at most 0xFF px (a TILE height is one byte) and
+            // columns under 128 px: Wide_Tile (src/pc/wide.c) stretches a
+            // tile of 128x120 or more that touches a frame edge, which
+            // would paint water past a pool edge in the margin.
+            for (; var_s4 > 0 && prim; var_s4 -= var_s1, var_s5 += var_s1) {
+                s32 x = var_s3, w = var_s2;
+                var_s1 = var_s4 > 0xFF ? 0xFF : var_s4;
+                for (; w > 0 && prim; prim = prim->next) {
+                    prim->u0 = w > 0x7F ? 0x7F : w;
+                    prim->v0 = var_s1;
+                    prim->x0 = x;
+                    prim->y0 = var_s5;
+                    x += prim->u0;
+                    w -= prim->u0;
+                    prim->drawMode = DRAW_TPAGE | DRAW_UNK02 | DRAW_TRANSP;
+                }
+            }
+#else
             if (var_s4 >= 0x100) {
                 var_s4 = 0xFF;
             }
@@ -264,6 +291,7 @@ void func_us_801C15F8(Entity* self) {
                 prim->drawMode = DRAW_TPAGE | DRAW_UNK02 | DRAW_TRANSP;
                 prim = prim->next;
             } while (var_s2 != 0);
+#endif
         }
     }
 
@@ -320,7 +348,7 @@ void func_us_801C1844(Entity* self) {
         InitializeEntity(g_EInitInteractable);
         self->animSet = 0;
         self->ext.et_801C12B0.unk80 = 4;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 0x10);
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(0x10, 0x20));
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -348,14 +376,17 @@ void func_us_801C1844(Entity* self) {
     prim = self->ext.et_801C12B0.prim;
     sp38 = (self->params >> 8) & 0xFF;
     ptr = &D_us_8018133C[(self->params & 0xFF) * 4];
-    scrollX = g_Tilemap.scrollX.i.hi - 0x10;
+    scrollX = g_Tilemap.scrollX.i.hi - 0x10 - WIDE_X;
     scrollY = g_Tilemap.scrollY.i.hi;
-    xOffset = scrollX + 0x120;
+    xOffset = scrollX + 0x120 + 2 * WIDE_X;
     yOffset = scrollY + 0xE0;
     var_s5 = &D_us_8018112C[20];
     var_s4 = var_s5[1];
 
     for (; sp38 > 0; sp38--) {
+        if (WIDE_NO_PRIM(prim)) {
+            break;
+        }
         var_s3 = *ptr++;
         var_s2 = *ptr++;
         if (scrollX >= var_s2 || xOffset < var_s3) {
@@ -378,8 +409,11 @@ void func_us_801C1844(Entity* self) {
                 var_s2 = xOffset;
             }
             var_s2 -= var_s3;
-            var_s3 -= scrollX + 0x10;
-            var_s6 = ((scrollX / 4) + var_s3) % 0x7E;
+            var_s3 -= scrollX + 0x10 + WIDE_X;
+            // the margin has screen x < 0: keep the phase positive
+            var_s6 = (((scrollX + WIDE_X) / 4) + var_s3 +
+                      (WIDE_X ? 4 * 0x7E : 0)) %
+                     0x7E;
             if (var_s7 < scrollY) {
                 var_s7 = scrollY;
             }
@@ -443,7 +477,7 @@ void func_us_801C1844(Entity* self) {
                 PRED(prim) = PBLU(prim) = sp34 + 0x80;
                 PGRN(prim) = 0x80;
                 prim = prim->next;
-            } while (var_s2 != 0);
+            } while (var_s2 != 0 && !WIDE_NO_PRIM(prim));
         }
     }
 
@@ -567,11 +601,14 @@ void func_us_801C1EE4(Entity* self) {
 
     s32 primIndex;
     s16* ptr;
+#ifdef PLATFORM_PSYZ
+    s32 sp;
+#endif
 
     if (!self->step) {
         InitializeEntity(g_EInitInteractable);
         self->animSet = 0;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 16);
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(16, 48));
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -625,6 +662,16 @@ void func_us_801C1EE4(Entity* self) {
         var_s2 += yOffset;
         clut = self->ext.et_801C12B0.clut + 0x90;
 
+#ifdef PLATFORM_PSYZ
+        // The table is two periods of 0x100 (5 strands each) and a 0
+        // terminator that the original loop never reaches. The wide view
+        // walks periods -2..2 of the first 5 entries instead.
+        for (sp = 0; sp < 25 && prim; sp++) {
+            var_s1 = ptr[sp % 5] + (sp / 5 - 2) * 0x100 - scrollX;
+            if (var_s1 < -2 - WIDE_X || var_s1 >= 0x100 + WIDE_X) {
+                continue;
+            }
+#else
         while (true) {
             var_s1 = *ptr++;
             var_s1 -= scrollX;
@@ -635,6 +682,7 @@ void func_us_801C1EE4(Entity* self) {
             if (var_s1 >= 0x100) {
                 break;
             }
+#endif
 
             prim->clut = clut;
             prim->v0 = prim->v1 = scrollY + 0x84;
@@ -646,7 +694,7 @@ void func_us_801C1EE4(Entity* self) {
             prim->drawMode =
                 DRAW_UNK_40 | DRAW_TPAGE2 | DRAW_TPAGE | DRAW_TRANSP;
             prim = prim->next;
-            if (var_s4 != 0) {
+            if (var_s4 != 0 && !WIDE_NO_PRIM(prim)) {
                 prim->clut = clut;
                 prim->v0 = prim->v1 = 0x84;
                 prim->v2 = prim->v3 = var_s4 + 0x84;
@@ -1566,18 +1614,18 @@ void func_us_801C37C8(Entity* self) {
     scrollX = g_Tilemap.scrollX.i.hi;
     scrollY = g_Tilemap.scrollY.i.hi;
 
-    if (scrollX < 0x288) {
+    if (scrollX < 0x288 + WIDE_X) {
         xOffset = 0x218 - scrollX;
-        if (xOffset < 0x100) {
+        if (xOffset < 0x100 + WIDE_X) {
             prim->u0 = prim->u2 = 0x11;
             prim->u1 = prim->u3 = 0x80;
         } else {
             prim->drawMode = DRAW_HIDE;
             return;
         }
-    } else if (scrollX < 0x4D8) {
+    } else if (scrollX < 0x4D8 + WIDE_X) {
         xOffset = 0x468 - scrollX;
-        if (xOffset < 0x100) {
+        if (xOffset < 0x100 + WIDE_X) {
             prim->u0 = prim->u2 = 0x80;
             prim->u1 = prim->u3 = 0x11;
         } else {
@@ -1797,7 +1845,7 @@ void func_us_801C3FB0(Entity* self) {
     if (!self->step) {
         InitializeEntity(g_EInitInteractable);
         self->animSet = 0;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 0x10);
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(0x10, 0x30));
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -1838,11 +1886,11 @@ void func_us_801C3FB0(Entity* self) {
     while (prim != NULL) {
         var_s3 = *ptr++;
         var_s3 -= scrollX;
-        if (var_s3 < -0x1B) {
+        if (var_s3 < -0x1B - WIDE_X) {
             continue;
         }
 
-        if (var_s3 >= 0x100) {
+        if (var_s3 >= 0x100 + WIDE_X) {
             break;
         }
 
@@ -1852,7 +1900,8 @@ void func_us_801C3FB0(Entity* self) {
         var_s4 = scrollY + *ptr++;
 #endif
         var_s2 = 0x60 - var_s4;
-        var_s1 = 0;
+        // wide view: start whole 0x60 periods above the frame
+        var_s1 = -((WIDE_Y + 0x5F) / 0x60 * 0x60);
 
         while (prim != NULL) {
             prim->clut = clut;
@@ -1867,13 +1916,13 @@ void func_us_801C3FB0(Entity* self) {
                 DRAW_UNK_40 | DRAW_TPAGE2 | DRAW_TPAGE | DRAW_TRANSP;
             prim = prim->next;
 
-            if (var_s1 >= 0xE8) {
+            if (var_s1 >= 0xE8 + WIDE_Y) {
                 break;
             }
 
             var_s4 = 0;
-            if (var_s1 > 0x88) {
-                var_s2 = 0xE8 - var_s1;
+            if (var_s1 > 0x88 + WIDE_Y) {
+                var_s2 = 0xE8 + WIDE_Y - var_s1;
             } else {
                 var_s2 = 0x60;
             }
@@ -1927,7 +1976,7 @@ void func_us_801C4228(Entity* self) {
     }
     yOffset = 0x550 - scrollY;
     yMax = yOffset + 0x80;
-    if (yMax > 0 && xOffset < 0x110) {
+    if (yMax > -WIDE_Y && xOffset < 0x110 + WIDE_X) {
         // Prim 1
         prim->x0 = prim->x2 = xOffset;
         prim->x1 = prim->x3 = xOffset + 0x30;
@@ -1986,9 +2035,9 @@ void func_us_801C4228(Entity* self) {
         prim = prim->next;
 
         // Prim 4
-        if (xOffset < 0x110) {
+        if (xOffset < 0x110 + WIDE_X) {
             prim->x0 = prim->x2 = xOffset;
-            prim->x1 = prim->x3 = 0x110;
+            prim->x1 = prim->x3 = 0x110 + WIDE_X;
             prim->y0 = prim->y1 = yOffset;
             prim->y2 = prim->y3 = yMax;
             prim->drawMode = DRAW_UNK02;

@@ -179,6 +179,56 @@ typedef struct {
     DR_ENV* env;
 } PrimitivesRenderer;
 
+#ifdef PLATFORM_PSYZ
+// Wide view: the player HUD (gauges, hearts, the boss gauge of the
+// prologue) moves from the 4:3 frame to the edges of the wide view. Only
+// the drawn copy moves; the game keeps its own coordinates.
+static u32 g_WideHudMark[MAX_PRIM_COUNT];
+static u32 g_WideHudFrame;
+
+static void Wide_MarkHud(void) {
+    s32 idx[2];
+    s32 i, n;
+    Primitive* p;
+
+    g_WideHudFrame++;
+    if (!WIDE_X && !WIDE_Y) {
+        return;
+    }
+    Hud_GetPrims(&idx[0], &idx[1]);
+    for (i = 0; i < 2; i++) {
+        if (idx[i] < 0 || idx[i] >= MAX_PRIM_COUNT) {
+            continue;
+        }
+        for (p = &g_PrimBuf[idx[i]], n = 0; p && n < 32; p = p->next, n++) {
+            g_WideHudMark[p - g_PrimBuf] = g_WideHudFrame;
+        }
+    }
+}
+
+// Left HUD parts move left by the X margin, right parts move right. All
+// parts move up by the Y margin. The HUD prims are DRAW_ABSPOS at priority
+// 0x1EE..0x1F0, so a stale index does not move other prims.
+static void Wide_MoveHud(s32 i, Primitive* prim, POLY_GT4* p) {
+    s32 dx;
+
+    if (g_WideHudMark[i] != g_WideHudFrame ||
+        !(prim->drawMode & DRAW_ABSPOS) || prim->priority < 0x1EE ||
+        prim->priority > 0x1F0) {
+        return;
+    }
+    dx = prim->x0 < 128 ? -WIDE_X : WIDE_X;
+    p->x0 += dx;
+    p->x1 += dx;
+    p->x2 += dx;
+    p->x3 += dx;
+    p->y0 -= WIDE_Y;
+    p->y1 -= WIDE_Y;
+    p->y2 -= WIDE_Y;
+    p->y3 -= WIDE_Y;
+}
+#endif
+
 void RenderPrimitives(void) {
 #if TARGET == TARGET_PSP
 #define RECT_LOC 0x12C
@@ -233,12 +283,18 @@ void RenderPrimitives(void) {
             r->tile->y0 = 0;
             r->tile->w = DISP_STAGE_W;
             r->tile->h = DISP_STAGE_H;
+#ifdef PLATFORM_PSYZ
+            Wide_Tile(r->tile);
+#endif
             addPrim(&r->ot[0], r->tile);
             g_GpuUsage.tile++;
             D_8003C0EC[3]--;
         }
     } else {
         unkBool = 0;
+#ifdef PLATFORM_PSYZ
+        Wide_MarkHud();
+#endif
         for (i = 0, prim = &g_PrimBuf[0]; i < MAX_PRIM_COUNT; prim++, i++) {
             primType = prim->type;
             if (!primType) {
@@ -255,10 +311,10 @@ void RenderPrimitives(void) {
             if (D_800973EC != 0 && !(prim->drawMode & DRAW_MENU)) {
                 continue;
             }
-            if (prim->x0 < -512 || prim->x0 > 512) {
+            if (prim->x0 < -512 - WIDE_X || prim->x0 > 512 + WIDE_X) {
                 continue;
             }
-            if (prim->y0 < -512 || prim->y0 > 512) {
+            if (prim->y0 < -512 - WIDE_Y || prim->y0 > 512 + WIDE_Y) {
                 continue;
             }
             if (prim->drawMode & DRAW_DITHERING) {
@@ -295,6 +351,9 @@ void RenderPrimitives(void) {
                     }
                     primbuf->tile.w = prim->u0;
                     primbuf->tile.h = prim->v0;
+#ifdef PLATFORM_PSYZ
+                    Wide_Tile(&primbuf->tile);
+#endif
                     *r->tile = primbuf->tile;
 #if TARGET == TARGET_PSP
                     if (prim->priority < 0 || prim->priority >= 0x200) {
@@ -478,6 +537,9 @@ void RenderPrimitives(void) {
                         prim->tpage +
                         (prim->drawMode & (DRAW_UNK_40 | DRAW_TPAGE2));
                     primbuf->gt4.clut = g_ClutIds[prim->clut];
+#ifdef PLATFORM_PSYZ
+                    Wide_MoveHud(i, prim, &primbuf->gt4);
+#endif
                     *r->gt4 = primbuf->gt4;
 #if TARGET == TARGET_PSP
                     if (prim->priority < 0 || prim->priority >= 0x200) {
@@ -654,4 +716,7 @@ void RenderPrimitives(void) {
             }
         }
     }
+#ifdef PLATFORM_PSYZ
+    PortMenu_Draw(r->ot);
+#endif
 }

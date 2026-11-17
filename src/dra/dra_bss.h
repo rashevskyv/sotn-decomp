@@ -46,7 +46,11 @@ extern u8 g_CdCommandResult[8];
 extern s8 g_KeyStatus[SPU_VOICE_NUM];
 extern s32 D_80138F7C;
 extern s16 D_80138F80;
+#ifdef PLATFORM_PSYZ
+extern u_long* g_SeqPointers[10];
+#else
 extern s32 g_SeqPointers[10];
+#endif
 extern s16 g_SfxRingBufferReadPos;
 extern DebugMode g_DebugMode;
 extern s16 g_VolL; // vol_l

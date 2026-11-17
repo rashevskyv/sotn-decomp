@@ -759,7 +759,7 @@ void EntityCutsceneDialogue(Entity* self) {
         };
         char_buffer = nextChar;
 #else
-        MoveImage(&rect, g_Dialogue.nextCharX, vCoord);
+        LANG_DIALOGUE_GLYPH(&rect, g_Dialogue.nextCharX, vCoord);
         g_Dialogue.nextCharX += 2;
 #endif
         break;

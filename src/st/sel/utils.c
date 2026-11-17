@@ -269,6 +269,7 @@ void func_801B2108(const char* str, s32 arg1) {
     s32 j;
     u8* dest_addr;
 
+    str = LANG_SJIS(str); // the file-select messages under language = uk
     var_s4 = 0x90;
     for (i = 0; i < var_s4 * FontHeight; i++) {
         D_801BAFD0[i] = 0;
@@ -484,17 +485,45 @@ void DrawString16x16(char* str, s32 x, s32 y, s32 tge) {
     const s32 H = 16;
     char ch;
     s32 uvIndex;
+#ifdef PLATFORM_PSYZ
+    // uk: the Ukrainian word, centred on the stock one; 'A'.. are the cells
+    // of the drawn page at VRAM 832,256 (texture page 0x1D). The typed name
+    // stays as it is, even when it spells a stock word.
+    extern u8 g_InputSaveName[];
+    const char* uk =
+        (u8*)str == g_InputSaveName ? NULL : Lang_Gothic(str);
+    // НОСІЯ (5 letters for "card") touched the frame of the 80 px card
+    // window at 16 px a letter, so it steps 14
+    s32 adv = uk && !strcmp(str, "card") ? 14 : W;
+    if (uk) {
+        x += ((s32)strlen(str) * W - ((s32)strlen(uk) - 1) * adv - W) / 2;
+        str = (char*)uk;
+    }
+#endif
 
     while (true) {
         ch = *str++;
         if (!ch) {
             break;
         }
+#ifdef PLATFORM_PSYZ
+        if (uk && ch >= 'A' && ch <= 'Z') {
+            uvIndex = ch - 'A';
+            DrawGlyph(x, y, W, H, (uvIndex & 7) * W, (uvIndex >> 3) * H, 0x200,
+                      0x1D, tge, 0x40);
+            x += adv;
+            continue;
+        }
+#endif
 
         uvIndex = func_801B2984(ch);
         DrawGlyph(x, y, W, H, D_8018046C[uvIndex * 3 + 1],
                   D_8018046C[uvIndex * 3 + 2], 0x200, 12, tge, 0x40);
+#ifdef PLATFORM_PSYZ
+        x += adv;
+#else
         x += W;
+#endif
     }
 }
 
@@ -505,6 +534,7 @@ void DrawGlyph8x8(s32 ch, s32 x, s32 y, s32 tge) {
 }
 
 void DrawString8x8(u8* str, s32 x, s32 y, s32 tge) {
+    str = (u8*)LANG_CELL((const char*)str);
     while (true) {
         if (*str == 0xFF)
             break;

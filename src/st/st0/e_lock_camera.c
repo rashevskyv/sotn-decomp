@@ -2,6 +2,9 @@
 #include "st0.h"
 
 #include "../player_is_within_hitbox.h"
+#ifdef PLATFORM_PSYZ
+#include "../../pc/wide.h"
+#endif
 
 extern EInit g_EInitLockCamera;
 static u8 D_8018065C[] = {32, 0};
@@ -29,9 +32,22 @@ void EntityLockCamera(Entity* self) {
             self->hitboxWidth = 20;
             self->hitboxHeight = D_8018065C[params];
         }
+#ifdef PLATFORM_PSYZ
+        self->ext.lockCamera.unk80 = self->posX.i.hi + g_Tilemap.scrollX.i.hi;
+        self->ext.lockCamera.unk82 = self->posY.i.hi + g_Tilemap.scrollY.i.hi;
+#endif
     }
 
     if (self->params & 0x100) {
+#ifdef PLATFORM_PSYZ
+        // The wide view creates this one-shot lock early, while the player
+        // is still on the prologue stairs. Wait for the PS1 window.
+        if (!Wide_InPsxSpawnWindow(
+                self->ext.lockCamera.unk80 - g_Tilemap.scrollX.i.hi,
+                self->ext.lockCamera.unk82 - g_Tilemap.scrollY.i.hi)) {
+            return;
+        }
+#endif
         params = params * 4;
         rect16 = &D_80180664[params];
         g_Tilemap.x = *rect16++;

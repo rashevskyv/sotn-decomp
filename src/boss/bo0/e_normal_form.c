@@ -1192,7 +1192,11 @@ void EntityBlastAttack(Entity* self) {
         self->velocityY = 0;
         if (self->facingLeft) {
             self->velocityX = FIX(-0.5);
+#ifdef VERSION_PC
+            self->ext.olroxBlast.unkAA.i.hi = -0x30;
+#else
             self->ext.olroxBlast.unkAA.i.hi = -0x30U;
+#endif
         } else {
             self->velocityX = FIX(0.5);
             self->ext.olroxBlast.unkAA.i.hi = 0x30;

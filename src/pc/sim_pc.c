@@ -29,6 +29,21 @@ SimFile D_800A024C[] = {
 // need a place for the data loaded to hardcoded offset
 u8 D_80280000[110000] = {0};
 
+#ifdef USE_PLAYER_MARIA
+int MariaReadVab(int body, void* dst, u32 size); // pl_maria.c
+#endif
+
+// a VAB of D_800A036C. Maria: her voices in the place of Richter's (vab 1)
+static int ReadPlayerVab(const char* path, u16 id, void* addr, u32 size) {
+#ifdef USE_PLAYER_MARIA
+    if (g_PlayableCharacter == PLAYER_MARIA && (id == 2 || id == 3) &&
+        MariaReadVab(id == 3, addr, size) == 0) {
+        return 0;
+    }
+#endif
+    return FileReadToBuf(path, addr, 0, size);
+}
+
 SimFile D_800A036C[] = {
     {
         "VAB/SD_ALK.VH",
@@ -229,6 +244,10 @@ void func_800E7D08(void) {
     D_800A04EC = 1;
 }
 
+// A copy of the stage tiles for the editor page (editor_net.c, /gfx.bin):
+// VRAM x 512..1023, y 0..511, as LoadStageTileset writes it.
+u16 g_TileVram[512 * 512];
+
 void LoadStageTileset(u8* pTilesetData, size_t len, s32 y) {
     const u32 MaxBlockCount = 0x20;
     RECT rect;
@@ -257,8 +276,17 @@ void LoadStageTileset(u8* pTilesetData, size_t len, s32 y) {
         }
 
         LoadImage(&rect, pTilesetDataSrc);
+        if (rect.x >= 512 && rect.x + rect.w <= 1024 && rect.y + rect.h <= 512) {
+            for (u32 row = 0; row < (u32)rect.h; row++) {
+                memcpy(&g_TileVram[(rect.y + row) * 512 + rect.x - 512],
+                       pTilesetDataSrc + row * rect.w * 2, rect.w * 2);
+            }
+        }
         while (DrawSync(1)) {
         }
+    }
+    if (y == 0x100) {
+        Lang_PaintFont8(); // the font sheet at 896,256 (language = uk only)
     }
 }
 
@@ -372,7 +400,8 @@ bool LoadFilePc(const struct FileUseContent* file) {
     }
     switch (sim->kind) { // slowly replacing the original func
     case SIM_1:
-        LoadStageTileset(sim->addr, file->length, 0x100);
+        // F_GAME: 32 tile blocks, then the CLUTs at 0x40000 (loaded below)
+        LoadStageTileset(sim->addr, MIN(file->length, 0x40000), 0x100);
         LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         LoadImage(&g_Vram.D_800ACDA8, (u8*)sim->addr + 0x40000);
         StoreImage(&g_Vram.D_800ACDA8, g_Clut[1]);
@@ -390,7 +419,8 @@ bool LoadFilePc(const struct FileUseContent* file) {
         LoadStageTileset(sim->addr, file->length, 0x100);
         break;
     case SIM_13:
-        LoadStageTileset(sim->addr, file->length, 0x100);
+        // F_GAME2: the same layout as F_GAME
+        LoadStageTileset(sim->addr, MIN(file->length, 0x40000), 0x100);
         LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         break;
     case 99:
@@ -505,6 +535,31 @@ static bool IsBossOvl(const char* ovlName) {
            !strcmp(ovlName, "MAR");
 }
 
+// A stage module that is missing (all boss modules link now; the test stages
+// TE1-TE5 do not) or fails to load. The callers retry every
+// frame, which hangs the game: go back to the last room the player entered,
+// or to the title.
+static int s_StageFallback; // the load back to the last room runs
+static void StagePrgFailed(void) {
+    if (g_GameState == Game_Play && g_DemoMode == Demo_None &&
+        !s_StageFallback && g_LastRoom.active &&
+        g_LastRoom.stage != g_StageId) {
+        WARNF("stage %02X did not load: back to stage %02X room %d cell %d,%d",
+              g_StageId, g_LastRoom.stage, g_LastRoom.room, g_LastRoom.cx,
+              g_LastRoom.cy);
+        s_StageFallback = 1;
+        g_WarpTarget = g_LastRoom; // the door path places the player there
+        D_80097C98 = 0;
+        D_8006C374 = 0;
+        g_GameStep = Play_PrepareNextStage;
+        return;
+    }
+    WARNF("stage %02X did not load: back to the title", g_StageId);
+    s_StageFallback = 0;
+    g_WarpTarget.active = 0;
+    SetGameState(Game_Title);
+}
+
 static bool LoadStagePrg(const char* name) {
     char ovlName[16];
     unsigned i;
@@ -514,8 +569,10 @@ static bool LoadStagePrg(const char* name) {
     ovlName[i] = '\0';
     if (!LoadStageOverlay(ovlName, &g_api.o)) {
         ERRORF("stage '%s' was not loaded", ovlName);
+        StagePrgFailed();
         return false;
     }
+    s_StageFallback = 0;
     return true;
 }
 
@@ -562,7 +619,7 @@ s32 LoadFileSim(s32 fileId, SimFileType type) {
 #ifdef USE_PLAYER_MARIA
             case PLAYER_MARIA:
                 InitPlayerMaria();
-                return;
+                return 0; // all her data is in the binary, no file
 #endif
             }
             sim.path = "BIN/RIC.BIN";
@@ -703,7 +760,7 @@ s32 LoadFileSim(s32 fileId, SimFileType type) {
             sim.addr = D_800A036C[actualFileId].addr;
             sim.kind = SIM_VH;
             snprintf(buf, sizeof(buf), SOTN_DATA_DIR "/%s", sim.path);
-            if (FileReadToBuf(buf, sim.addr, 0, sim.size) < 0) {
+            if (ReadPlayerVab(buf, actualFileId, sim.addr, sim.size) < 0) {
                 return -1;
             }
             if (sim.addr == aPbav) {
@@ -781,7 +838,7 @@ s32 LoadFileSim(s32 fileId, SimFileType type) {
             sim.addr = D_800A036C[actualFileId].addr;
             sim.kind = SIM_VB;
             snprintf(buf, sizeof(buf), SOTN_DATA_DIR "/%s", sim.path);
-            if (FileReadToBuf(buf, sim.addr, 0, sim.size) < 0) {
+            if (ReadPlayerVab(buf, actualFileId, sim.addr, sim.size) < 0) {
                 return -1;
             }
             if (SsVabTransBodyPartly(sim.addr, sim.size, g_SimVabId) == -1) {

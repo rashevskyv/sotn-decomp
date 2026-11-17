@@ -1,0 +1,504 @@
+[
+ {
+  "git": null,
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "copy.png",
+  "name": "copy",
+  "native": [
+   "F_SEL.BIN @y0"
+  ],
+  "proven": "placement",
+  "rect": [
+   768,
+   128,
+   32,
+   32
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": null,
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "delete.png",
+  "name": "delete",
+  "native": [
+   "F_SEL.BIN @y0"
+  ],
+  "proven": "placement",
+  "rect": [
+   768,
+   160,
+   32,
+   32
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": null,
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "entry.png",
+  "name": "entry",
+  "native": [
+   "F_SEL.BIN @y0"
+  ],
+  "proven": "placement",
+  "rect": [
+   768,
+   192,
+   32,
+   32
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": null,
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "change.png",
+  "name": "change",
+  "native": [
+   "F_SEL.BIN @y0"
+  ],
+  "proven": "placement",
+  "rect": [
+   768,
+   224,
+   32,
+   32
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": null,
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "select.png",
+  "name": "select",
+  "native": [
+   "F_SEL.BIN @y0"
+  ],
+  "proven": "placement",
+  "rect": [
+   800,
+   144,
+   32,
+   32
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": "font8.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": null,
+  "label_png": null,
+  "name": "sheet0",
+  "native": [
+   "F_GAME.BIN @y0",
+   "F_GAME2.BIN @y0",
+   "F_TITLE1.BIN @y0"
+  ],
+  "proven": "content",
+  "rect": [
+   896,
+   48,
+   32,
+   40
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "font8.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": null,
+  "label_png": null,
+  "name": "sheet256",
+  "native": [
+   "F_GAME.BIN @y256",
+   "F_GAME2.BIN @y256",
+   "F_TITLE1.BIN @y256"
+  ],
+  "proven": "placement",
+  "rect": [
+   896,
+   304,
+   32,
+   40
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/gothic.png",
+  "how": "no stock hash: the port writes it on demand",
+  "label_matches_record": true,
+  "label_png": "gothic.png",
+  "name": "gothic",
+  "native": [],
+  "proven": false,
+  "rect": [
+   832,
+   256,
+   32,
+   32
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": null,
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "name_place.png",
+  "name": "name_place",
+  "native": [
+   "F_SEL.BIN @y0"
+  ],
+  "proven": "placement",
+  "rect": [
+   800,
+   240,
+   20,
+   13
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": null,
+  "how": "no native source matched the record hash",
+  "label_matches_record": null,
+  "label_png": null,
+  "name": "hud300_976",
+  "native": [],
+  "proven": false,
+  "rect": [
+   976,
+   300,
+   16,
+   16
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": null,
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": null,
+  "label_png": null,
+  "name": "hud300_720",
+  "native": [
+   "F_GAME2.BIN @y256"
+  ],
+  "proven": "placement",
+  "rect": [
+   720,
+   300,
+   16,
+   16
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": null,
+  "how": "no native source matched the record hash",
+  "label_matches_record": null,
+  "label_png": null,
+  "name": "hud324_976",
+  "native": [],
+  "proven": false,
+  "rect": [
+   976,
+   324,
+   16,
+   16
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": null,
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": null,
+  "label_png": null,
+  "name": "hud324_720",
+  "native": [
+   "F_GAME2.BIN @y256"
+  ],
+  "proven": "placement",
+  "rect": [
+   720,
+   324,
+   16,
+   16
+  ],
+  "stock_pixels": true
+ },
+ {
+  "git": "labels/bloodlines.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "bloodlines.png",
+  "name": "bloodlines",
+  "native": [
+   "assets/st/st0/stage_title_st0_us.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   68,
+   257,
+   24,
+   30
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_NO0.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_NO0.png",
+  "name": "zone_NO0",
+  "native": [
+   "assets/st/no0/stage_title_no0.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   95
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_NO1.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_NO1.png",
+  "name": "zone_NO1",
+  "native": [
+   "assets/st/no1/D_8019519C.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   265,
+   32,
+   89
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_LIB.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_LIB.png",
+  "name": "zone_LIB",
+  "native": [
+   "assets/st/lib/gfx_stage_name_en.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   264,
+   32,
+   92
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_CAT.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_CAT.png",
+  "name": "zone_CAT",
+  "native": [
+   "assets/st/cat/gfx_stage_name_en.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   265,
+   32,
+   88
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_NO2.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_NO2.png",
+  "name": "zone_NO2",
+  "native": [
+   "assets/st/no2/stage_title_no2.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   93
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_CHI.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_CHI.png",
+  "name": "zone_CHI",
+  "native": [
+   "assets/st/chi/bn_gfx_stage_name_en.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   92
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_DAI.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_DAI.png",
+  "name": "zone_DAI",
+  "native": [
+   "assets/st/dai/gfx_stage_name_en.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   95
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_NO4.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_NO4.png",
+  "name": "zone_NO4",
+  "native": [
+   "assets/st/no4/D_80185400.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   93
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_ARE.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_ARE.png",
+  "name": "zone_ARE",
+  "native": [
+   "assets/st/are/gfx_stage_name_en.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   87
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_TOP.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_TOP.png",
+  "name": "zone_TOP",
+  "native": [
+   "assets/st/top/gfx_stage_name_en.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   95
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_NZ0.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_NZ0.png",
+  "name": "zone_NZ0",
+  "native": [
+   "assets/st/nz0/stage_title_nz0_us.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   95
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_NZ1.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_NZ1.png",
+  "name": "zone_NZ1",
+  "native": [
+   "assets/st/nz1/D_80186530.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   261,
+   32,
+   92
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_DRE.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_DRE.png",
+  "name": "zone_DRE",
+  "native": [
+   "assets/st/dre/gfx_stage_name_en.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   260,
+   32,
+   88
+  ],
+  "stock_pixels": false
+ },
+ {
+  "git": "labels/zone_NO1_elevator.png",
+  "how": "fnv1a32 of the stock rect (big-endian halfwords) equals the record hash",
+  "label_matches_record": true,
+  "label_png": "zone_NO1_elevator.png",
+  "name": "zone_NO1_elevator",
+  "native": [
+   "assets/st/no1/D_80194E14.png @64,256"
+  ],
+  "proven": "content",
+  "rect": [
+   64,
+   257,
+   32,
+   20
+  ],
+  "stock_pixels": false
+ }
+]

@@ -135,14 +135,20 @@ typedef enum {
 #define MAX_ENV_COUNT 0x10
 #define MAX_DRAW_MODES 0x400
 #ifdef PLATFORM_PSYZ
-#define MAX_POLY_GT4_COUNT 0x1400
+// Saturn stages draw 8x8 characters as quads: 3 layers of the wide view,
+// up to 960x540, need about 0x7B00 of them.
+#define MAX_POLY_GT4_COUNT 0xA000
 #else
 #define MAX_POLY_GT4_COUNT 0x300
 #endif
 #define MAX_POLY_G4_COUNT 0x100
 #define MAX_POLY_GT3_COUNT 0x30
 #define MAX_LINE_G2_COUNT 0x100
+#ifdef PLATFORM_PSYZ
+#define MAXSPRT16 0x4000 // tiles of the wide view, up to 960x540
+#else
 #define MAXSPRT16 0x280
+#endif
 #define MAX_TILE_COUNT 0x100
 #define MAX_SPRT_COUNT 0x200
 
@@ -976,6 +982,260 @@ typedef struct GpuBuffer { // also called 'DB' in the PSY-Q samples
 #endif
 } GpuBuffer; // size=0x177F4
 
+#ifdef PLATFORM_PSYZ
+// Wide view (src/pc/wide.c): game pixels shown past the 256x240 frame on each
+// side. Both 0 means no margin: the original code paths run unchanged.
+extern s32 g_WideX;
+extern s32 g_WideY;
+// Saturn stages: rows at the top and bottom of every room that hold no art
+// (the Saturn shows 224 lines). The wide camera keeps them out of view. The
+// stage module sets them, every stage load resets them to 0.
+extern s32 g_WideBandTop, g_WideBandBottom;
+// PC: the music a stage module plays; 0 = g_StagesLba[g_StageId].musicId
+extern s32 g_StageMusicId;
+// A room shorter than the view: draw only the rows y0..y1 of the frame.
+void Wide_BandClip(int y0, int y1);
+void Wide_Config(int scale);
+void Wide_OnFrame(void);
+void Wide_Tile(TILE* tile);
+// Player HUD prim chains (src/dra/5F60C.c), -1 when none.
+void Hud_GetPrims(s32* index1, s32* index2);
+// Port menu (src/pc/port_menu.c): L3+R3 opens it.
+u16 PortMenu_Pad(u16 pressed);
+void Wide_LoadIni(const char* path);
+void Wide_MenuGet(int* scale, int* lo, int* hi);
+void Wide_MenuSet(int scale);
+void Wide_SaveIni(void);
+// spawn = in sotn.ini (Switch): a --spawn-point name, empty: normal start.
+extern char g_IniSpawn[48];
+void PortMenu_Draw(OT_TYPE* ot);
+// Mark b of the button set (PS index), its 11 rows from x, y, drawn this frame
+// over the game (the Librarian's compare window).
+void PortMenu_Mark(int x, int y, int b);
+// Serif menu cell (Lang_MenuCellAny), its 11 rows from x, y, in colour rgb.
+void PortMenu_Cell(int x, int y, int cell, u32 rgb);
+// The stat bonus colours of the status page, the Librarian's compare window.
+#define TINT_BONUS_UP 0xFF3030   // red
+#define TINT_BONUS_DOWN 0x5070FF // blue
+// Label tints (texel x tint / 0x80 of the grey ink 197,206,206): the Gold
+// label (255,255,74), the shop's Number (110,235,130), Next (200,120,255)
+#define TINT_GOLD 0xFFC830
+#define TINT_NUMBER 0x479251
+#define TINT_NEXT 0x824BA0
+#define TINT_HP 0xFF3030 // the HP label of the status page and the bestiary
+// Voice sets (src/pc/voice.c), saved as voice = in sotn.ini.
+enum { VOICE_PS1, VOICE_JP, VOICE_PSP, VOICE_COUNT };
+extern int g_VoiceSet;
+extern const char* const g_VoiceSetNames[VOICE_COUNT];
+s32 Voice_Open(s32 id, s32 isVoice);
+// Button marks of the menus (src/pc/buttons.c), saved as buttons = in
+// sotn.ini. Mark b: the PS button of g_ChButtons (0..7), 8 Select, 9 Start,
+// 10 the d-pad. The pause menu atlas holds them under its cells.
+enum { BUTTONS_SWITCH, BUTTONS_XBOX, BUTTONS_PSX, BUTTON_SETS };
+#define BUTTON_MARKS 11
+#define BUTTON_MARKS_V (16 * 11)
+// the dotted row of the atlas, under the marks (the status page lines)
+#define MENU_DOTS_V (BUTTON_MARKS_V + (BUTTON_SETS * BUTTON_MARKS + 7) / 8 * 11)
+extern int g_ButtonSet;
+extern const char* const g_ButtonSetNames[BUTTON_SETS];
+int Buttons_Width(int b);
+int Buttons_Rows(int set, int b, u8 px[11][16]);
+void Buttons_Paint(u16* dst, int stride, int ink);
+// Cheats (src/pc/cheats.c), saved as cheat_* = 0|1 in sotn.ini.
+struct Cheats {
+    int refill;       // HP, MP and hearts stay full
+    int invincible;   // hits do nothing
+    int walls;        // mist passes every wall and does not end
+    int items;        // all weapons, items and relics, once per load
+    int skipPrologue; // a new game starts as Alucard at the castle entrance
+    int character;    // CHEAT_CHAR_*: who plays a new game or a loaded save
+    int map; // the whole castle map explored (both castles), once per load
+};
+// cheat_character values. 3 and 5 are kept for later and act as 0 for now;
+// 4 needs USE_PLAYER_MARIA (Cheat_CharacterNext skips what is not built).
+enum {
+    CHEAT_CHAR_GAME,    // the game's own rule (Richter: cleared save, name)
+    CHEAT_CHAR_ALUCARD,
+    CHEAT_CHAR_RICHTER, // PS1 Richter
+    CHEAT_CHAR_RICHTER_SATURN,
+    CHEAT_CHAR_MARIA_PSP,
+    CHEAT_CHAR_MARIA_SATURN,
+    CHEAT_CHAR_N,
+};
+// The next value of the CHARACTER row that works in this build (dir +1/-1;
+// dir 0 checks v: v itself when it works, else CHEAT_CHAR_GAME).
+int Cheat_CharacterNext(int v, int dir);
+extern struct Cheats g_Cheat;
+// The character the save belongs to: a new game or a loaded save sets it,
+// a save writes it (save_mgr.h). -1: not set, the save writes the player.
+extern int g_CheatSaveChar;
+// The character the cheat picks; `game` is the one the game picks itself.
+int Cheat_Character(int game);
+// APPLY NOW: reload the player as the cheat character in place. NULL when
+// it starts, else the reason why it is refused.
+const char* Cheat_ApplyCharacter(void);
+#ifdef USE_PLAYER_MARIA
+// g_Status.D_80097C40 is Alucard's Muramasa counter and Maria's second
+// animal (PSP). While one of them plays a save of the other, the owner's
+// value waits in pl_maria.c and the save gets it back. g_Status.subWeapon
+// is kept the same way for each of the three characters.
+void Maria_ResetStash(void);             // a new game or a loaded save
+void Maria_SyncStash(void);              // the player changed
+void Maria_SaveStash(u32* subWeapon, u32* c40); // the values a save writes
+#endif
+// Engine_Init (5087C.c): 1 once after APPLY NOW, the stage music restarts.
+int Cheat_TakeMusicRestart(void);
+extern int g_CheatMistRequest; // a warp sets it: turn into mist once
+extern int g_EditorOn;         // editor = 1 in sotn.ini, or --editor (PC)
+// Debug overlay (src/pc/port_menu.c): overlay = 1 shows the stage, room,
+// map cell and cheats in a corner; fps = 1 shows the frame rate.
+extern int g_OverlayOn, g_FpsOn;
+// The door path (5087C.c) calls it before a room loads: a flushed log line
+// [room] <stage> (<zone>) id <hex> room <n> cell <x>,<y> pos <x>,<y>, and
+// the room for the overlay.
+void PortMenu_OnRoom(const RoomLoadDef* def, int cx, int cy);
+void Cheat_OnFrame(void);
+void Cheat_SkipPrologue(void); // game_handlers.c, before a stage load
+// Teleport to room `room` of `stage`, map cell (cx, cy). Returns NULL when
+// the warp starts, else the reason why it is refused.
+const char* Cheat_Warp(int stage, int room, int cx, int cy);
+// NULL when a warp can start now, else the reason.
+const char* Cheat_WarpRefusal(void);
+// Read by the door path in 5087C.c at the next stage load.
+extern struct WarpTarget {
+    int active, stage, room, cx, cy;
+    int exact, px, py; // exact = 1: the player at room pixel (px, py)
+} g_WarpTarget;
+// The last room PortMenu_OnRoom saw (active = 1 once set). A stage that does
+// not load sends the player back there (sim_pc.c).
+extern struct WarpTarget g_LastRoom;
+// The door path calls it once: the target room, the player placed in it.
+RoomHeader* Cheat_WarpRoom(void);
+// Castle rooms in map cells, built from assets/st/*/rooms.json into the
+// build directory (tools/editor/export_castle.py). Ends with stage 0xFF.
+struct CastleRoom {
+    u8 stage, room, left, top, right, bottom;
+};
+extern const struct CastleRoom g_CastleRooms[];
+extern const int g_CastleRoomCount;
+struct CastleStage {
+    u8 id;
+    char name[5];
+};
+extern const struct CastleStage g_CastleStages[];
+extern const int g_CastleStageCount;
+// Teleport map markers in map cells of their own castle (0 or 0x20):
+// boss rooms from assets/boss/*/rooms.json, save rooms and teleporters from
+// the colours of the game's map (F_MAP.BIN). Same generated file.
+enum { MARK_BOSS, MARK_SAVE, MARK_WARP };
+struct CastleMark {
+    u8 castle, kind, left, top, right, bottom;
+};
+extern const struct CastleMark g_CastleMarks[];
+extern const int g_CastleMarkCount;
+const char* Castle_StageName(int stage);
+// The zone name of a stage for the log ("Marble Gallery"), "" if unknown.
+const char* Castle_ZoneName(int stage);
+// Map screen coordinates (window or touch pixels) to game frame pixels.
+void Wide_ScreenToFrame(float sx, float sy, int* x, int* y);
+// Pointer input for the port menu map, in game frame pixels: n contacts
+// (0, 1 or 2) this frame. Mouse wheel: PortMenu_Wheel.
+void PortMenu_Touch(int n, const int* x, const int* y);
+void PortMenu_Wheel(int dir, int x, int y);
+int PortMenu_IsOpen(void);
+// Apron tiles around a room (src/pc/apron.c), visual only.
+extern int g_ApronLayer; // the LoadRoomLayer argument of the current room
+void Apron_OnRoomLayer(s32 layerIndex);
+int Apron_Has(int bg);
+u16 Apron_Tile(int bg, int tx, int ty);
+const char* Apron_Path(char* buf, int size);
+const char* Apron_Text(void);
+const char* Apron_Save(const char* text, int len);
+// Text files built into the program (tools/editor/bake_apron.py).
+struct BakedFile {
+    const char* name;
+    const char* text;
+    int len;
+};
+extern const struct BakedFile g_ApronBaked[];
+extern const int g_ApronBakedCount;
+extern const struct BakedFile g_EditorPage[];
+extern const int g_EditorPageCount;
+// The editor server (src/pc/editor_net.c), on with g_EditorOn.
+void Editor_OnFrame(void);
+// The port menu line under EDITOR: "HTTP://<ip>:8080/", "NO NETWORK" or the
+// error; NULL while the server is off. Refresh reads the address again.
+const char* Editor_Status(void);
+void Editor_RefreshAddress(void);
+#define WIDE_X g_WideX
+#define WIDE_Y g_WideY
+// a prim pool that fills the wide view may run out: stop, do not crash
+#define WIDE_NO_PRIM(prim) ((prim) == NULL)
+#define WIDE_POOL(ps1, wide) (wide)
+void Wide_MoveCornerText(s32 prims, s32 left);
+// The language of this run (src/pc/lang.c): 0 English, 1 Ukrainian.
+// Under English every Lang_ lookup returns its argument.
+extern int g_Lang, g_LangNext;
+void Lang_Init(void);
+const char* Lang_Cell(const char* s);
+const char* Lang_Sjis(const char* s);
+const char* Lang_Row(int table, int index, const char* s);
+const unsigned char* Lang_Glyph(unsigned short ch);
+void Lang_PaintFont8(void);
+void Lang_DialogueGlyph(RECT* rect, s32 x, s32 y);
+#define LANG_DIALOGUE_GLYPH(rect, x, y) Lang_DialogueGlyph(rect, x, y)
+unsigned char* Lang_ScriptStart(unsigned char* script);
+#define LANG_SCRIPT(script) Lang_ScriptStart(script)
+#define LANG_CELL(s) Lang_Cell(s)
+#define LANG_SJIS(s) Lang_Sjis(s)
+#define LANG_ROW(table, index, s) Lang_Row(table, index, s)
+const char* Lang_NameDelete(const char* s);
+#define LANG_NAME_DELETE(s) Lang_NameDelete(s)
+// uk: the Ukrainian gothic word of the file select for a stock one, or NULL
+const char* Lang_Gothic(const char* word);
+// the pause menu's serif atlas in VRAM (1 open, 0 put the VRAM back); under
+// en it holds the stock cells and the two stat arrows only
+int Lang_MenuFont(int on);
+// the drawn up and down arrows of the atlas (tools/lang/uk/serif_latin.py),
+// in two sheet cells no stock string uses (the sheet has ¶ ∑ there)
+#define MENU_CELL_UP 0xFA
+#define MENU_CELL_DOWN 0xFB
+// the serif < and > of the port menu, in two cells no sheet character takes
+#define MENU_CELL_LT 0x02
+#define MENU_CELL_GT 0x1B
+int Lang_MenuFontOn(void);
+const char* Lang_Port(int index);
+// uk: the 11 rows (4 bytes, 4 bits a pixel) of a serif menu cell, or NULL
+const unsigned char* Lang_MenuCell(int code);
+// the same under en too, where only the shared cells (stat arrows) exist
+const unsigned char* Lang_MenuCellAny(int code);
+// the 11 rows of atlas cell code (any cell) while the atlas is open
+void Lang_MenuCellRows(int code, unsigned char rows[44]);
+// the atlas cell of a 12x16 font code (Shift-JIS, or an ASCII letter), or -1
+int Lang_SjisCell(int sjis);
+// the status page's words (src/dra/menu.c): 0..5 ATT DEF STR CON INT LCK in
+// full, as menu cells (FF end), uk or en
+const char* PortWord(int i);
+#define LANG_MENU_FONT(on) Lang_MenuFont(on)
+#define LANG_MENU_FONT_ON() Lang_MenuFontOn()
+#else
+#define LANG_MENU_FONT(on) 0
+#define LANG_MENU_FONT_ON() 0
+#define LANG_DIALOGUE_GLYPH(rect, x, y) MoveImage(rect, x, y)
+#define LANG_SCRIPT(script) (script)
+#define LANG_CELL(s) (s)
+#define LANG_SJIS(s) (s)
+#define LANG_ROW(table, index, s) (s)
+#define LANG_NAME_DELETE(s) (s)
+#define WIDE_X 0
+#define WIDE_Y 0
+#define WIDE_NO_PRIM(prim) 0
+#define WIDE_POOL(ps1, wide) (ps1)
+#define Wide_MoveCornerText(prims, left)
+#endif
+#define WIDE_COLS ((WIDE_X + 15) >> 4)
+#define WIDE_ROWS ((WIDE_Y + 15) >> 4)
+
 typedef struct {
     /* 0x00 */ u32 drawModes;
     /* 0x04 */ u32 gt4;
@@ -1076,8 +1336,28 @@ typedef struct {
 #define RELIC_FLAG_DISABLE 0
 #define RELIC_FLAG_FOUND 1
 #define RELIC_FLAG_ACTIVE 2
+// US/EU builds hide the two JP-only familiar cards (Sprite, Nosedevil).
+// SKIP_JP_RELICS compiles the skip code; JP_RELICS_HIDDEN says if it skips.
+// The PC port decides at boot: sotn.ini jp_cards = extra|jp|off.
 #if IS_VER_INTL
-#define NUM_AVAIL_RELICS (NUM_RELICS - 2)
+#define SKIP_JP_RELICS 1
+#else
+#define SKIP_JP_RELICS 0
+#endif
+#ifdef PLATFORM_PSYZ
+// extra: the cards next to the US pickups; jp: at the JP/PSP spots; off: US
+enum { JP_CARDS_EXTRA, JP_CARDS_JP, JP_CARDS_OFF, JP_CARDS_MODES };
+extern int g_JpCards;
+extern const char* const g_JpCardsNames[JP_CARDS_MODES];
+// sotn.ini relic_toggle: 0 modern (red/green toggle), 1 stock (ON/OFF)
+enum { RELIC_TOGGLE_MODERN, RELIC_TOGGLE_STOCK };
+extern int g_RelicToggle; // relic_toggle = in sotn.ini
+#define JP_RELICS_HIDDEN (g_JpCards == JP_CARDS_OFF)
+#else
+#define JP_RELICS_HIDDEN 1
+#endif
+#if SKIP_JP_RELICS
+#define NUM_AVAIL_RELICS (JP_RELICS_HIDDEN ? NUM_RELICS - 2 : NUM_RELICS)
 #else
 #define NUM_AVAIL_RELICS (NUM_RELICS)
 #endif

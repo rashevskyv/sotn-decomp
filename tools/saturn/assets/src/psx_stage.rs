@@ -425,6 +425,12 @@ fn render_decoded_layer(
 
 fn pc_teleport(destination: u8) -> Option<u16> {
     match destination {
+        // STAGE_15 has two exits, 70 at (2,44) and 69 at (2,45), one per CD
+        // room. The Saturn target of 69 is not decoded. The Entrance
+        // (STAGE_01) has one garden door (72 at 4,44), so 69 uses the same
+        // way back as a fallback. Without it the CD room at (3,45) is a dead
+        // end.
+        69 => Some(137),
         70 => Some(137),
         74 => Some(138),
         73 => Some(139),

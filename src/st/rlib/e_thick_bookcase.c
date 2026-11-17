@@ -261,9 +261,22 @@ void EntityThickBookcase(Entity* self) {
     temp_a0_3 = D_us_80180D28;
     prim2 = self->ext.et_801AE8E8.unk98;
     for (i = 0; i < 8; i++) {
+#ifdef PLATFORM_PSYZ
+        // long is 8 bytes on 64-bit hosts. The loop below reads 4-byte
+        // slots, and the 4th color byte must keep prim->type, or the
+        // prims are freed and the next AllocPrimitives reuses them.
+        {
+            long sxy;
+            RotTransPers(*temp_a0_2, &sxy, &p, &flag);
+            SPAD(0)[i] = sxy;
+        }
+        VectorNormalS(*temp_a0_3, &sp70);
+        NormalColorDpq(&sp70, &sp68, p, (CVECTOR*)&SPAD(8)[i]);
+#else
         RotTransPers(*temp_a0_2, &((long*)SPAD(0))[i], &p, &flag);
         VectorNormalS(*temp_a0_3, &sp70);
         NormalColorDpq(&sp70, &sp68, p, &((long*)SPAD(8))[i]);
+#endif
         temp_a0_2++;
         temp_a0_3++;
     }

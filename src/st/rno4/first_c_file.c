@@ -32,7 +32,7 @@ void func_us_801C5364(Entity* self) {
         InitializeEntity(g_EInitInteractable);
         self->animSet = 0;
         self->ext.et_801C5364.unk80 = 4;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 0x10);
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(0x10, 0x20));
         if (primIndex == (-1)) {
             DestroyEntity(self);
             return;
@@ -72,13 +72,17 @@ void func_us_801C5364(Entity* self) {
 
     i = (self->params >> 8) & 0xff;
     tileDimensions = D_us_80181280 + ((self->params & 0xff) * 4);
-    x0 = g_Tilemap.scrollX.i.hi - 0x10;
+    // wide view: the window grows by the margins (0 in 4:3)
+    x0 = g_Tilemap.scrollX.i.hi - 0x10 - WIDE_X;
     y0 = g_Tilemap.scrollY.i.hi;
-    x1 = x0 + 0x120;
+    x1 = x0 + 0x120 + 2 * WIDE_X;
     y1 = y0 + 0xe0;
     tilePos = D_us_80181084;
     tileY1Wrap = tilePos[1];
     while (i > 0) {
+        if (WIDE_NO_PRIM(prim)) {
+            break;
+        }
         tileX0 = *(tileDimensions++);
         tileX1 = *(tileDimensions++);
         if ((x0 >= tileX0) || (x1 < tileX1)) {
@@ -96,8 +100,11 @@ void func_us_801C5364(Entity* self) {
                     tileX0 = x1;
                 }
                 tileX0 -= tileX1;
-                tileX1 -= (x0 + 0x10);
-                subTileX = ((x0 / 4) + tileX1) % 126;
+                tileX1 -= (x0 + 0x10 + WIDE_X);
+                // the margin has screen x < 0: keep the phase positive
+                subTileX =
+                    (((x0 + WIDE_X) / 4) + tileX1 + (WIDE_X ? 4 * 126 : 0)) %
+                    126;
                 if (tileY1 < y0) {
                     tileY1 = y0;
                 }
@@ -153,7 +160,7 @@ void func_us_801C5364(Entity* self) {
                             prim->b1 = prim->b2 = prim->b3 = bgColorValue;
                         prim->g0 = prim->g1 = prim->g2 = prim->g3 = 0x80;
                         prim = prim->next;
-                    } while (tileX0);
+                    } while (tileX0 && !WIDE_NO_PRIM(prim));
                 }
             }
         }

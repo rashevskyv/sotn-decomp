@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "dra.h"
 #include "dra_bss.h"
+#ifdef PLATFORM_PSYZ
+#include <stdio.h> // [xa] log lines: XA music start and loop seek
+#endif
 
 u8 aPbav[] = {
 #include GEN_VERSION(vh_0.h)
@@ -62,7 +65,20 @@ s32 g_VabAddrs[] = {0x00001010, 0x00042CC0, 0x00050E90,
                     0x00060D40, 0x00060D40, 0x00060D40};
 #endif
 
+#ifdef PLATFORM_PSYZ
+// On PSX, ids 0x2xx (MU_SEQ_LIBRARIAN, MU_SEQ_CONFESSIONAL_BELLS) write past
+// the end of D_80138784 into g_SeqPointers[id & 0xFF], which PlaySeq reads.
+// Separate arrays on PC: store it there, or PlaySeq opens a NULL sequence.
+void func_80131EBC(const char* str, s16 id) {
+    if ((id & 0xFF00) == 0x200) {
+        g_SeqPointers[id & 0xFF] = (u_long*)str;
+        return;
+    }
+    D_80138784[id + 1] = str;
+}
+#else
 void func_80131EBC(const char* str, s16 id) { D_80138784[id + 1] = str; }
+#endif
 
 void SetCdPos(s32 value) { g_CurCdPos = value; }
 
@@ -382,8 +398,26 @@ void KeyOnRange(s32 minVoice, s32 maxVoice, s16 vabId, s16 prog, s16 tone,
     }
 }
 
+#ifdef USE_PLAYER_MARIA
+#include <stdlib.h>
+// SOTN_SFX_LOG=1 logs each sound ID and key-on (the Maria voice tests)
+static int SfxLog(void) {
+    static int on = -1;
+    if (on < 0) {
+        on = getenv("SOTN_SFX_LOG") != NULL;
+    }
+    return on;
+}
+#endif
+
 void func_80132A04(s16 voice, s16 vabId, s16 prog, s16 tone, s16 note,
                    s16 volume, s16 distance) {
+#ifdef USE_PLAYER_MARIA
+    if (SfxLog()) {
+        fprintf(stderr, "[sfx] key-on voice %d vab %d prog %d tone %d note %d\n",
+                voice, vabId, prog, tone, note);
+    }
+#endif
     if (!distance) {
         g_VolL = volume;
         g_VolR = volume;
@@ -524,7 +558,22 @@ void CdSoundCommand4(void) {
         } else {
             D_8013AE90 = g_XaMusicConfigs[g_CurrentXaConfigId].unk228;
         }
+#ifdef PLATFORM_PSYZ
+        {
+            // voice set JP or PSP EN: the clip replaces the sector read and
+            // its real length replaces the table time
+            s32 n = Voice_Open(g_CurrentXaConfigId + 0x300, D_80139014 == 2);
+            if (n > 0) {
+                D_8013AE90 = n + 20;
+            }
+        }
+#endif
         address += g_CurCdPos;
+#ifdef PLATFORM_PSYZ
+        fprintf(stderr, "[xa] start %03X sector %d, mode %d in %d frames\n",
+                g_CurrentXaConfigId + 0x300, (s32)address - 150,
+                D_80139014, D_8013AE90);
+#endif
         MakeCdLoc(address, &D_8013B640);
         g_CdSoundCommandStep++;
         /* fallthrough */
@@ -593,6 +642,10 @@ void CdSoundCommand6(void) {
         cd_pos = g_XaMusicConfigs[g_QueuedXaBgmId + 1].filter_channel_id +
                  g_XaMusicConfigs[g_QueuedXaBgmId + 1].cd_addr;
         cd_pos += CD_PREGAP_BLOCKS + g_CurCdPos;
+#ifdef PLATFORM_PSYZ
+        fprintf(stderr, "[xa] loop %03X seek to sector %d\n",
+                D_8013845C + 0x300, (s32)cd_pos - CD_PREGAP_BLOCKS);
+#endif
         MakeCdLoc(cd_pos, &D_8013B640);
         g_CdSoundCommandStep++;
         /* fallthrough */
@@ -603,6 +656,9 @@ void CdSoundCommand6(void) {
         break;
 
     case 2:
+#ifdef PLATFORM_PSYZ
+        Voice_Open(0, 0); // music: no voice clip on this read
+#endif
         if (DoCdCommand(CdlReadN, NULL, NULL) == 0) {
             g_CdSoundCommandStep++;
         }
@@ -897,6 +953,9 @@ void CdSoundStartXaPlayback(void) {
         break;
 
     case 4:
+#ifdef PLATFORM_PSYZ
+        Voice_Open(0, 0); // resume by sector: no voice clip on this read
+#endif
         if (DoCdCommand(CdlReadN, NULL, NULL) == 0) {
             g_CdSoundCommandStep++;
         }
@@ -999,6 +1058,10 @@ void func_80133FCC(void) {
         D_80139014 = g_XaMusicConfigs[g_QueuedXaBgmId + 1].unk230;
         D_8013AEF4 = VSync(-1);
         D_8013AE90 = g_XaMusicConfigs[g_QueuedXaBgmId + 1].unk228;
+#ifdef PLATFORM_PSYZ
+        fprintf(stderr, "[xa] %03X intro end, mode %d in %d frames\n",
+                g_QueuedXaBgmId + 0x300, D_80139014, D_8013AE90);
+#endif
         break;
     case 0:
         g_QueuedXaBgmId = g_PlayingXaBgmId;
@@ -1717,6 +1780,12 @@ void func_8013572C(s16 arg0, u16 volume, s16 distance) {
     if (!arg0) {
         return;
     }
+#ifdef USE_PLAYER_MARIA
+    if (SfxLog()) {
+        fprintf(stderr, "[sfx] id %03X vab %d mode %d\n", arg0 + SFX_START,
+                g_SfxData[arg0].vabid, g_SfxData[arg0].mode);
+    }
+#endif
     if (g_SfxData[arg0].vabid == 9) {
         if (!g_SeqIsPlaying) {
             for (i = 0; i < 3; i++) {

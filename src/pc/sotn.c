@@ -124,6 +124,13 @@ static void GameLoopCallback(void) {
     }
     Replay_OnFrame();
     SpawnPoint_OnFrame();
+    Cheat_OnFrame();
+    Editor_OnFrame();
+    Wide_OnFrame();
+#ifdef __SWITCH__
+    void Switch_OnFrame(void);
+    Switch_OnFrame();
+#endif
 }
 
 struct InitGameParams g_GameParams;
@@ -140,6 +147,12 @@ bool InitGame(struct InitGameParams* params) {
     }
     if (!InitPlatform()) {
         return false;
+    }
+    // The castle map blueprint: the PS1 loader (src/main/main.c) reads it,
+    // the game map and the 100% MAP cheat draw from it.
+    if (FileReadToBuf(SOTN_DATA_DIR "/F_MAP.BIN", g_BmpCastleMap, 0,
+                      sizeof(g_BmpCastleMap)) <= 0) {
+        WARNF("no F_MAP.BIN: the game map stays empty");
     }
 
     // These two are necessary to make HandleTitle working
@@ -267,7 +280,7 @@ int MyStoreImage(RECT* rect, u_long* p) {
 }
 
 static bool ReadFromDra(u32 addr, void* dst, size_t len) {
-    const char* path = "disks/us/DRA.BIN";
+    const char* path = SOTN_DATA_DIR "/DRA.BIN";
     int readlen = FileReadToBuf(path, dst, addr - DRA_PRG_PTR, len);
     if (readlen >= 0 && (size_t)readlen != len) {
         ERRORF("file read for '%s' at %08X failed (%d/%zu)", path, addr,

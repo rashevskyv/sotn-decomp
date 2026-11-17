@@ -206,6 +206,8 @@ void CutsceneUnk1(void) {
 u8 SetCutsceneScript(u8* script) {
     Primitive* prim;
 
+    script = LANG_SCRIPT(script); // the rebuilt Ukrainian script
+
     g_Dialogue.primIndex[2] = g_api.AllocPrimitives(PRIM_SPRT, 7);
     if (g_Dialogue.primIndex[2] != -1) {
         g_Dialogue.scriptCur = script;

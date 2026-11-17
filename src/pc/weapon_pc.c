@@ -19,32 +19,16 @@ void EntityWeaponShieldSpellDummy(Entity* self) { NOT_IMPLEMENTED; }
 void func_ptr_80170024Dummy(Entity* self) { NOT_IMPLEMENTED; }
 void func_ptr_80170028Dummy(Entity* self) { NOT_IMPLEMENTED; }
 
-Weapon D_8017A000 = {
-    EntityWeaponAttackDummy,
-    func_ptr_80170004Dummy,
-    func_ptr_80170008Dummy,
-    func_ptr_8017000CDummy,
-    func_ptr_80170010Dummy,
-    func_ptr_80170014Dummy,
-    GetWeaponIdDummy,
-    LoadWeaponPaletteDummy,
-    EntityWeaponShieldSpellDummy,
-    func_ptr_80170024Dummy,
-    func_ptr_80170028Dummy,
-};
-Weapon D_8017D000 = {
-    EntityWeaponAttackDummy,
-    func_ptr_80170004Dummy,
-    func_ptr_80170008Dummy,
-    func_ptr_8017000CDummy,
-    func_ptr_80170010Dummy,
-    func_ptr_80170014Dummy,
-    GetWeaponIdDummy,
-    LoadWeaponPaletteDummy,
-    EntityWeaponShieldSpellDummy,
-    func_ptr_80170024Dummy,
-    func_ptr_80170028Dummy,
-};
+#define DUMMY_WEAPON                                                           \
+    {EntityWeaponAttackDummy,      func_ptr_80170004Dummy,                     \
+     func_ptr_80170008Dummy,       func_ptr_8017000CDummy,                     \
+     func_ptr_80170010Dummy,       func_ptr_80170014Dummy,                     \
+     GetWeaponIdDummy,             LoadWeaponPaletteDummy,                     \
+     EntityWeaponShieldSpellDummy, func_ptr_80170024Dummy,                     \
+     func_ptr_80170028Dummy}
+
+Weapon D_8017A000 = DUMMY_WEAPON;
+Weapon D_8017D000 = DUMMY_WEAPON;
 
 void HandleWeaponPrg(unsigned handId, unsigned weaponId) {
     char name[16];
@@ -54,10 +38,15 @@ void HandleWeaponPrg(unsigned handId, unsigned weaponId) {
         return;
     }
     snprintf(name, sizeof(name), "w%d_%03d", handId, weaponId);
-    if (!LoadWeaponOverlay(name, handId, handId ? &D_8017D000 : &D_8017A000)) {
+    Weapon* w = handId ? &D_8017D000 : &D_8017A000;
+    if (!LoadWeaponOverlay(name, handId, w)) {
+        // all 59 weapons link; this is only for a module that is missing.
+        // Do not abort the game: the hand gets the dummy table.
         ERRORF("weapon '%s' was not loaded", name);
-        abort();
+        *w = (Weapon)DUMMY_WEAPON;
+        return;
     }
+    fprintf(stderr, "[weapon] %s loaded\n", name);
 }
 
 void HandleWeaponChr(unsigned handId, unsigned weaponId) {

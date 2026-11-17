@@ -80,6 +80,9 @@ typedef enum {
     Upd_Eng_0x10 = 0x10,
     Upd_Eng_17,
     Upd_Eng_18,
+#ifdef PLATFORM_PSYZ
+    Upd_Eng_CharSelect, // PC: the Player select after the name entry
+#endif
     Upd_Eng_FileSelect = 0x30,
     Upd_Eng_49,
     Upd_Eng_50,

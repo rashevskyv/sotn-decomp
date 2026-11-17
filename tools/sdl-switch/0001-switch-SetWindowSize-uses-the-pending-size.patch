@@ -1,0 +1,47 @@
+From 8b7763c04eb9ac4db3686804c23c337fcbbcbf25 Mon Sep 17 00:00:00 2001
+From: sotn-native <sotn-native@localhost>
+Date: Fri, 13 Nov 2026 15:40:19 +0000
+Subject: [PATCH] switch: SetWindowSize uses the pending size
+
+SDL_SetWindowSize() stores the new size in window->pending. The Switch
+backend used window->w/h, the old size, so a dock change kept the old
+surface. Use the pending size and send SDL_EVENT_WINDOW_RESIZED.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/video/switch/SDL_switchvideo.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/src/video/switch/SDL_switchvideo.c b/src/video/switch/SDL_switchvideo.c
+index 8742877..99d67c0 100644
+--- a/src/video/switch/SDL_switchvideo.c
++++ b/src/video/switch/SDL_switchvideo.c
+@@ -312,19 +312,22 @@ static bool SWITCH_SetWindowPosition(SDL_VideoDevice *_this, SDL_Window *window)
+ 
+ static void SWITCH_SetWindowSize(SDL_VideoDevice *_this, SDL_Window *window)
+ {
+-    u32 w = 0, h = 0;
++    // SDL_SetWindowSize() stores the new size in window->pending; window->w/h
++    // still hold the old size here. Use the pending size and report it back.
++    int w = window->pending.w, h = window->pending.h;
+     SDL_WindowData *data = (SDL_WindowData *)window->internal;
+     SDL_GLContext ctx = SDL_GL_GetCurrentContext();
+     NWindow *nWindow = nwindowGetDefault();
+ 
+-    if (window->w != w || window->h != h) {
++    if (w > 0 && h > 0 && (window->w != w || window->h != h)) {
+         if (data != NULL && data->egl_surface != EGL_NO_SURFACE) {
+             SDL_EGL_MakeCurrent(_this, NULL, NULL);
+             SDL_EGL_DestroySurface(_this, data->egl_surface);
+-            nwindowSetDimensions(nWindow, window->w, window->h);
++            nwindowSetDimensions(nWindow, w, h);
+             data->egl_surface = SDL_EGL_CreateSurface(_this, window, nWindow);
+             SDL_EGL_MakeCurrent(_this, data->egl_surface, ctx);
+         }
++        SDL_SendWindowEvent(window, SDL_EVENT_WINDOW_RESIZED, w, h);
+     }
+ }
+ 
+-- 
+2.43.0
+
