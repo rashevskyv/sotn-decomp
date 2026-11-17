@@ -206,6 +206,9 @@ int Main(int argc, char* argv[]) {
 #ifdef __SWITCH__
     const char* Switch_Init(void);
     const char* cue = Switch_Init();
+#elif defined(_WIN32)
+    void Win_Init(int* argc, char*** argv);
+    Win_Init(&argc, &argv);
 #endif
     fprintf(stderr, "[boot] sotn-native %s\n", SOTN_VERSION);
     if (!parseArgs(&params, argc, argv)) {

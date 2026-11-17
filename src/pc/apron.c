@@ -14,6 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#if defined(_WIN32)
+#include <direct.h>
+#endif
 
 #define AX 24 // grid margin in tiles, left and right
 #define AY 10 // top and bottom
@@ -193,7 +196,11 @@ const char* Apron_Save(const char* text, int len) {
     if (len < 0 || len >= MAX_TEXT) {
         return "patch too large";
     }
+#if defined(_WIN32)
+    _mkdir("apron");
+#else
     mkdir("apron", 0755);
+#endif
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
     f = fopen(tmp, "wb");
     if (!f || fwrite(text, 1, len, f) != (size_t)len) {

@@ -130,6 +130,9 @@ static void GameLoopCallback(void) {
 #ifdef __SWITCH__
     void Switch_OnFrame(void);
     Switch_OnFrame();
+#elif defined(_WIN32)
+    void Win_OnFrame(void);
+    Win_OnFrame();
 #endif
 }
 

@@ -722,6 +722,7 @@ static void Text(int x, int y, const char* s, u8 r, u8 g, u8 b) {
 // The words are the port table's (tools/lang/uk/ua_port.json, P_*). A uk
 // line is cell codes with an FF end; MARK_ESC then 1 + b is the mark of PS
 // button b. en lines stay ASCII in the 5x7 font, as does the debug overlay.
+#undef P_OVERLAY // MinGW process.h defines it
 enum {
     P_SCALE = 20,
     P_VOICE,

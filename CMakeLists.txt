@@ -90,6 +90,11 @@ if(MSVC)
 else()
     add_compile_options(-funsigned-char)
 endif()
+if(MINGW)
+    # direct references instead of .refptr.* COMDATs: a module's local
+    # copy would win over the host's (psyz static modules, vita_ovl_link)
+    add_compile_options(-mcmodel=small)
+endif()
 
 find_program(CARGO_BIN cargo)
 if(NOT CARGO_BIN)
@@ -2803,6 +2808,9 @@ if(NINTENDO_SWITCH)
     set_source_files_properties(src/pc/switch.c PROPERTIES
         COMPILE_DEFINITIONS "SWITCH_DIR=\"${SOTN_SWITCH_DIR}\"")
 endif()
+if(WIN32)
+    list(APPEND SOURCE_FILES_PC src/pc/win.c)
+endif()
 # build.py sets "data": the PC program then reads data/ from the folder it
 # runs in, so out/pc can move. Empty: the absolute <build>/data.
 set(SOTN_PC_DATA_DIR "" CACHE STRING "Data folder compiled into the PC program")
@@ -2842,6 +2850,12 @@ if(NOT MSVC)
 endif()
 if(NOT WIN32)
     target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_DL_LIBS})
+endif()
+if(MINGW)
+    # no console window (the log goes to sotn.log, src/pc/win.c); one
+    # exe without libgcc/libwinpthread DLLs
+    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--subsystem,windows -static)
+    target_link_libraries(${PROJECT_NAME} PRIVATE pthread) # clock_gettime
 endif()
 
 psyz_exports(${PROJECT_NAME})
