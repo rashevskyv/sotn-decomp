@@ -206,6 +206,7 @@ void EntityCutscene(Entity* self) {
                 if (g_SkipCutscene) {
                     continue;
                 }
+                CS_VOICE_WAIT();
                 for (prim = g_Dialogue.prim[0], i = 0; i < 5; i++) {
                     prim->drawMode = DRAW_HIDE;
                     prim = prim->next;

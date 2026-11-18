@@ -73,6 +73,32 @@ static inline int Wide_FollowY(
     return scroll < lo ? lo : scroll > hi ? hi : scroll;
 }
 
+// The layout column that fills a wide-view cell outside a layer row of w
+// tiles (tx < 0 or tx >= w). The row continues with the smallest period p
+// of 1, 2, 4 or 8 that its first (last) columns repeat: checked on up to 8
+// columns past the edge period, so a two-column brick wall or a floor of
+// four tiles goes on without a seam. A row without such a period is
+// mirrored at the edge.
+static inline int Wide_EdgeColumn(const unsigned short* row, int w, int tx) {
+    int right = tx >= w, d = right ? tx - w : -1 - tx; // 0: next to the edge
+    int p, x, a, b;
+
+    for (p = 1; p <= 8 && 2 * p <= w; p *= 2) {
+        for (x = 0; x < 8 && x + p < w; x++) {
+            a = right ? w - 1 - x : x;
+            b = right ? a - p : a + p;
+            if (row[a] != row[b]) {
+                break;
+            }
+        }
+        if (x == 8 || x + p == w) {
+            return right ? w - p + d % p : p - 1 - d % p;
+        }
+    }
+    d = d < w ? d : w - 1;
+    return right ? w - 1 - d : d;
+}
+
 // The PS1 creates a layout entity when it is in this screen window. The wide
 // view creates entities earlier; an entity that must act at its original
 // moment checks this window itself.

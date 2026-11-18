@@ -81,6 +81,14 @@ void EntityCutsceneSupport(Entity* self) {
                 g_Entities[E_AFTERIMAGE_1].ext.afterImage.disableFlag = 1;
                 g_Player.demo_timer = 255;
                 func_801AA218(posX);
+#ifdef PLATFORM_PSYZ
+                // wide view: narrow the camera now that the cutscene walks
+                // Richter (step 4 does it on the PS1), so the camera pans to
+                // the centre while he walks in
+                if (g_WideX) {
+                    g_Tilemap.width = 0x100;
+                }
+#endif
                 SetStep(2);
             }
         } else {

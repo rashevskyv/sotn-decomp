@@ -112,6 +112,23 @@ bool func_80131F68(void) {
     return ret;
 }
 
+#ifdef PLATFORM_PSYZ
+// CSOP_NEXT_DIALOG of every cutscene asks this: 1 = a voice line still
+// plays, so the box keeps its text and portrait. Only a one-shot XA (mode
+// 2, the voices) counts; it ends on its timer. Looping music never holds a
+// box. The uk boxes are shorter than the clips, and the JP and PSP clips
+// are longer than the PS1 times.
+bool Cutscene_VoiceBusy(void) {
+    if (func_80131F68() && D_80139014 == 2) {
+        return true;
+    }
+    fprintf(stderr, "[dlg] next box at vsync %d: xa %03X mode %d, %d of %d\n",
+            VSync(-1), g_PlayingXaBgmId ? g_PlayingXaBgmId + 0x300 : 0,
+            D_80139014, VSync(-1) - D_8013AEF4, D_8013AE90);
+    return false;
+}
+#endif
+
 s16 GetCdVolume(void) { return g_CdVolume; }
 
 void SetReverbDepth(short depth) { SsUtSetReverbDepth(depth, depth); }

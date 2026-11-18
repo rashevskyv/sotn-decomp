@@ -1064,6 +1064,16 @@ void HandleGameOver(void) {
         if (prim->p1) {
             break;
         }
+#ifdef PLATFORM_PSYZ
+        // the picture has 240 rows: open the stage clip (rows 20..226) to the
+        // whole frame, the wide view fits all of them (src/pc/wide.c)
+        for (i = 0; i < 2; i++) {
+            if (g_GpuBuffers[i].draw.clip.h == 0xCF) {
+                g_GpuBuffers[i].draw.clip.y -= 0x14;
+                g_GpuBuffers[i].draw.clip.h = DISP_STAGE_H;
+            }
+        }
+#endif
         g_GameStep++;
         break;
     case Gameover_6:

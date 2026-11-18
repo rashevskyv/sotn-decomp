@@ -367,6 +367,7 @@ void EntityCutscene(Entity* self) {
                     if (skip_cutscene) {
                         continue;
                     }
+                    CS_VOICE_WAIT();
                     prim = g_Dialogue.prim[0];
 #if TARGET == TARGET_PSP
                     for (i = 0; i < LEN(g_Dialogue.prim); i++) {

@@ -347,7 +347,13 @@ s32 SetNextRoomToLoad(u32 x, u32 y) {
 // the view is centred. The player screen position is always derived from the
 // world position, because the scroll is no longer page aligned at room load.
 static void WideCamera(void) {
-    s32 lo, hi, scroll;
+    // the range of the last frame and its room: a range that collapses to
+    // its centre inside the same room (a script or a lock narrows the
+    // camera, as ST0 before the Dracula dialogue) pans there 2 px a frame
+    // instead of one jump. A room load snaps, and so does a lock in the
+    // first half second of a room (an entry lock).
+    static s32 last_lo, last_hi, last_room = -1, age, ease;
+    s32 lo, hi, scroll, room;
 
     Wide_ScrollRange(g_Tilemap.x, g_Tilemap.width, 256, g_WideX, 0, 256, &lo,
                      &hi);
@@ -356,6 +362,26 @@ static void WideCamera(void) {
         scroll = lo;
     } else if (scroll > hi) {
         scroll = hi;
+    }
+    room = g_StageId << 16 | g_Tilemap.left << 8 | g_Tilemap.top;
+    age = room == last_room ? age + 1 : 0;
+    if (age == 0 || lo != hi) {
+        ease = 0;
+    } else if (last_lo != last_hi && age > 30) {
+        ease = 1;
+    }
+    last_room = room;
+    last_lo = lo;
+    last_hi = hi;
+    if (ease) {
+        s32 cur = g_Tilemap.scrollX.i.hi;
+        if (scroll > cur + 2) {
+            scroll = cur + 2;
+        } else if (scroll < cur - 2) {
+            scroll = cur - 2;
+        } else {
+            ease = 0;
+        }
     }
     g_Tilemap.scrollX.i.hi = scroll;
     PLAYER.posX.i.hi = g_PlayerX - scroll;

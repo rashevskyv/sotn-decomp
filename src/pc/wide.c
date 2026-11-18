@@ -460,8 +460,13 @@ void Wide_OnFrame(void) {
         fbh = DISP_STAGE_H;
     }
     // the stage clip (a Saturn band is inside it): only the rows 20..226
-    // must fit, so docked shows the stage at scale 5 (384x216)
-    rows = clip->y >= CLIP_TOP && clip->y + clip->h <= CLIP_BOTTOM;
+    // must fit, so docked shows the stage at scale 5 (384x216). Game over
+    // from Gameover_6 (the melt ends; it opens the clip there) and the
+    // loading screen are full 240-row pictures: all rows fit.
+    rows = clip->y >= CLIP_TOP && clip->y + clip->h <= CLIP_BOTTOM &&
+           (g_GameState == Game_Play ||
+            (g_GameState == Game_GameOver &&
+             (g_GameStep < Gameover_6 || g_GameStep >= Gameover_Alt)));
     if (d.w <= 0 || d.h <= 0 ||
         (d.w == last_disp.w && d.h == last_disp.h && fbw == last_fbw &&
          fbh == last_fbh && rows == last_rows)) {
@@ -478,6 +483,10 @@ void Wide_OnFrame(void) {
     keep = rows && fbw == DISP_STAGE_W && fbh == DISP_STAGE_H;
     if (!keep) {
         k = MIN(k, MAX(req.h / DISP_STAGE_H, 1)); // all 240 rows must fit
+        if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
+            // black bars above and below, not the VRAM rows past the frame
+            req.h = MIN(req.h, DISP_STAGE_H * k);
+        }
     }
     g_WideX = ((req.w / k & ~1) - DISP_STAGE_W) / 2;
     Psyz_VideoSetKeepRows(keep ? CLIP_TOP : 0, keep ? CLIP_BOTTOM : 0);

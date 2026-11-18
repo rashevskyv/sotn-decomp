@@ -36,17 +36,22 @@ typedef struct {
 } TilemapRenderer;
 
 #ifdef PLATFORM_PSYZ
+#include "../pc/wide.h"
+#include <psyz/gpu.h>
+#include <psyz/video.h>
+
 static s32 ClampTile(s32 t, s32 n) { return t < 0 ? 0 : t >= n ? n - 1 : t; }
 
 // The cells of the wide view outside the room (or layer). The loops below
 // skip them, as on the PS1. bg 0 is the foreground, 1 is bg layer 0: those
 // two take tiles from the apron patch (src/pc/apron.c). A cell the patch
-// does not cover, or a layer without a patch, repeats the nearest edge tile
-// of the layer: rock walls look right, an open doorway at the edge smears.
+// does not cover, or a layer without a patch, continues the edge of its
+// row (Wide_EdgeColumn: the period of the edge columns, or a mirror); a
+// row above or below the layer repeats the nearest row.
 static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
                       s32 startTx, s32 startTy, s32 subX, s32 subY) {
     s32 i, j, tx, ty, x0, y0;
-    u16 tile, clut;
+    u16 tile, clut, *row;
 
     if (!WIDE_COLS && !WIDE_ROWS) {
         return;
@@ -64,9 +69,11 @@ static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
             }
             tile = bg <= 1 ? Apron_Tile(bg, tx, ty) : 0xFFFF;
             if (tile == 0xFFFF) {
-                tile = layout[ClampTile(ty, r->roomTileHeight) *
-                                  r->roomTileWidth +
-                              ClampTile(tx, r->roomTileWidth)];
+                row = layout +
+                      ClampTile(ty, r->roomTileHeight) * r->roomTileWidth;
+                tile = row[tx >= 0 && tx < r->roomTileWidth
+                               ? tx
+                               : Wide_EdgeColumn(row, r->roomTileWidth, tx)];
             }
             if (tile == 0 || tile >= 0x1000 || g_GpuUsage.sp16 >= MAXSPRT16) {
                 continue;
@@ -151,6 +158,80 @@ static bool StretchBackdrop(TilemapRenderer* r, BgLayer* bg) {
         }
     }
     return true;
+}
+
+// The wide view outside the camera range: a room, or a lock of the camera,
+// narrower than the view shows the room beyond the range or the edge fill
+// of ApronPass there. It darkens toward the screen edges, a gouraud quad a
+// side in the psyz darken mode (the picture times 1 - red/255, so the hue
+// stays): light at the range edge, darker the further away. A GP0 command
+// of the port switches the mode on and off in the OT. It fades in and out
+// over 30 frames, below the HUD (0x1EE) and the dialogue (0x1FC), above
+// the stage layers and the entities.
+#define VIGNETTE_OT 0x1E0
+#define VIGNETTE_FADE 30
+#define VIGNETTE_MAX 0xC8 // darkness at the full margin width, of 0xFF
+#define VIGNETTE_GP0 0x10 // a NOP on the PS1 GPU
+static int VignetteGp0(const u_long* words, int n, void* user) {
+    Psyz_VideoSetDarken(words[0] & 1);
+    return 1;
+}
+
+static void VignetteMode(TilemapRenderer* r, s32 on) {
+    setlen(r->dr, 1);
+    r->dr->code[0] = VIGNETTE_GP0 << 24 | on;
+    addPrim(&r->ot[VIGNETTE_OT], r->dr);
+    r->dr++;
+    g_GpuUsage.drawModes++;
+}
+
+static void WideVignette(TilemapRenderer* r) {
+    static s32 fade, init;
+    s32 edge[2], side, x0, x1, c;
+    POLY_G4* p;
+
+    if (!init) {
+        init = 1;
+        Psyz_GpuRegisterCommandHandler(VIGNETTE_GP0, VignetteGp0, NULL);
+    }
+
+    edge[0] = MAX(g_Tilemap.x, 0) - g_Tilemap.scrollX.i.hi + r->x;
+    edge[1] = MIN(g_Tilemap.width, g_Tilemap.hSize * 256) -
+              g_Tilemap.scrollX.i.hi + r->x;
+    if (g_WideX && (g_Tilemap.flags & LAYER_SHOW) &&
+        edge[1] - edge[0] < DISP_STAGE_W + 2 * g_WideX) {
+        fade = MIN(fade + 1, VIGNETTE_FADE);
+    } else {
+        fade = MAX(fade - 1, 0);
+    }
+    if (!fade || g_GpuUsage.drawModes + 2 > MAX_DRAW_MODES) {
+        return;
+    }
+    // the last added is drawn first in its slot: on, the quads, off
+    VignetteMode(r, 0);
+    for (side = 0; side < 2; side++) {
+        x0 = side ? edge[1] : -g_WideX;
+        x1 = side ? DISP_STAGE_W + g_WideX : edge[0];
+        if (x1 - x0 <= 0 || g_GpuUsage.g4 >= MAX_POLY_G4_COUNT) {
+            continue;
+        }
+        // the same darkness at the same distance from the range edge
+        c = VIGNETTE_MAX * MIN(x1 - x0, g_WideX) / g_WideX * fade /
+            VIGNETTE_FADE;
+        p = &g_CurrentBuffer->polyG4[g_GpuUsage.g4++];
+        setPolyG4(p);
+        setSemiTrans(p, true);
+        p->x0 = p->x2 = x0;
+        p->x1 = p->x3 = x1;
+        p->y0 = p->y1 = 0;
+        p->y2 = p->y3 = DISP_STAGE_H;
+        setRGB0(p, side ? 0 : c, side ? 0 : c, side ? 0 : c);
+        setRGB2(p, side ? 0 : c, side ? 0 : c, side ? 0 : c);
+        setRGB1(p, side ? c : 0, side ? c : 0, side ? c : 0);
+        setRGB3(p, side ? c : 0, side ? c : 0, side ? c : 0);
+        addPrim(&r->ot[VIGNETTE_OT], p);
+    }
+    VignetteMode(r, 1);
 }
 #endif
 
@@ -426,6 +507,9 @@ void RenderTilemap(void) {
             g_GpuUsage.drawModes++;
         }
     }
+#ifdef PLATFORM_PSYZ
+    WideVignette(r);
+#endif
 }
 
 static void SetRoomForegroundLayer(LayerDef* layerDef) {
