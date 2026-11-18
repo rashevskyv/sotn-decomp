@@ -586,6 +586,98 @@ void Lang_MenuCellRows(int code, u8 rows[44]) {
     }
 }
 
+// The speaker name of a cutscene box (src/st/cutscene_actor_name.h), the
+// owner's mockup B of step 77: the serif 8x11 menu cells (mfont.bin; a cell
+// with no record takes its 8x8 sheet cell 3 rows down), 8 px apart, a space
+// 4 px; gold from light at the top to dark at the bottom, a dark shadow 1 px
+// right and down. The name goes once into a 4bpp strip of 48x12 halfwords at
+// NAME_X, NAME_Y with its CLUT at NAME_X + 48 (slot NAME_CLUT), one sprite
+// shows it. Rows 496..507 at x 0..63 are free in every stage: below the
+// line buffers (0,384..), outside all draw areas (240 rows high) and the CLUT
+// rows 240..255; only the whole-screen g_Vram clears reach it, never while a
+// box is open. A VRAM survey of all 56 stage ids found the rect empty.
+#define NAME_X 0
+#define NAME_Y 496
+#define NAME_CLUT 0x3FE
+_Static_assert(NAME_X % 64 == 0 && (NAME_Y & 255) + 12 <= 256,
+               "the strip and its CLUT in one texture page");
+#define NAME_TEXELS 192 // 48 halfwords
+static const u8 name_gold[11][3] = {
+    {248, 224, 160}, {240, 216, 152}, {232, 208, 144}, {232, 200, 136},
+    {224, 192, 120}, {224, 184, 112}, {216, 176, 104}, {208, 168, 88},
+    {208, 160, 80},  {200, 152, 72},  {200, 144, 64}};
+#define NAME_SHADOW 15 // ink 1 + row: gold; 15: the shadow (16, 8, 32)
+
+void Lang_ActorName(const char* s, Primitive* prim) {
+    static u8 tx[12][NAME_TEXELS + 1];
+    static u16 strip[48 * 12];
+    u16 clut[16] = {0};
+    RECT r = {NAME_X, NAME_Y, 48, 12};
+    RECT c = {NAME_X + 48, NAME_Y, 16, 1};
+    u8 cell[44];
+    int x = 0, y, i;
+    u8 ch;
+    memset(tx, 0, sizeof(tx));
+    for (;;) {
+        ch = *s++;
+        if (ch == DIAG_EOL && (ch = *s++) == DIAG_EOS) {
+            break;
+        }
+        if (ch == CH(' ')) {
+            x += FONT_SPACE;
+            continue;
+        }
+        if (x + 9 > NAME_TEXELS) {
+            break;
+        }
+        if (mfont[ch]) {
+            memcpy(cell, mfont[ch], 44);
+        } else { // the sheet cell (VRAM 896,256) 3 rows down
+            RECT k = {896 + (ch & 15) * 2, 256 + (ch >> 4) * 8, 2, 8};
+            memset(cell, 0, 12);
+            StoreImage(&k, (u_long*)(cell + 12));
+            DrawSync(0);
+        }
+        for (y = 0; y < 11; y++) {
+            for (i = 0; i < 8; i++) {
+                if (cell[y * 4 + i / 2] >> (i & 1) * 4 & 15) {
+                    tx[y][x + i] = 1 + y;
+                }
+            }
+        }
+        x += FONT_GAP;
+    }
+    for (y = 11; y > 0; y--) { // bottom up: only gold casts a shadow
+        for (i = NAME_TEXELS; i > 0; i--) {
+            if (!tx[y][i] && tx[y - 1][i - 1]) {
+                tx[y][i] = NAME_SHADOW;
+            }
+        }
+    }
+    for (y = 0; y < 12; y++) {
+        for (i = 0; i < 48; i++) {
+            u8* t = &tx[y][i * 4];
+            strip[y * 48 + i] = t[0] | t[1] << 4 | t[2] << 8 | t[3] << 12;
+        }
+    }
+    for (i = 0; i < 11; i++) {
+        clut[1 + i] = name_gold[i][0] >> 3 | name_gold[i][1] >> 3 << 5 |
+                      name_gold[i][2] >> 3 << 10;
+    }
+    clut[NAME_SHADOW] = 16 >> 3 | 8 >> 3 << 5 | 32 >> 3 << 10;
+    LoadImage(&r, (u_long*)strip);
+    LoadImage(&c, (u_long*)clut);
+    DrawSync(0);
+    g_ClutIds[NAME_CLUT] = GetClut(c.x, c.y);
+    prim->type = PRIM_SPRT;
+    prim->tpage = (NAME_Y & 0x100) >> 4 | NAME_X >> 6; // 4bpp
+    prim->clut = NAME_CLUT;
+    prim->u0 = (NAME_X & 63) * 4;
+    prim->v0 = NAME_Y & 255;
+    prim->u1 = x + 1;
+    prim->v1 = 12;
+}
+
 // the Shift-JIS marks with an ASCII cell (― ‐ ‘ ’ “ ” × as the nearest)
 static const u16 jis_marks[][2] = {
     {0x8140, ' '}, {0x8143, ','}, {0x8144, '.'},  {0x8146, ':'},

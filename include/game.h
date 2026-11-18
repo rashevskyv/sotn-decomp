@@ -1227,6 +1227,9 @@ const unsigned char* Lang_MenuCell(int code);
 const unsigned char* Lang_MenuCellAny(int code);
 // the 11 rows of atlas cell code (any cell) while the atlas is open
 void Lang_MenuCellRows(int code, unsigned char rows[44]);
+// a cutscene speaker name (cells, 0xFF 0x00 end) as one gold serif sprite:
+// sets type, tpage, clut, u0, v0, u1, v1 of prim
+void Lang_ActorName(const char* cells, Primitive* prim);
 // the atlas cell of a 12x16 font code (Shift-JIS, or an ASCII letter), or -1
 int Lang_SjisCell(int sjis);
 // the status page's words (src/dra/menu.c): 0..5 ATT DEF STR CON INT LCK in

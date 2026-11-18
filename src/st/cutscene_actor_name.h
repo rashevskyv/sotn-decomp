@@ -87,6 +87,27 @@ static void DrawCutsceneActorName(u16 actorIndex, Entity* self) {
     char ch;
 
     actorName = LANG_CELL(actor_names[DRAW_NAME_ACTOR_INDEX]);
+#ifdef PLATFORM_PSYZ
+    // the serif gold name in one sprite (src/pc/lang.c), 3 rows higher: the
+    // 8x11 baseline (row 9) meets the 8x8 one (row 6)
+    primIndex = g_api.AllocPrimitives(PRIM_SPRT, 1);
+    if (primIndex == -1) {
+        DestroyEntity(self);
+        return;
+    }
+    g_Dialogue.primIndex[1] = primIndex;
+    prim = &g_PrimBuf[primIndex];
+    Lang_ActorName(actorName, prim);
+    prim->priority = 0x1FF;
+    prim->drawMode = DRAW_HIDE;
+    prim->x0 = 0x38;
+#ifdef DRAW_NAME_PRIM_Y0
+    prim->y0 = DRAW_NAME_PRIM_Y0 - 3;
+#else
+    prim->y0 = g_Dialogue.startY + 3;
+#endif
+    return;
+#endif
     chCount = 0;
     while (true) {
         ch = *actorName++;
