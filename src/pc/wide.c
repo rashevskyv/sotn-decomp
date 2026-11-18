@@ -391,6 +391,15 @@ static void ClearRows(int y0, int y1) {
     }
 }
 
+// The black bars of a stage frame: on a stage start (func_800E34DC), as the
+// screen before may have drawn there, and on a new canvas.
+void Wide_ClearBars(void) {
+    if (g_WideX) {
+        ClearRows(0, CLIP_TOP);
+        ClearRows(CLIP_BOTTOM, DISP_STAGE_H);
+    }
+}
+
 // The wide camera calls it on every frame with the art rows of the room on
 // the screen. Only a stage with a band (Saturn) narrows the clip, for a room
 // shorter than the view: black bars instead of the empty rows.
@@ -489,9 +498,7 @@ void Wide_OnFrame(void) {
     Psyz_VideoSetScale(s);
     Psyz_VideoSetResolution(req);
     if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
-        // a new canvas, or one that held a title or menu: black bars
-        ClearRows(0, CLIP_TOP);
-        ClearRows(CLIP_BOTTOM, DISP_STAGE_H);
+        Wide_ClearBars();
     }
     fprintf(stderr,
             "[video] output %dx%d scale %d (asked %d) "
