@@ -1158,7 +1158,12 @@ int PortMenu_IsOpen(void);
 extern int g_ApronLayer; // the LoadRoomLayer argument of the current room
 void Apron_OnRoomLayer(s32 layerIndex);
 int Apron_Has(int bg);
+// The patch cell: 0xFFFF for none, else the tile and its art flip
 u16 Apron_Tile(int bg, int tx, int ty);
+#define APRON_TILE 0x0FFF
+#define APRON_FLIP_H 0x1000
+#define APRON_FLIP_V 0x2000
+#define APRON_FLIP (APRON_FLIP_H | APRON_FLIP_V)
 const char* Apron_Path(char* buf, int size);
 const char* Apron_Text(void);
 const char* Apron_Save(const char* text, int len);

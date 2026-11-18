@@ -96,7 +96,8 @@ small { color:var(--dim); }
     or drag: several tiles). 2. Click the room to place it; drag to paint.
     Right-drag or Shift+drag on the room: select cells, their tiles light up in
     the palette. Alt+click: take the tile under the mouse. Middle or Space+drag:
-    pan. Wheel: zoom. Ctrl+C: selection to brush. H / V: flip, Del: restore the
+    pan. Wheel: zoom. Ctrl+C: selection to brush. H / V: flip the selection
+    (or the brush) left-right / upside down, the tile art too, Del: restore the
     game tiles, Esc: drop the selection, Ctrl+Z / Ctrl+Y: undo / redo.</small></div>
   <div class="roomlay">
     <div id="roomwrap"><div id="roomstack"><canvas id="roomc"></canvas><canvas id="ovc"></canvas></div></div>
@@ -363,10 +364,14 @@ function parseRoom(buf) {
   return {stage: h[2], layer: h[3], ax: h[10], ay: h[11], L};
 }
 
-// one 16x16 tile, decoded from the VRAM copy (4 bpp) and the palettes
-function tileCanvas(li, t) {
-  const key = room.stage + ":" + li + ":" + t;
+// one 16x16 tile, decoded from the VRAM copy (4 bpp) and the palettes.
+// A cell value is the tile id with the art flip of the patch file:
+// FLIP_H (mirrored left-right), FLIP_V (upside down), as the game draws it.
+const TILE = 0xFFF, FLIP_H = 0x1000, FLIP_V = 0x2000;
+function tileCanvas(li, v) {
+  const key = room.stage + ":" + li + ":" + v;
   if (tileCache.has(key)) return tileCache.get(key);
+  const t = v & TILE, fh = v & FLIP_H, fv = v & FLIP_V;
   const Ld = room.L[li], c = document.createElement("canvas");
   c.width = c.height = 16;
   const img = c.getContext("2d").createImageData(16, 16);
@@ -374,13 +379,13 @@ function tileCanvas(li, t) {
   const pal = (Ld.clut[t] + (Ld.flags & 0x200 ? 0x100 : 0)) * 16;
   const vx = (tp & 15) * 64 - 512, vy = ((tp >> 4) & 1) * 256 + (gi & 0xF0);
   const u0 = (gi & 0xF) * 16;
-  if (vx >= 0 && vx < 512 && t > 0 && t < 4096) {
+  if (vx >= 0 && vx < 512 && v > 0 && t > 0) {
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
       const u = u0 + x;
       const hw = gfx.vram[(vy + y) * 512 + vx + (u >> 2)];
       const col = gfx.clut[pal + ((hw >> ((u & 3) * 4)) & 15)];
       if (!col) continue;
-      const i = (y * 16 + x) * 4;
+      const i = ((fv ? 15 - y : y) * 16 + (fh ? 15 - x : x)) * 4;
       img.data[i] = (col & 31) * 255 / 31;
       img.data[i + 1] = ((col >> 5) & 31) * 255 / 31;
       img.data[i + 2] = ((col >> 10) & 31) * 255 / 31;
@@ -440,20 +445,25 @@ function parsePatch(text) {
     if ((r = l.match(/^L\s+(\d+)\s+(fg|bg)/))) {
       key = r[1] + " " + r[2];
       if (!m.has(key)) m.set(key, new Map());
-    } else if (key && (r = l.match(/^(-?\d+)\s+(-?\d+)\s+([0-9a-fA-F]+)/))) {
-      m.get(key).set(r[1] + "," + r[2], parseInt(r[3], 16));
+    } else if (key && (r = l.match(/^(-?\d+)\s+(-?\d+)\s+([0-9a-fA-F]+)(?:\s+([hv]+)(?=\s|$))?/))) {
+      const f = r[4] || "";
+      m.get(key).set(r[1] + "," + r[2], (parseInt(r[3], 16) & TILE) |
+        (f.includes("h") ? FLIP_H : 0) | (f.includes("v") ? FLIP_V : 0));
     }
   }
   return m;
 }
 
+// the patch file (src/pc/apron.c): v2 adds an optional flip after the
+// tile, h, v or hv; a v1 file is a valid v2 file
 function patchText() {
-  let s = "# sotn apron v1\n";
+  let s = "# sotn apron v2\n";
   for (const [key, cells] of [...patch.entries()].sort()) {
     if (!cells.size) continue;
     s += "L " + key + "\n";
     for (const [xy, t] of cells) s += xy.replace(",", " ") + " " +
-      t.toString(16).toUpperCase().padStart(4, "0") + "\n";
+      (t & TILE).toString(16).toUpperCase().padStart(4, "0") +
+      (t & (FLIP_H | FLIP_V) ? " " + (t & FLIP_H ? "h" : "") + (t & FLIP_V ? "v" : "") : "") + "\n";
   }
   return s;
 }
@@ -692,8 +702,10 @@ function drawPalette() {
 }
 
 // the slots of the tile under the mouse and of the room selection
+// the palette slot of a cell value (a flipped tile lights its upright slot)
+function slotOf(t) { return t > 0 ? palSlot.get(t & TILE) : undefined; }
 function litSlots() {
-  const s = new Set(), add = t => { const i = palSlot.get(t); if (i != null) s.add(i); };
+  const s = new Set(), add = t => { const i = slotOf(t); if (i != null) s.add(i); };
   if (!room || room.native) return s;
   if (sel) selTiles().forEach(add);
   if (hover && inGrid(hover[0], hover[1])) add(cellTile(hover[0], hover[1]));
@@ -709,7 +721,7 @@ function drawPalOverlay() {
     if (fill) { ctx.fillStyle = fill; ctx.fillRect(x, y, s, s); }
     ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.strokeRect(x + 1.5, y + 1.5, s - 3, s - 3);
   };
-  if (brush) for (const t of brush.t) { const i = palSlot.get(t); if (i != null) box(i, "#ffd000"); }
+  if (brush) for (const t of brush.t) { const i = slotOf(t); if (i != null) box(i, "#ffd000"); }
   for (const i of litSlots()) box(i, "#5ad1ff", "rgba(90,209,255,.35)");
 }
 
@@ -735,7 +747,8 @@ function setBrush(b) {
   }
   const n = b ? b.t.filter(t => t >= 0).length : 0;
   $("#selname").textContent = !b ? "none" : n === 1 && b.w === 1 ?
-    "tile " + b.t[0].toString(16).toUpperCase() : `${b.w} x ${b.h} (${n} tiles)`;
+    "tile " + (b.t[0] & TILE).toString(16).toUpperCase() +
+    (b.t[0] & FLIP_H ? " H" : "") + (b.t[0] & FLIP_V ? " V" : "") : `${b.w} x ${b.h} (${n} tiles)`;
   if (b) setTool("paint"); else showTool();
   drawPalOverlay();
 }
@@ -861,14 +874,14 @@ function setHover(c) {
   hover = c;
   if (same) return;
   setCursor(); drawOverlay(); drawPalOverlay();
-  if (c && room && inGrid(c[0], c[1])) scrollPalTo(palSlot.get(cellTile(c[0], c[1])));
+  if (c && room && inGrid(c[0], c[1])) scrollPalTo(slotOf(cellTile(c[0], c[1])));
 }
 
 function pickAt(c) {
   if (room.native) { msg(whyLocked(), "bad"); return; }
   const t = cellTile(c[0], c[1]);
   if (!t) { msg("This cell has no tile."); return; }
-  const i = palSlot.get(t);
+  const i = slotOf(t);
   palPick = i != null ? new Set([i]) : new Set();
   setBrush({stage: room.stage, layer, w: 1, h: 1, t: [t]});
   scrollPalTo(i);
@@ -884,10 +897,13 @@ function copySel() {
   msg(`The brush is now ${w} x ${h} tiles. Click the room to place it.`, "good");
 }
 
+// a true mirror image: the cells change places and each tile art flips
 function flipArr(t, w, h, horiz) {
   const o = [];
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++)
-    o.push(horiz ? t[y * w + (w - 1 - x)] : t[(h - 1 - y) * w + x]);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const v = horiz ? t[y * w + (w - 1 - x)] : t[(h - 1 - y) * w + x];
+    o.push(v > 0 ? v ^ (horiz ? FLIP_H : FLIP_V) : v);
+  }
   return o;
 }
 

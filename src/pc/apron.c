@@ -5,10 +5,15 @@
 // One patch per stage, apron/<STAGE>.txt next to sotn.ini; a file on disk
 // wins over the copy built into the program (tools/editor/bake_apron.py).
 //
-//   # sotn apron v1
+//   # sotn apron v2
 //   L 12 fg        layer index 12 (the LoadRoomLayer argument), fg or bg
 //   -3 5 01A7      tx ty tile (hex); tx, ty in layer tiles, may be negative
+//   -2 5 01A7 h    v2: an optional art flip after the tile: h (mirrored
+//                  left-right), v (upside down) or hv
 //
+// A v1 file (no flip tokens) is a valid v2 file; a v1 program reads a v2
+// file with the flips ignored. Apron_Tile returns the tile in the low 12
+// bits and the flip as APRON_FLIP_H / APRON_FLIP_V (game.h).
 // RenderTilemap (4CE2C.c) asks Apron_Tile for the cells outside the room and,
 // graphics only, for the cells inside it (fg and the first bg layer).
 #include <game.h>
@@ -39,7 +44,7 @@ static u16* s_grid[2]; // fg, bg; 0xFFFF: no tile
 static int s_gw[2], s_gh[2];
 
 static void Parse(const char* text) {
-    char line[128], kind[4];
+    char line[128], kind[4], flip[4];
     int layer = -1, bg = 0, tx, ty, n;
     unsigned tile;
     const char* p = text;
@@ -52,10 +57,16 @@ static void Parse(const char* text) {
             bg = strcmp(kind, "bg") == 0;
             continue;
         }
-        if (layer < 0 || sscanf(line, " %d %d %x", &tx, &ty, &tile) != 3 ||
+        flip[0] = 0;
+        if (layer < 0 ||
+            sscanf(line, " %d %d %x %3s", &tx, &ty, &tile, flip) < 3 ||
             tile >= 0x1000 || tx < -AX - 256 || tx > 512 || ty < -AY - 256 ||
             ty > 512) {
             continue; // comment, bad line or a tile outside the tile tables
+        }
+        if (flip[strspn(flip, "hv")] == 0) { // not a comment
+            tile |= (strchr(flip, 'h') ? APRON_FLIP_H : 0) |
+                    (strchr(flip, 'v') ? APRON_FLIP_V : 0);
         }
         if (s_count == s_cap) {
             s_cap = s_cap ? s_cap * 2 : 256;

@@ -37,62 +37,113 @@ typedef struct {
 
 #ifdef PLATFORM_PSYZ
 #include "../pc/wide.h"
+#include <math.h>
 #include <psyz/gpu.h>
 #include <psyz/video.h>
 
 static s32 ClampTile(s32 t, s32 n) { return t < 0 ? 0 : t >= n ? n - 1 : t; }
 
+// The draw mode of a page slot with the rectangle flip of the later GPUs
+// (GP0(E1h) bits 12, 13; psyz reads the texture backwards).
+static void FlipMode(TilemapRenderer* r, s32 page, s32 flip) {
+    u16 tpage = page + 8 + r->tpage;
+
+    if (r->flags & LAYER_TPAGE_ALT) {
+        tpage += 0x80;
+    }
+    SetDrawMode(r->dr, 0, 0, tpage, &r->rect);
+    r->dr->code[0] |= flip << 12;
+    addPrim(r->order + page + r->ot, r->dr);
+    r->dr++;
+    g_GpuUsage.drawModes++;
+}
+
 // The cells of the wide view outside the room (or layer). The loops below
 // skip them, as on the PS1. bg 0 is the foreground, 1 is bg layer 0: those
-// two take tiles from the apron patch (src/pc/apron.c). A cell the patch
-// does not cover, or a layer without a patch, continues the edge of its
-// row (Wide_EdgeColumn: the period of the edge columns, or a mirror); a
-// row above or below the layer repeats the nearest row.
+// two take tiles from the apron patch (src/pc/apron.c), and draw here the
+// patch cells inside the room with a flipped art. A cell the patch does
+// not cover, or a layer without a patch, shows the mirror image of the
+// row about the room edge (Wide_MirrorColumn), its art flipped; a row
+// above or below the layer repeats the nearest row.
+// A flipped tile is a SPRT_16 under a flip draw mode. In its OT slot the
+// last added is drawn first: pass f (the flip of its tiles) adds the mode
+// without flip before the first tile of a slot and the flip mode after
+// the last one, so no other prim sees the flip.
 static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
                       s32 startTx, s32 startTy, s32 subX, s32 subY) {
-    s32 i, j, tx, ty, x0, y0;
+    s32 i, j, tx, ty, x0, y0, in, flip, pass, page;
+    s32 patched = bg <= 1 && Apron_Has(bg);
+    u32 slots;
     u16 tile, clut, *row;
 
-    if (!WIDE_COLS && !WIDE_ROWS) {
+    if (!WIDE_COLS && !WIDE_ROWS && !patched) {
         return;
     }
-    y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
-    for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS; i++, y0 += TILE_SIZE) {
-        ty = startTy + i;
-        x0 = r->x - subX - WIDE_COLS * TILE_SIZE;
-        for (j = -WIDE_COLS; j < N_HORIZ_TILES + WIDE_COLS;
-             j++, x0 += TILE_SIZE) {
-            tx = startTx + j;
-            if (tx >= 0 && tx < r->roomTileWidth && ty >= 0 &&
-                ty < r->roomTileHeight) {
-                continue;
+    for (pass = 0; pass < 4; pass++) {
+        slots = 0;
+        y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
+        for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS;
+             i++, y0 += TILE_SIZE) {
+            ty = startTy + i;
+            x0 = r->x - subX - WIDE_COLS * TILE_SIZE;
+            for (j = -WIDE_COLS; j < N_HORIZ_TILES + WIDE_COLS;
+                 j++, x0 += TILE_SIZE) {
+                tx = startTx + j;
+                in = tx >= 0 && tx < r->roomTileWidth && ty >= 0 &&
+                     ty < r->roomTileHeight;
+                tile = patched ? Apron_Tile(bg, tx, ty) : 0xFFFF;
+                if (in && (tile == 0xFFFF || !(tile & APRON_FLIP))) {
+                    continue; // the room loop draws it
+                }
+                if (tile != 0xFFFF) {
+                    flip = tile >> 12;
+                    tile &= APRON_TILE;
+                } else {
+                    row = layout +
+                          ClampTile(ty, r->roomTileHeight) * r->roomTileWidth;
+                    flip = 0;
+                    tile = row[tx >= 0 && tx < r->roomTileWidth
+                                   ? tx
+                                   : Wide_MirrorColumn(r->roomTileWidth, tx,
+                                                       &flip)];
+                }
+                if (flip != pass || tile == 0 || tile >= 0x1000 ||
+                    g_GpuUsage.sp16 >= MAXSPRT16) {
+                    continue;
+                }
+                page = r->page[tile];
+                if (flip && (page >= 32 || !(slots >> page & 1))) {
+                    // keep 2 modes for this slot, 24 + 2 for the layer
+                    // modes and the vignette
+                    if (page >= 32 ||
+                        g_GpuUsage.drawModes + 2 + 24 + 2 > MAX_DRAW_MODES) {
+                        continue;
+                    }
+                    slots |= 1 << page;
+                    FlipMode(r, page, 0);
+                }
+                clut = g_ClutIds[r->clut[tile]];
+                if (r->clutAlt) {
+                    clut = g_ClutIds[0x100 + r->clut[tile]];
+                }
+                sp16->clut = clut;
+                sp16->x0 = x0;
+                sp16->y0 = y0;
+                // flipped: the texture is read from the far texel back
+                sp16->u0 = (u8)(r->gfx[tile] << 4) + (flip & 1 ? 15 : 0);
+                sp16->v0 = (r->gfx[tile] & 0xF0) + (flip & 2 ? 15 : 0);
+                setSemiTrans(sp16, r->isSemiTrans);
+                setShadeTex(sp16, true);
+                *r->sp16 = *sp16;
+                addPrim(r->order + page + r->ot, r->sp16);
+                r->sp16++;
+                g_GpuUsage.sp16++;
             }
-            tile = bg <= 1 ? Apron_Tile(bg, tx, ty) : 0xFFFF;
-            if (tile == 0xFFFF) {
-                row = layout +
-                      ClampTile(ty, r->roomTileHeight) * r->roomTileWidth;
-                tile = row[tx >= 0 && tx < r->roomTileWidth
-                               ? tx
-                               : Wide_EdgeColumn(row, r->roomTileWidth, tx)];
+        }
+        for (page = 0; page < 32; page++) {
+            if (slots >> page & 1) {
+                FlipMode(r, page, pass);
             }
-            if (tile == 0 || tile >= 0x1000 || g_GpuUsage.sp16 >= MAXSPRT16) {
-                continue;
-            }
-            clut = g_ClutIds[r->clut[tile]];
-            if (r->clutAlt) {
-                clut = g_ClutIds[0x100 + r->clut[tile]];
-            }
-            sp16->clut = clut;
-            sp16->x0 = x0;
-            sp16->y0 = y0;
-            sp16->u0 = (u8)(r->gfx[tile] << 4);
-            sp16->v0 = r->gfx[tile] & 0xF0;
-            setSemiTrans(sp16, r->isSemiTrans);
-            setShadeTex(sp16, true);
-            *r->sp16 = *sp16;
-            addPrim(r->order + r->page[tile] + r->ot, r->sp16);
-            r->sp16++;
-            g_GpuUsage.sp16++;
         }
     }
 }
@@ -162,16 +213,17 @@ static bool StretchBackdrop(TilemapRenderer* r, BgLayer* bg) {
 
 // The wide view outside the camera range: a room, or a lock of the camera,
 // narrower than the view shows the room beyond the range or the edge fill
-// of ApronPass there. It darkens toward the screen edges, a gouraud quad a
-// side in the psyz darken mode (the picture times 1 - red/255, so the hue
-// stays): light at the range edge, darker the further away. A GP0 command
-// of the port switches the mode on and off in the OT. It fades in and out
-// over 30 frames, below the HUD (0x1EE) and the dialogue (0x1FC), above
-// the stage layers and the entities.
+// of ApronPass there. Then the view darkens outside the central 256 px
+// (the PS1 view) toward the screen edges, in the psyz darken mode (the
+// picture times 1 - red/255, so the hue stays): darkness
+// d(t) = 0.95 * (1 - (1 - t)^2.5), t 0 at the 4:3 edge, 1 at the screen
+// edge, as gouraud strips. A GP0 command of the port switches the mode on
+// and off in the OT. It fades in and out over 30 frames, below the HUD
+// (0x1EE) and the dialogue (0x1FC), above the stage layers and entities.
 #define VIGNETTE_OT 0x1E0
 #define VIGNETTE_FADE 30
-#define VIGNETTE_MAX 0xC8 // darkness at the full margin width, of 0xFF
-#define VIGNETTE_GP0 0x10 // a NOP on the PS1 GPU
+#define VIGNETTE_STRIPS 12 // a side
+#define VIGNETTE_GP0 0x10  // a NOP on the PS1 GPU
 static int VignetteGp0(const u_long* words, int n, void* user) {
     Psyz_VideoSetDarken(words[0] & 1);
     return 1;
@@ -185,9 +237,16 @@ static void VignetteMode(TilemapRenderer* r, s32 on) {
     g_GpuUsage.drawModes++;
 }
 
+// darkness at x of the w px margin, of 0xFF, times fade
+static s32 VignetteDark(s32 x, s32 w, s32 fade) {
+    float t = (float)x / w;
+    return (s32)(0xFF * 0.95f * (1.0f - powf(1.0f - t, 2.5f)) + 0.5f) * fade /
+           VIGNETTE_FADE;
+}
+
 static void WideVignette(TilemapRenderer* r) {
     static s32 fade, init;
-    s32 edge[2], side, x0, x1, c;
+    s32 edge[2], side, k, a, b, ca, cb, xa, xb, y0, y1;
     POLY_G4* p;
 
     if (!init) {
@@ -209,27 +268,33 @@ static void WideVignette(TilemapRenderer* r) {
     }
     // the last added is drawn first in its slot: on, the quads, off
     VignetteMode(r, 0);
+    y0 = -WIDE_Y;
+    y1 = DISP_STAGE_H + WIDE_Y;
     for (side = 0; side < 2; side++) {
-        x0 = side ? edge[1] : -g_WideX;
-        x1 = side ? DISP_STAGE_W + g_WideX : edge[0];
-        if (x1 - x0 <= 0 || g_GpuUsage.g4 >= MAX_POLY_G4_COUNT) {
-            continue;
+        for (k = 0; k < VIGNETTE_STRIPS; k++) {
+            // a..b px from the 4:3 edge, outward
+            a = g_WideX * k / VIGNETTE_STRIPS;
+            b = g_WideX * (k + 1) / VIGNETTE_STRIPS;
+            if (b <= a || g_GpuUsage.g4 >= MAX_POLY_G4_COUNT) {
+                continue;
+            }
+            ca = VignetteDark(a, g_WideX, fade);
+            cb = VignetteDark(b, g_WideX, fade);
+            xa = side ? DISP_STAGE_W + a : -b; // the left x of the strip
+            xb = side ? DISP_STAGE_W + b : -a;
+            p = &g_CurrentBuffer->polyG4[g_GpuUsage.g4++];
+            setPolyG4(p);
+            setSemiTrans(p, true);
+            p->x0 = p->x2 = xa;
+            p->x1 = p->x3 = xb;
+            p->y0 = p->y1 = y0;
+            p->y2 = p->y3 = y1;
+            setRGB0(p, side ? ca : cb, side ? ca : cb, side ? ca : cb);
+            setRGB2(p, side ? ca : cb, side ? ca : cb, side ? ca : cb);
+            setRGB1(p, side ? cb : ca, side ? cb : ca, side ? cb : ca);
+            setRGB3(p, side ? cb : ca, side ? cb : ca, side ? cb : ca);
+            addPrim(&r->ot[VIGNETTE_OT], p);
         }
-        // the same darkness at the same distance from the range edge
-        c = VIGNETTE_MAX * MIN(x1 - x0, g_WideX) / g_WideX * fade /
-            VIGNETTE_FADE;
-        p = &g_CurrentBuffer->polyG4[g_GpuUsage.g4++];
-        setPolyG4(p);
-        setSemiTrans(p, true);
-        p->x0 = p->x2 = x0;
-        p->x1 = p->x3 = x1;
-        p->y0 = p->y1 = 0;
-        p->y2 = p->y3 = DISP_STAGE_H;
-        setRGB0(p, side ? 0 : c, side ? 0 : c, side ? 0 : c);
-        setRGB2(p, side ? 0 : c, side ? 0 : c, side ? 0 : c);
-        setRGB1(p, side ? c : 0, side ? c : 0, side ? c : 0);
-        setRGB3(p, side ? c : 0, side ? c : 0, side ? c : 0);
-        addPrim(&r->ot[VIGNETTE_OT], p);
     }
     VignetteMode(r, 1);
 }
@@ -336,6 +401,9 @@ void RenderTilemap(void) {
 #ifdef PLATFORM_PSYZ
                     if (patched &&
                         (patch = Apron_Tile(0, tx, ty)) != 0xFFFF) {
+                        if (patch & APRON_FLIP) {
+                            continue; // ApronPass draws it
+                        }
                         tile = patch;
                     }
 #endif
@@ -458,6 +526,9 @@ void RenderTilemap(void) {
                 tile = *r->tiles++;
 #ifdef PLATFORM_PSYZ
                 if (patched && (patch = Apron_Tile(1, tx, ty)) != 0xFFFF) {
+                    if (patch & APRON_FLIP) {
+                        continue; // ApronPass draws it
+                    }
                     tile = patch;
                 }
 #endif

@@ -85,33 +85,19 @@ int main(void) {
         assert(lo == 4 && hi == 260);
     }
 
-    // edge fill: a two-column wall continues with period 2, a floor of
-    // four tiles with period 4, a plain row repeats its edge tile, and a
-    // row without a period is mirrored
+    // edge fill: a true mirror image, the art flipped next to the edge,
+    // upright again past one room width
     {
-        unsigned short wall[16] = {1, 2, 1, 2, 1, 2, 1, 2,
-                                   1, 2, 1, 2, 1, 2, 9, 8};
-        unsigned short floor_[16] = {4, 3, 2, 1, 4, 3, 2, 1,
-                                     4, 3, 2, 1, 4, 3, 2, 1};
-        unsigned short flat[16] = {5, 5, 5, 5, 5, 5, 5, 5,
-                                   5, 5, 5, 5, 5, 5, 5, 5};
-        unsigned short door[16] = {7, 6, 5, 4, 3, 2, 1, 0,
-                                   1, 2, 3, 4, 5, 6, 7, 8};
-        assert(Wide_EdgeColumn(wall, 16, -1) == 1); // ..2 | 1 2
-        assert(Wide_EdgeColumn(wall, 16, -2) == 0);
-        assert(Wide_EdgeColumn(wall, 16, -5) == 1);
-        assert(Wide_EdgeColumn(wall, 16, 16) == 15); // right: 9 8 mirrored
-        assert(Wide_EdgeColumn(wall, 16, 17) == 14);
-        assert(Wide_EdgeColumn(floor_, 16, -1) == 3);
-        assert(Wide_EdgeColumn(floor_, 16, -4) == 0);
-        assert(Wide_EdgeColumn(floor_, 16, 16) == 12);
-        assert(Wide_EdgeColumn(floor_, 16, 19) == 15);
-        assert(Wide_EdgeColumn(flat, 16, -3) == 0);
-        assert(Wide_EdgeColumn(flat, 16, 18) == 15);
-        assert(Wide_EdgeColumn(door, 16, -1) == 0);
-        assert(Wide_EdgeColumn(door, 16, -3) == 2);
-        assert(Wide_EdgeColumn(door, 16, 40) == 0); // far: the last mirror
-        assert(Wide_EdgeColumn(door, 1, -2) == 0);
+        int f;
+        assert(Wide_MirrorColumn(16, -1, &f) == 0 && f);
+        assert(Wide_MirrorColumn(16, -3, &f) == 2 && f);
+        assert(Wide_MirrorColumn(16, -16, &f) == 15 && f);
+        assert(Wide_MirrorColumn(16, -17, &f) == 15 && !f);
+        assert(Wide_MirrorColumn(16, 16, &f) == 15 && f);
+        assert(Wide_MirrorColumn(16, 18, &f) == 13 && f);
+        assert(Wide_MirrorColumn(16, 32, &f) == 0 && !f);
+        assert(Wide_MirrorColumn(16, 5, &f) == 5 && !f);
+        assert(Wide_MirrorColumn(1, -2, &f) == 0 && !f);
     }
 
     puts("wide_test ok");
