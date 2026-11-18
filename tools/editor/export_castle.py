@@ -37,6 +37,13 @@ BOSSES = {"bo4": 0x1A}
 SATURN = {"STAGE_15.PRG": (0x4C, "ST15"), "STAGE_16.PRG": (0x4D, "ST16"),
           "RSTAGE15.PRG": (0x6C, "RS15"), "RSTAGE16.PRG": (0x6D, "RS16")}
 SATURN_LOAD_ADDRESS = 0x060DC000
+# stages with no place on the castle map: a name only, for the apron patch
+# file (apron/<NAME>.txt) and the editor page. Written with or without assets.
+NAME_ONLY = {"DRE": 0x12, "BO7": 0x16, "MAR": 0x17, "BO6": 0x18, "BO5": 0x19,
+             "BO4": 0x1A, "BO3": 0x1B, "BO2": 0x1C, "BO1": 0x1D, "BO0": 0x1E,
+             "ST0": 0x1F, "RBO8": 0x36, "RBO7": 0x37, "RBO6": 0x38,
+             "RBO5": 0x39, "RBO4": 0x3A, "RBO3": 0x3B, "RBO2": 0x3C,
+             "RBO1": 0x3D, "RBO0": 0x3E, "MAD": 0x40}
 
 
 def rooms_file(assets, name, kind="st"):
@@ -117,6 +124,9 @@ def main():
             continue
         names.append((sid, name))
         rows += [(sid,) + r for r in saturn_rooms(open(path, "rb").read())]
+    named = {sid for sid, _ in names}
+    names += [(sid, n) for n, sid in sorted(NAME_ONLY.items(), key=lambda kv: kv[1])
+              if sid not in named]
     marks = boss_marks(assets)
     fmap_path = os.path.join(assets, "..", "disks", "us", "F_MAP.BIN")
     if os.path.exists(fmap_path):

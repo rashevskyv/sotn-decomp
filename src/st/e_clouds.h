@@ -100,7 +100,7 @@ void EntityClouds(Entity* self) {
 
     if (!self->step) {
         InitializeEntity(g_EInitInteractable);
-        primIndex = g_api.func_800EDB58(PRIM_GT4, 0x60);
+        primIndex = g_api.func_800EDB58(PRIM_GT4, WIDE_POOL(0x60, 0xA0));
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -232,7 +232,7 @@ void EntityClouds(Entity* self) {
                     primTwo->drawMode = DRAW_HIDE;
                     break;
                 }
-                if (primTwo->x3 < 0) {
+                if (primTwo->x3 < -WIDE_X) {
                     primTwo->drawMode = DRAW_HIDE;
                     if (sp58 < 0) {
                         sp58 += 2;
@@ -247,7 +247,7 @@ void EntityClouds(Entity* self) {
                 primTwo->priority = priority;
                 gte_stsxy3_gt3(primTwo);
 
-                if (primTwo->x2 > 0x100) {
+                if (primTwo->x2 > 0x100 + WIDE_X) {
                     primTwo->drawMode = DRAW_HIDE;
                     if (sp58 > 0) {
                         break;

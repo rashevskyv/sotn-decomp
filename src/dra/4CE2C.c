@@ -36,6 +36,9 @@ typedef struct {
 } TilemapRenderer;
 
 #ifdef PLATFORM_PSYZ
+#include <stdio.h>
+#include <string.h>
+
 static s32 ClampTile(s32 t, s32 n) { return t < 0 ? 0 : t >= n ? n - 1 : t; }
 
 // The cells of the wide view outside the room (or layer). The loops below
@@ -87,6 +90,156 @@ static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
             r->sp16++;
             g_GpuUsage.sp16++;
         }
+    }
+}
+
+extern u16 g_TileVram[512 * 512]; // sim_pc.c: VRAM x 512..1023, y 0..511
+
+// 1 if a tile has a texel that is not transparent (colour 0). A tile on a
+// page outside the copy counts as opaque. Cached per tile set and layer.
+static bool TileOpaque(s32 bg, const TileDefinition* td, u16 tile, s32 alt) {
+    static const TileDefinition* set[2];
+    static s32 setAlt[2];
+    static u8 known[2][0x1000]; // 0 not known, 1 transparent, 2 opaque
+    const u16* clut = &g_Clut[0][0];
+    s32 tp, gi, pal, vx, vy, u, y;
+
+    if (!tile || tile >= 0x1000) {
+        return false;
+    }
+    if (set[bg] != td || setAlt[bg] != alt) {
+        set[bg] = td;
+        setAlt[bg] = alt;
+        memset(known[bg], 0, sizeof(known[bg]));
+    }
+    if (!known[bg][tile]) {
+        tp = td->gfxPage[tile] + 8;
+        gi = td->gfxIndex[tile];
+        pal = (td->clut[tile] + (alt ? 0x100 : 0)) * 16;
+        vx = (tp & 15) * 64 - 512;
+        vy = ((tp >> 4) & 1) * 256 + (gi & 0xF0);
+        known[bg][tile] = vx < 0 ? 2 : 1;
+        for (y = 0; y < 16 * 16 && known[bg][tile] == 1; y++) {
+            u = (gi & 0xF) * 16 + (y & 15);
+            if (clut[pal + ((g_TileVram[(vy + (y >> 4)) * 512 + vx + (u >> 2)] >>
+                             ((u & 3) * 4)) & 15)]) {
+                known[bg][tile] = 2;
+            }
+        }
+    }
+    return known[bg][tile] == 2;
+}
+
+// 1 if the wide view draws a texel in a cell, on the fg or on bg layer 0
+// when it lies on the fg (same size, same scroll). A cell takes the patch,
+// else the room cell; outside the room the nearest edge cell (ApronPass).
+static bool CellOpaque(s32 tx, s32 ty) {
+    Tilemap* t = &g_Tilemap;
+    BgLayer* bg = &g_BgLayers[0];
+    s32 w = t->hSize * 16, h = t->vSize * 16;
+    u16 tile = Apron_Tile(0, tx, ty);
+
+    if (tile == 0xFFFF) {
+        tile = t->fg[ClampTile(ty, h) * w + ClampTile(tx, w)];
+    }
+    if (TileOpaque(0, t->tileDef, tile, t->flags & LAYER_CLUT_ALT)) {
+        return true;
+    }
+    if (!bg->tileDef || !bg->layout || !(bg->flags & LAYER_SHOW) ||
+        (bg->flags & LAYER_WRAP_BG) || bg->w != t->hSize ||
+        bg->h != t->vSize || bg->scrollX.i.hi != t->scrollX.i.hi ||
+        bg->scrollY.i.hi != t->scrollY.i.hi) {
+        return false;
+    }
+    tile = Apron_Tile(1, tx, ty);
+    if (tile == 0xFFFF) {
+        tile = bg->layout[ClampTile(ty, h) * w + ClampTile(tx, w)];
+    }
+    return TileOpaque(1, bg->tileDef, tile, bg->flags & LAYER_CLUT_ALT);
+}
+
+// The PS1 clips a stage to the rows 20..226 and keeps the camera 4 px below
+// the room top and 12 px above its bottom, so it never shows the room rows
+// above y 24 or in the last 26 px. The wide view opens the clip (wide.c
+// StageClip) and shows them. A see-through cell there, with an opaque cell
+// between it and the rows the PS1 shows (a ceiling, a floor), is a hole to
+// the sky behind: the wide view draws it black, as the PS1 border was. Where
+// the PS1 shows sky in that column, the sky goes on. A patch cell wins. vt
+// and vb: the first and the last row the PS1 shows.
+static bool IsHole(s32 tx, s32 ty, s32 vt, s32 vb) {
+    s32 step = ty < vt ? 1 : -1, end = ty < vt ? vt : vb;
+    if ((ty >= vt && ty <= vb) || Apron_Tile(0, tx, ty) != 0xFFFF ||
+        Apron_Tile(1, tx, ty) != 0xFFFF || CellOpaque(tx, ty)) {
+        return false;
+    }
+    for (ty += step; ty != end + step; ty += step) {
+        if (CellOpaque(tx, ty)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+#define HOLE_TOP (24 / TILE_SIZE)
+#define HOLE_BOTTOM(h) (((h) * TILE_SIZE - 26) / TILE_SIZE)
+
+// The holes in view, one black TILE per run, at the fg order.
+static void HolePass(TilemapRenderer* r, s32 startTx, s32 startTy, s32 subX,
+                     s32 subY) {
+    s32 vt = HOLE_TOP, vb = HOLE_BOTTOM(r->roomTileHeight);
+    s32 i, j, ty, run, y0;
+    TILE* t;
+
+    if (!WIDE_X && !WIDE_Y) {
+        return;
+    }
+    y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
+    for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS; i++, y0 += TILE_SIZE) {
+        ty = startTy + i;
+        if (ty >= vt && ty <= vb) {
+            continue;
+        }
+        run = 0;
+        for (j = -WIDE_COLS; j <= N_HORIZ_TILES + WIDE_COLS; j++) {
+            if (j < N_HORIZ_TILES + WIDE_COLS &&
+                IsHole(startTx + j, ty, vt, vb)) {
+                run++;
+                continue;
+            }
+            if (run && g_GpuUsage.tile < MAX_TILE_COUNT) {
+                t = &g_CurrentBuffer->tiles[g_GpuUsage.tile++];
+                setTile(t);
+                setRGB0(t, 0, 0, 0);
+                t->x0 = r->x - subX + (j - run) * TILE_SIZE;
+                t->y0 = y0;
+                t->w = run * TILE_SIZE;
+                t->h = TILE_SIZE;
+                addPrim(r->ot + r->order, t);
+            }
+            run = 0;
+        }
+    }
+}
+
+// The holes of the room, logged on each room load.
+static void LogHoles(s32 layerIndex) {
+    s32 w = g_Tilemap.hSize * 16, h = g_Tilemap.vSize * 16;
+    s32 vt = HOLE_TOP, vb = HOLE_BOTTOM(h), tx, ty, top = 0, bottom = 0;
+
+    if (!g_Tilemap.tileDef) {
+        return;
+    }
+    for (tx = 0; tx < w; tx++) {
+        for (ty = 0; ty < vt; ty++) {
+            top += IsHole(tx, ty, vt, vb);
+        }
+        for (ty = vb + 1; ty < h; ty++) {
+            bottom += IsHole(tx, ty, vt, vb);
+        }
+    }
+    if (top || bottom) {
+        fprintf(stderr, "[wide] layer %d: black cells %d top, %d bottom\n",
+                layerIndex, top, bottom);
     }
 }
 
@@ -286,6 +439,7 @@ void RenderTilemap(void) {
             }
 #ifdef PLATFORM_PSYZ
             ApronPass(r, sp16, 0, t->fg, startTx, startTy, subX, subY);
+            HolePass(r, startTx, startTy, subX, subY);
 #endif
 
             for (i = 0; i < 24; i++) {
@@ -496,5 +650,6 @@ void LoadRoomLayer(s32 layerIndex) {
     }
 #ifdef PLATFORM_PSYZ
     Apron_OnRoomLayer(layerIndex);
+    LogHoles(layerIndex);
 #endif
 }
