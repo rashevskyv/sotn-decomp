@@ -166,9 +166,8 @@ static int FbH(void) { return g_CurrentBuffer->disp.disp.h; }
 static void ViewRect(int* x0, int* y0, int* x1, int* y1) {
     *x0 = -g_WideX;
     *x1 = DISP_STAGE_W + g_WideX;
-    // no vertical margin (240 rows) keeps the stage clip of rows 20..226
-    *y0 = g_WideY ? -g_WideY : 20;
-    *y1 = g_WideY ? DISP_STAGE_H + g_WideY : 226;
+    *y0 = 20; // the stage clip rows (func_800E34DC), also in the wide view
+    *y1 = 226;
 }
 
 static int CellX(int cx) { return (ox16 + cx * zoom16) >> 4; }

@@ -671,14 +671,6 @@ void func_800E34DC(s32 arg0) {
         g_GpuBuffers[1].draw.clip.y = 0x0114;
     }
     g_GpuBuffers[1].draw.clip.h = 0x00CF;
-#ifdef PLATFORM_PSYZ
-    if (!arg0 && (g_WideX || g_WideY)) {
-        // the clip touches the frame edges, so psyz extends it to the canvas
-        g_GpuBuffers[0].draw.clip.y = g_GpuBuffers[1].draw.clip.y = 0;
-        g_GpuBuffers[0].draw.clip.h = g_GpuBuffers[1].draw.clip.h =
-            DISP_STAGE_H;
-    }
-#endif
     g_GpuBuffers[0].draw.isbg = g_GpuBuffers[1].draw.isbg = 1;
     SetGPUBuffRGBZero();
     g_GpuBuffers[0].draw.dtd = g_GpuBuffers[1].draw.dtd = 0;

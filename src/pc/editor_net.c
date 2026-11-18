@@ -212,8 +212,8 @@ static void Room(void) {
         head[7] = g_BgLayers[0].h * 16;
         head[9] = g_BgLayers[0].flags;
     }
-    head[10] = 24; // apron margins, src/pc/apron.c AX and AY
-    head[11] = 10;
+    head[10] = 24; // apron margin left and right, src/pc/apron.c AX
+    head[11] = 0;  // none above or below: the PS1 clip rows hide them
     Put(head, sizeof(head));
     PutLayer(g_Tilemap.fg, head[4], head[5]);
     PutLayer(g_BgLayers[0].layout, head[6], head[7]);

@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Wide view, always 16:9. The player picks an integer scale. In stage mode
 // psyz draws a canvas of (screen / scale) game pixels; the stage code reads
-// the extra pixels per side in g_WideX and g_WideY. Other display modes
-// show the PS1 frame at the largest integer scale that fits.
+// the extra pixels per side in g_WideX. The stage keeps the PS1 rows: the
+// clip of func_800E34DC (rows 20..226) touches only the left and right
+// frame edges, so psyz widens it and the rows above and below stay black
+// bars across the whole width, as on the PS1. g_WideY stays 0. Other
+// display modes show the PS1 frame at the largest integer scale that fits.
 #include <game.h>
 #include <psyz/input.h>
 #include <psyz/video.h>
@@ -11,7 +14,7 @@
 #include "wide.h"
 
 s32 g_WideX;
-s32 g_WideY;
+s32 g_WideY; // always 0: no extra stage rows (the black bars)
 s32 g_WideBandTop, g_WideBandBottom;
 static int band_clip; // Wide_BandClip narrowed the stage clip
 static int cfg_scale; // 0: off, the psyz default output (PC)
@@ -373,25 +376,24 @@ static void ScaleRange(PsyzSize req, int* lo, int* hi) {
     *lo = MIN(MAX((req.w + 959) / 960, (req.h + 539) / 540), *hi);
 }
 
-// The stage clip (func_800E34DC) is set when a stage starts: rows 20..226
-// with no margin, the whole frame in the wide view. The port menu scale can
-// turn the wide view on in a stage, so open the PS1 clip then. The other way
-// keeps the whole frame until the next stage start; the extra rows hold room
-// tiles.
-static void StageClip(void) {
-    DRAWENV* d0 = &g_GpuBuffers[0].draw;
-    DRAWENV* d1 = &g_GpuBuffers[1].draw;
-    if ((g_WideX || g_WideY) && d0->clip.y == 0x14 && d0->clip.h == 0xCF &&
-        d1->clip.y == 0x14 && d1->clip.h == 0xCF) {
-        d0->clip.y = d1->clip.y = 0;
-        d0->clip.h = d1->clip.h = DISP_STAGE_H;
+// The PS1 stage clip of func_800E34DC: rows 20..226.
+#define CLIP_TOP 0x14
+#define CLIP_BOTTOM (0x14 + 0xCF)
+
+// The frame clear covers only the clip: black out the rows y0..y1 of both
+// pages, or they keep an old picture. A rect on a frame edge reaches the
+// canvas edge.
+static void ClearRows(int y0, int y1) {
+    for (int i = 0; i < 2 && y1 > y0; i++) {
+        DRAWENV* d = &g_GpuBuffers[i].draw;
+        RECT r = {d->clip.x, y0, d->clip.w, y1 - y0};
+        ClearImage(&r, 0, 0, 0);
     }
 }
 
 // The wide camera calls it on every frame with the art rows of the room on
 // the screen. Only a stage with a band (Saturn) narrows the clip, for a room
-// shorter than the view: black bars instead of the empty rows. The whole
-// frame (0..240) is the wide clip, psyz extends it to the canvas.
+// shorter than the view: black bars instead of the empty rows.
 void Wide_BandClip(int y0, int y1) {
     DRAWENV* d0 = &g_GpuBuffers[0].draw;
     DRAWENV* d1 = &g_GpuBuffers[1].draw;
@@ -400,23 +402,16 @@ void Wide_BandClip(int y0, int y1) {
         return; // no band, or the two-page clip of 42398.c
     }
     if (!g_WideBandTop && !g_WideBandBottom) {
-        y0 = 0, y1 = DISP_STAGE_H; // the stage changed: the wide clip again
+        y0 = CLIP_TOP, y1 = CLIP_BOTTOM; // the stage changed: the PS1 clip
     }
-    y0 = Clamp(y0, 0, DISP_STAGE_H);
-    y1 = Clamp(y1, y0, DISP_STAGE_H);
-    band_clip = y0 > 0 || y1 < DISP_STAGE_H;
+    y0 = Clamp(y0, CLIP_TOP, CLIP_BOTTOM);
+    y1 = Clamp(y1, y0, CLIP_BOTTOM);
+    band_clip = y0 > CLIP_TOP || y1 < CLIP_BOTTOM;
     d0->clip.y = d1->clip.y = y0;
     d0->clip.h = d1->clip.h = y1 - y0;
     if (band_clip) {
-        // the frame clear covers only the clip: black out the rows outside
-        // it, or they keep the last room's picture
-        DRAWENV* d[] = {d0, d1};
-        for (int i = 0; i < 2; i++) {
-            RECT top = {d[i]->clip.x, 0, d[i]->clip.w, y0};
-            RECT bottom = {d[i]->clip.x, y1, d[i]->clip.w, DISP_STAGE_H - y1};
-            ClearImage(&top, 0, 0, 0);
-            ClearImage(&bottom, 0, 0, 0);
-        }
+        ClearRows(0, y0);
+        ClearRows(y1, DISP_STAGE_H);
     }
 }
 
@@ -461,7 +456,6 @@ void Wide_OnFrame(void) {
     ScaleRange(req, &lo, &hi);
     k = Clamp(cfg_scale, lo, hi);
     g_WideX = ((req.w / k & ~1) - DISP_STAGE_W) / 2;
-    g_WideY = ((req.h / k & ~1) - DISP_STAGE_H) / 2;
 
     if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
         s = k;
@@ -492,9 +486,13 @@ void Wide_OnFrame(void) {
         canvas[3] = fbh + my;
         canvas_zoom = MAX((k + s / 2) / s, 1);
     }
-    StageClip();
     Psyz_VideoSetScale(s);
     Psyz_VideoSetResolution(req);
+    if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
+        // a new canvas, or one that held a title or menu: black bars
+        ClearRows(0, CLIP_TOP);
+        ClearRows(CLIP_BOTTOM, DISP_STAGE_H);
+    }
     fprintf(stderr,
             "[video] output %dx%d scale %d (asked %d) "
             "frame %dx%d internal %dx%d margin x %d y %d\n",
