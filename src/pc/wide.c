@@ -4,8 +4,10 @@
 // the extra pixels per side in g_WideX. The stage keeps the PS1 rows: the
 // clip of func_800E34DC (rows 20..226) touches only the left and right
 // frame edges, so psyz widens it and the rows above and below stay black
-// bars across the whole width, as on the PS1. g_WideY stays 0. Other
-// display modes show the PS1 frame at the largest integer scale that fits.
+// bars across the whole width, as on the PS1. g_WideY stays 0. Only these
+// rows must fit, so docked shows the stage at scale 5 (384x216, rows
+// 16..231). A frame without that clip and other display modes show the
+// PS1 frame at the largest integer scale that fits (docked 4).
 #include <game.h>
 #include <psyz/input.h>
 #include <psyz/video.h>
@@ -21,7 +23,7 @@ static int cfg_scale; // 0: off, the psyz default output (PC)
 static const char* ini_path; // NULL: settings are not saved (PC)
 char g_IniSpawn[48];
 static PsyzSize last_disp;
-static int last_fbw, last_fbh;
+static int last_fbw, last_fbh, last_rows;
 
 int Wide_GetScale(void) { return cfg_scale; }
 
@@ -39,8 +41,12 @@ static const char ini_head[] =
     "; scale: size of one game pixel on the screen, a whole number.\n"
     "; The view is the screen size divided by the scale:\n"
     ";   handheld 1280x720: 3 = 426x240, 2 = 640x360\n"
-    ";   docked 1920x1080:  4 = 480x270, 3 = 640x360, 2 = 960x540\n"
-    "; The game picks the nearest value that fits the screen.\n";
+    ";   docked 1920x1080:  5 = 384x216, 4 = 480x270, 3 = 640x360,\n"
+    ";                      2 = 960x540\n"
+    "; The game picks the nearest value that fits the screen (5 is 3 on\n"
+    "; the handheld). The stage always shows the PS1 rows with black bars\n"
+    "; above and below. At 5 the stage, map and dialogues use 5; the\n"
+    "; title, pause menu and other full screens use 4.\n";
 
 static const char ini_voice[] =
     "\n"
@@ -242,7 +248,7 @@ void Wide_SaveIni(void) {
 // A missing key keeps its default (cheats, editor, overlay and fps off).
 // The view is always 16:9: the aspect key of an old file does nothing.
 void Wide_LoadIni(const char* path) {
-    int scale = 3, v, i;
+    int scale = 5, v, i; // docked 5, handheld 3 (ScaleRange)
     char line[128], word[32];
     FILE* f = fopen(path, "r");
 
@@ -369,16 +375,16 @@ static PsyzSize AspectRect(PsyzSize d) {
     return d;
 }
 
-// Scales that fit: the 256x240 frame must fit, and above 960x540 game
-// pixels the tile budget runs out.
-static void ScaleRange(PsyzSize req, int* lo, int* hi) {
-    *hi = MAX(MIN(req.w / DISP_STAGE_W, req.h / DISP_STAGE_H), 1);
-    *lo = MIN(MAX((req.w + 959) / 960, (req.h + 539) / 540), *hi);
-}
-
 // The PS1 stage clip of func_800E34DC: rows 20..226.
 #define CLIP_TOP 0x14
 #define CLIP_BOTTOM (0x14 + 0xCF)
+
+// Scales that fit: the 256 columns and the stage clip rows must fit, and
+// above 960x540 game pixels the tile budget runs out.
+static void ScaleRange(PsyzSize req, int* lo, int* hi) {
+    *hi = MAX(MIN(req.w / DISP_STAGE_W, req.h / (CLIP_BOTTOM - CLIP_TOP)), 1);
+    *lo = MIN(MAX((req.w + 959) / 960, (req.h + 539) / 540), *hi);
+}
 
 // The frame clear covers only the clip: black out the rows y0..y1 of both
 // pages, or they keep an old picture. A rect on a frame edge reaches the
@@ -440,7 +446,8 @@ int Wide_Canvas(int* x0, int* y0, int* x1, int* y1) {
 // Called on every vsync. Follows dock changes and display mode changes.
 void Wide_OnFrame(void) {
     PsyzSize d, req;
-    int fbw, fbh, k, s, lo, hi;
+    int fbw, fbh, k, s, lo, hi, rows, keep;
+    RECT* clip = &g_GpuBuffers[0].draw.clip;
 
     if (!cfg_scale) {
         return;
@@ -452,19 +459,28 @@ void Wide_OnFrame(void) {
         fbw = DISP_STAGE_W;
         fbh = DISP_STAGE_H;
     }
+    // the stage clip (a Saturn band is inside it): only the rows 20..226
+    // must fit, so docked shows the stage at scale 5 (384x216)
+    rows = clip->y >= CLIP_TOP && clip->y + clip->h <= CLIP_BOTTOM;
     if (d.w <= 0 || d.h <= 0 ||
         (d.w == last_disp.w && d.h == last_disp.h && fbw == last_fbw &&
-         fbh == last_fbh)) {
+         fbh == last_fbh && rows == last_rows)) {
         return;
     }
     last_disp = d;
     last_fbw = fbw;
     last_fbh = fbh;
+    last_rows = rows;
 
     req = AspectRect(d);
     ScaleRange(req, &lo, &hi);
     k = Clamp(cfg_scale, lo, hi);
+    if (!rows) {
+        k = MIN(k, MAX(req.h / DISP_STAGE_H, 1)); // all 240 rows must fit
+    }
     g_WideX = ((req.w / k & ~1) - DISP_STAGE_W) / 2;
+    keep = rows && fbw == DISP_STAGE_W && fbh == DISP_STAGE_H;
+    Psyz_VideoSetKeepRows(keep ? CLIP_TOP : 0, keep ? CLIP_BOTTOM : 0);
 
     if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
         s = k;
@@ -502,9 +518,9 @@ void Wide_OnFrame(void) {
     }
     fprintf(stderr,
             "[video] output %dx%d scale %d (asked %d) "
-            "frame %dx%d internal %dx%d margin x %d y %d\n",
+            "frame %dx%d internal %dx%d margin x %d y %d keep rows %d\n",
             d.w, d.h, s, cfg_scale, fbw, fbh, req.w / s & ~1,
-            req.h / s & ~1, (int)g_WideX, (int)g_WideY);
+            req.h / s & ~1, (int)g_WideX, (int)g_WideY, keep);
 }
 
 // Port menu state.
