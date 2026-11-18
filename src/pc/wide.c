@@ -475,11 +475,11 @@ void Wide_OnFrame(void) {
     req = AspectRect(d);
     ScaleRange(req, &lo, &hi);
     k = Clamp(cfg_scale, lo, hi);
-    if (!rows) {
+    keep = rows && fbw == DISP_STAGE_W && fbh == DISP_STAGE_H;
+    if (!keep) {
         k = MIN(k, MAX(req.h / DISP_STAGE_H, 1)); // all 240 rows must fit
     }
     g_WideX = ((req.w / k & ~1) - DISP_STAGE_W) / 2;
-    keep = rows && fbw == DISP_STAGE_W && fbh == DISP_STAGE_H;
     Psyz_VideoSetKeepRows(keep ? CLIP_TOP : 0, keep ? CLIP_BOTTOM : 0);
 
     if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
