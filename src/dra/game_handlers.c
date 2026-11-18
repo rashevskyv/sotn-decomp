@@ -797,6 +797,64 @@ void func_800E5498(void) {
 
 #ifdef PLATFORM_PSYZ
 #include <psyz/video.h>
+// The melt strips copy only the 256x240 PS1 frame. Over the stretched
+// picture, the canvas outside that frame stays black (letters included)
+// until every strip has left the frame. Then it fades in, 2 steps per frame
+// as the letters do, and the parked strips hide (scale 2 shows them).
+// ponytail: black, not the old stage; a wide melt needs a canvas snapshot
+// in psyz.
+static void GameOverMaskMelt(
+    Primitive* strips, s32 x0, s32 y0, s32 x1, s32 y1) {
+    static s32 fade; // 0: black, 0x80: no mask
+    s16 box[4][4] = {{x0, y0, 0, y1},
+                     {0x100, y0, x1, y1},
+                     {0, y0, 0x100, 0},
+                     {0, 0xF0, 0x100, y1}};
+    OT_TYPE* ot = &g_CurrentBuffer->ot[0x1FF];
+    RECT tw = {0, 0, 0xFF, 0xFF};
+    Primitive* prim = strips;
+    POLY_G4* poly;
+    DR_MODE* mode;
+    s32 i, c;
+
+    for (i = 0; i < 0x100 && prim->y0 >= 0xF0; i++, prim = prim->next)
+        ;
+    if (i < 0x100) {
+        fade = 0;
+    } else {
+        for (prim = strips, i = 0; i < 0x100; i++, prim = prim->next) {
+            prim->drawMode = DRAW_HIDE;
+        }
+        if (fade < 0x80) {
+            fade += 2;
+        }
+    }
+    if (fade >= 0x80 || g_GpuUsage.drawModes >= MAX_DRAW_MODES) {
+        return;
+    }
+    // subtract blend: 0xFF gives black, 0 leaves the picture
+    c = 0xFF * (0x80 - fade) / 0x80;
+    for (i = 0; i < 4 && g_GpuUsage.g4 < MAX_POLY_G4_COUNT; i++) {
+        if (box[i][2] <= box[i][0] || box[i][3] <= box[i][1]) {
+            continue;
+        }
+        poly = &g_CurrentBuffer->polyG4[g_GpuUsage.g4++];
+        setPolyG4(poly);
+        setSemiTrans(poly, true);
+        setRGB0(poly, c, c, c);
+        setRGB1(poly, c, c, c);
+        setRGB2(poly, c, c, c);
+        setRGB3(poly, c, c, c);
+        setXY4(poly, box[i][0], box[i][1], box[i][2], box[i][1], box[i][0],
+               box[i][3], box[i][2], box[i][3]);
+        AddPrim(ot, poly);
+    }
+    // added last, so it draws before the quads: blend mode 2 (subtract)
+    mode = &g_CurrentBuffer->drawModes[g_GpuUsage.drawModes++];
+    SetDrawMode(mode, 0, 0, DRAW_UNK_40, &tw);
+    AddPrim(ot, mode);
+}
+
 // The game-over picture (two quads, VRAM 640,0) is 256x240 in the middle of
 // the wide view. An HD file wider than 4:3 for it (data/textures) draws it
 // over the whole canvas instead, as the title stretches its background.
@@ -834,6 +892,9 @@ static void GameOverFillCanvas(void) {
         prim->x1 = prim->x3 = r;
         prim->y0 = prim->y1 = y0;
         prim->y2 = prim->y3 = y1;
+    }
+    if (x0 < 0 || y0 < 0 || x1 > 0x100 || y1 > 0xF0) {
+        GameOverMaskMelt(prim, x0, y0, x1, y1);
     }
 }
 #endif
