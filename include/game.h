@@ -1041,8 +1041,17 @@ extern int g_ButtonPick; // sotn.ini buttons =: -1 auto, else a set
 extern const char* const g_ButtonSetNames[BUTTON_SETS];
 void Buttons_Update(void);
 int Buttons_Width(int b);
+// px: a colour index per pixel, 0 off, else g_ButtonRgb
 int Buttons_Rows(int set, int b, u8 px[11][16]);
-void Buttons_Paint(u16* dst, int stride, int ink);
+void Buttons_Paint(u16* dst, int stride);
+#define BUTTON_INKS 11
+extern const u8 g_ButtonRgb[BUTTON_INKS][3];
+// The 16 colours of the marks: a CLUT in the atlas at texel u BUTTON_CLUT_U of
+// the last mark row, where the slots (k & 7) 4..7 hold no mark; drawn as
+// g_ClutIds[BUTTON_CLUT] (a port slot above the stock 0x300).
+#define BUTTON_CLUT_U 64
+#define BUTTON_CLUT_V (BUTTON_MARKS_V + BUTTON_SETS * BUTTON_MARKS / 8 * 11)
+#define BUTTON_CLUT 0x3FF
 // Cheats (src/pc/cheats.c), saved as cheat_* = 0|1 in sotn.ini.
 struct Cheats {
     int refill;       // HP, MP and hearts stay full

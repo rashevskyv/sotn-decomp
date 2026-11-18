@@ -493,6 +493,11 @@ void Lang_PaintFont8(void) {
 #define MENU_FONT_H (MENU_DOTS_V + 1)
 static int menu_font_on;
 static u16 atlas[32 * MENU_FONT_H];
+// the mark CLUT (16 halfwords from u BUTTON_CLUT_U) lies where no mark is
+_Static_assert(BUTTON_SETS * BUTTON_MARKS % 8 &&
+                   BUTTON_SETS * BUTTON_MARKS % 8 * 16 <= BUTTON_CLUT_U &&
+                   (MENU_FONT_X * 4 + BUTTON_CLUT_U) % 64 == 0,
+               "mark CLUT spot");
 
 int Lang_MenuFont(int on) {
     static u16 saved[32 * MENU_FONT_H];
@@ -520,10 +525,14 @@ int Lang_MenuFont(int on) {
                 }
             }
         }
-        // the marks take the white of the stock arrows (cell 0xE0): its most
-        // frequent ink; the serif cells' ink 6 is a light grey
+        // the dots take the white of the stock arrows (cell 0xE0): its most
+        // frequent ink; the serif cells' ink 6 is a light grey. The marks
+        // have their own CLUT: 1 that white, then g_ButtonRgb.
         {
             int n[16] = {0}, ink = 6;
+            u16 font_clut[16], *mark_clut;
+            RECT f = {(g_ClutIds[0x196] & 0x3F) << 4, g_ClutIds[0x196] >> 6,
+                      16, 1};
             for (y = 0; y < 16; y++) { // 8 rows of 2 halfwords
                 c = sheet[((0xE0 >> 4) * 8 + (y >> 1)) * 32 + (y & 1)];
                 for (; c; c >>= 4) {
@@ -533,10 +542,23 @@ int Lang_MenuFont(int on) {
             for (c = 1; c < 16; c++) {
                 ink = n[c] > n[ink] ? c : ink;
             }
-            Buttons_Paint(atlas + BUTTON_MARKS_V * 32, 32, ink);
+            Buttons_Paint(atlas + BUTTON_MARKS_V * 32, 32);
             for (c = 0; c < 32; c++) { // a dot every other texel
                 atlas[MENU_DOTS_V * 32 + c] = ink | ink << 8;
             }
+            StoreImage(&f, (u_long*)font_clut);
+            DrawSync(0);
+            mark_clut = atlas + BUTTON_CLUT_V * 32 + BUTTON_CLUT_U / 4;
+            mark_clut[1] = font_clut[ink];
+            for (c = 2; c < BUTTON_INKS; c++) { // the bit 15 of the white
+                mark_clut[c] = (font_clut[ink] & 0x8000) |
+                               g_ButtonRgb[c][0] >> 3 |
+                               g_ButtonRgb[c][1] >> 3 << 5 |
+                               g_ButtonRgb[c][2] >> 3 << 10;
+            }
+            g_ClutIds[BUTTON_CLUT] =
+                GetClut(MENU_FONT_X + BUTTON_CLUT_U / 4,
+                        MENU_FONT_Y + BUTTON_CLUT_V);
         }
         LoadImage(&r, (u_long*)atlas);
     } else {

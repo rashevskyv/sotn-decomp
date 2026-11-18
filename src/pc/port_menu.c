@@ -774,19 +774,22 @@ static void Rect(int x, int y, int w, int h, u8 r, u8 g, u8 b) {
     addPrim(&menu_ot[0x1FF], t);
 }
 
-// A button mark: one tile per run of lit pixels, 11 rows from y - 2 (its
-// row 9 on the baseline of the 5x7 glyphs), always white: the text tint
-// never colours a mark. Returns its width.
+// A button mark: one tile per run of one colour, 11 rows from y - 2 (its
+// row 9 on the baseline of the 5x7 glyphs), in its own colours
+// (g_ButtonRgb): the text tint never colours a mark. Returns its width.
 static int Mark(int x, int y, int b) {
     int row, col, run, w;
     u8 px[11][16];
+    const u8* c;
     w = Buttons_Rows(g_ButtonSet, b, px);
     for (row = 0; row < 11; row++) {
-        for (col = 0; col < w; col += run ? run : 1) {
-            for (run = 0; col + run < w && px[row][col + run]; run++) {
+        for (col = 0; col < w; col += run) {
+            for (run = 1; col + run < w && px[row][col + run] == px[row][col];
+                 run++) {
             }
-            if (run) {
-                Rect(x + col, y - 2 + row, run, 1, 255, 255, 255);
+            c = g_ButtonRgb[px[row][col]];
+            if (px[row][col]) {
+                Rect(x + col, y - 2 + row, run, 1, c[0], c[1], c[2]);
             }
         }
     }

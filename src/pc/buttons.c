@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // The button marks of the menus, drawn for the port pixel by pixel (no
 // console or pad maker art). Three sets: Switch, Xbox, PSX. A face button is
-// a disc with its mark cut out, a shoulder button a tab with its name cut
-// out, 11 rows high like the pause menu cells (row 9 meets their baseline).
+// a disc with its mark cut out (Switch) or a dark disc with a white rim and
+// the mark in its pad colour (Xbox, PSX), a shoulder button a white tab with
+// its name cut out, 11 rows high like the pause menu cells (row 9 meets their baseline).
 // Mark b is the PS button of g_ChButtons: 0 Square, 1 Circle, 2 Cross,
 // 3 Triangle, 4 R2, 5 L1, 6 R1, 7 L2; then 8 Select, 9 Start, 10 the d-pad.
 // The face buttons go by position, as sdl3_common.h maps them: Square west,
@@ -93,15 +94,29 @@ static const char* const big[] = {
     "B" "####." "#...#" "#...#" "####." "#...#" "#...#" "####.",
     "X" "#...#" "#...#" ".#.#." "..#.." ".#.#." "#...#" "#...#",
     "Y" "#...#" "#...#" ".#.#." "..#.." "..#.." "..#.." "..#..",
-    "o" ".###." "#...#" "#...#" "#...#" "#...#" "#...#" ".###.", // circle
-    "x" "....." "#...#" ".#.#." "..#.." ".#.#." "#...#" ".....", // cross
-    "s" "....." "#####" "#...#" "#...#" "#...#" "#####" ".....", // square
-    "t" "....." "..#.." ".#.#." ".#.#." "#...#" "#####" ".....", // triangle
     "-" "....." "....." "....." "#####" "....." "....." ".....",
     "+" "....." "..#.." "..#.." "#####" "..#.." "..#.." ".....",
     "v" "....." "###.." "#.###" "###.#" "..#.#" "..###" ".....", // view
     "m" "....." "#####" "....." "#####" "....." "#####" ".....", // menu
 };
+
+// 7x7 PS symbols drawn in colour on a dark disc (cross and square 5x5 inside:
+// at 7x7 their corners would touch the rim)
+static const char* const sym7[] = {
+    "o" "..###.." ".#...#." "#.....#" "#.....#" "#.....#" ".#...#." "..###..",
+    "x" "......." ".#...#." "..#.#.." "...#..." "..#.#.." ".#...#." ".......",
+    "s" "......." ".#####." ".#...#." ".#...#." ".#...#." ".#####." ".......",
+    "t" "...#..." "..#.#.." "..#.#.." ".#...#." ".#...#." "#######" ".......",
+};
+
+// The colours of the marks by index (Buttons_Rows): 0 off, 1 white (the
+// atlas takes the stock ink there), 2 the dark face, then the marks.
+const u8 g_ButtonRgb[BUTTON_INKS][3] = {
+    {0, 0, 0},       {255, 255, 255}, {24, 24, 40},   {64, 224, 176},
+    {255, 72, 72},   {120, 176, 255}, {255, 112, 208}, {96, 208, 64},
+    {240, 64, 64},   {110, 170, 255}, {255, 208, 32},
+};
+enum { INK_W = 1, PS_T = 3, PS_O, PS_X, PS_S, XB_A, XB_B, XB_X, XB_Y };
 
 // 3x5 letters cut out of a tab or a pill
 static const char* const small[] = {
@@ -115,16 +130,18 @@ static const char* const small[] = {
 static const struct {
     u8 shape;
     const char* text; // a big mark on a disc, small letters on a tab or pill
+    u8 ink; // 0: the mark cut out of a white shape; else a disc with a white
+            // rim, the dark face and the mark in this colour
 } sets[BUTTON_SETS][BUTTON_MARKS] = {
     {{DISC, "Y"}, {DISC, "A"}, {DISC, "B"}, {DISC, "X"}, {TAB_R, "ZR"},
      {TAB_L, "L"}, {TAB_R, "R"}, {TAB_L, "ZL"}, {DISC, "-"}, {DISC, "+"},
      {DPAD, ""}},
-    {{DISC, "X"}, {DISC, "B"}, {DISC, "A"}, {DISC, "Y"}, {TAB_R, "RT"},
-     {TAB_L, "LB"}, {TAB_R, "RB"}, {TAB_L, "LT"}, {DISC, "v"}, {DISC, "m"},
-     {DPAD, ""}},
-    {{DISC, "s"}, {DISC, "o"}, {DISC, "x"}, {DISC, "t"}, {TAB_R, "R2"},
-     {TAB_L, "L1"}, {TAB_R, "R1"}, {TAB_L, "L2"}, {PILL, "_"}, {PILL, ">"},
-     {DPAD, ""}},
+    {{DISC, "X", XB_X}, {DISC, "B", XB_B}, {DISC, "A", XB_A},
+     {DISC, "Y", XB_Y}, {TAB_R, "RT"}, {TAB_L, "LB"}, {TAB_R, "RB"},
+     {TAB_L, "LT"}, {DISC, "v", INK_W}, {DISC, "m", INK_W}, {DPAD, ""}},
+    {{DISC, "s", PS_S}, {DISC, "o", PS_O}, {DISC, "x", PS_X},
+     {DISC, "t", PS_T}, {TAB_R, "R2"}, {TAB_L, "L1"}, {TAB_R, "R1"},
+     {TAB_L, "L2"}, {PILL, "_"}, {PILL, ">"}, {DPAD, ""}},
 };
 
 static const char* Find(const char* const* t, int n, char c) {
@@ -141,11 +158,15 @@ static int Width(u8 shape) { return shape == DISC || shape == DPAD ? 11 : 15; }
 
 int Buttons_Width(int b) { return Width(sets[g_ButtonSet][b].shape); }
 
+static int Disc(int x, int y) {
+    return x >= 0 && x < 11 && y >= 0 && y < 11 && art[0][y][x] == '#';
+}
+
 int Buttons_Rows(int set, int b, u8 px[11][16]) {
-    u8 shape = sets[set][b].shape;
+    u8 shape = sets[set][b].shape, ink = sets[set][b].ink;
     const char* t = sets[set][b].text;
     const char* g;
-    int w = Width(shape), x, y, x0;
+    int w = Width(shape), x, y, x0, gw;
     memset(px, 0, 11 * 16);
     for (y = 0; y < 11; y++) {
         for (x = 0; x < w; x++) {
@@ -153,7 +174,26 @@ int Buttons_Rows(int set, int b, u8 px[11][16]) {
                 art[shape_art[shape]][y][x] == '#';
         }
     }
-    if (shape == DISC && (g = Find(big, LEN(big), *t))) {
+    if (shape == DISC && ink) {
+        // the rim: disc pixels with a 4-neighbour outside; the rest is face
+        for (y = 0; y < 11; y++) {
+            for (x = 0; x < 11; x++) {
+                if (px[y][x] && Disc(x - 1, y) && Disc(x + 1, y) &&
+                    Disc(x, y - 1) && Disc(x, y + 1)) {
+                    px[y][x] = 2;
+                }
+            }
+        }
+        gw = (g = Find(sym7, LEN(sym7), *t)) ? 7 : 5;
+        g = g ? g : Find(big, LEN(big), *t);
+        for (y = 0; g && y < 7; y++) {
+            for (x = 0; x < gw; x++) {
+                if (g[y * gw + x] == '#') {
+                    px[2 + y][(11 - gw) / 2 + x] = ink;
+                }
+            }
+        }
+    } else if (shape == DISC && (g = Find(big, LEN(big), *t))) {
         for (y = 0; y < 7; y++) {
             for (x = 0; x < 5; x++) {
                 px[2 + y][3 + x] &= g[y * 5 + x] != '#';
@@ -172,20 +212,19 @@ int Buttons_Rows(int set, int b, u8 px[11][16]) {
     return w;
 }
 
-// Every mark of every set into the pause menu atlas, 4 bits a texel (ink:
-// the white of the stock arrows): mark k = set * BUTTON_MARKS + b is the 16x11
-// box at u (k & 7) * 16, v (k >> 3) * 11 of dst, stride halfwords a row.
-void Buttons_Paint(u16* dst, int stride, int ink) {
+// Every mark of every set into the pause menu atlas, 4 bits a texel (the
+// colour index of Buttons_Rows, drawn with the CLUT at BUTTON_CLUT_U/V): mark
+// k = set * BUTTON_MARKS + b is the 16x11 box at u (k & 7) * 16, v (k >> 3) *
+// 11 of dst, stride halfwords a row.
+void Buttons_Paint(u16* dst, int stride) {
     u8 px[11][16];
     int k, x, y;
     for (k = 0; k < BUTTON_SETS * BUTTON_MARKS; k++) {
         Buttons_Rows(k / BUTTON_MARKS, k % BUTTON_MARKS, px);
         for (y = 0; y < 11; y++) {
             for (x = 0; x < 16; x++) {
-                if (px[y][x]) {
-                    dst[((k >> 3) * 11 + y) * stride + (k & 7) * 4 + x / 4] |=
-                        ink << (x & 3) * 4;
-                }
+                dst[((k >> 3) * 11 + y) * stride + (k & 7) * 4 + x / 4] |=
+                    px[y][x] << (x & 3) * 4;
             }
         }
     }

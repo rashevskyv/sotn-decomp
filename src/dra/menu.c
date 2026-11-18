@@ -1116,14 +1116,25 @@ u8 g_ChButtons2[] = {CH('2'), CH('1'), CH('1'), CH('2')};
 #ifdef PLATFORM_PSYZ
 // port: the mark of PS button b (g_ChButtons order) in the button set of the
 // port menu, from the atlas rows under the cells (src/pc/buttons.c). Returns
-// its width with a 1 px gap, or 0 with no atlas: the stock marks then.
+// its width with a 1 px gap, or 0 with no atlas: the stock marks then. The
+// mark CLUT keeps its colours on a greyed line too (no grey CLUT swap).
 static s32 MenuDrawButton(MenuContext* ctx, s32 b, s32 x, s32 y) {
     s32 k = g_ButtonSet * BUTTON_MARKS + b;
+#if IS_VER_INTL
+    s32 grey = D_8013784C;
+#endif
     if (!LANG_MENU_FONT_ON()) {
         return 0;
     }
+#if IS_VER_INTL
+    D_8013784C = 0;
+#endif
     MenuDrawImg(ctx, x, y - 3, 16, 11, (k & 7) * 16,
-                BUTTON_MARKS_V + (k >> 3) * 11, 0x196, MENU_FONT_TPAGE, 1, 0);
+                BUTTON_MARKS_V + (k >> 3) * 11, BUTTON_CLUT, MENU_FONT_TPAGE,
+                1, 0);
+#if IS_VER_INTL
+    D_8013784C = grey;
+#endif
     return Buttons_Width(b) + 1;
 }
 #endif
