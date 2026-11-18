@@ -3,6 +3,7 @@
 #include "spawn_point.h"
 #include "dra.h"
 #include "psyz/log.h"
+#include <psyz/video.h>
 #include "stage.h"
 #include "dra_bss.h"
 #include "servant.h"
@@ -122,6 +123,9 @@ static void GameLoopCallback(void) {
         // load state after Play_Reset initialization
         D_8003C730 = 3;
     }
+    // HD pictures are for the title, loading and game-over screens (owner,
+    // 2026-11-18): no HD lookup at all while the player walks the castle
+    Psyz_HdTexEnable(g_GameState != Game_Play || g_GameStep != Play_Default);
     Replay_OnFrame();
     SpawnPoint_OnFrame();
     Cheat_OnFrame();

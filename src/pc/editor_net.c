@@ -35,6 +35,7 @@ const char* Editor_Status(void) {
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -48,6 +49,9 @@ extern u16 g_TileVram[512 * 512]; // sim_pc.c: VRAM x 512..1023, y 0..511
 
 static int s_listen = -1;
 static int s_failed;
+
+#define MAX_WAIT 8 // accepted connections whose request has not arrived
+static int s_fd[MAX_WAIT], s_age[MAX_WAIT], s_n;
 
 // a growing reply buffer
 static char* s_out;
@@ -251,14 +255,17 @@ static void Handle(int fd) {
     char method[8], path[256], *body, *query, *p;
     int n = 0, k, len = 0, code = 200;
     const char* why;
-    struct timeval tv = {0, 300000};
+    struct timeval rtv = {0, 20000}, stv = {0, 300000};
 
     req[0] = 0;
     fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) & ~O_NONBLOCK);
-    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-    // ponytail: blocking reads with a 0.3 s timeout on the game thread; a
-    // slow client stalls a frame. Fine for a LAN tool, a thread if not.
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &rtv, sizeof(rtv));
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &stv, sizeof(stv));
+    // Editor_OnFrame calls this only when the request has arrived, so the
+    // 20 ms read timeout covers only a request that comes in parts.
+    // ponytail: the 0.3 s send timeout stays: room.bin and gfx.bin (0.6 MB)
+    // may wait for a slow Wi-Fi client after a click on the page; the small
+    // /state replies fit the socket buffer. A thread if that ever matters.
     while (n < MAX_HEAD && !strstr(req, "\r\n\r\n")) {
         k = recv(fd, req + n, MAX_HEAD - n, 0);
         if (k <= 0) {
@@ -532,6 +539,9 @@ void Editor_OnFrame(void) {
         return;
     }
     if (!g_EditorOn) {
+        while (s_n > 0) {
+            close(s_fd[--s_n]);
+        }
         if (s_listen >= 0) {
             close(s_listen);
             s_listen = -1;
@@ -548,13 +558,26 @@ void Editor_OnFrame(void) {
         Start();
         return;
     }
-    for (i = 0; i < 4; i++) {
-        fd = accept(s_listen, NULL, NULL);
-        if (fd < 0) {
-            return;
+    // never wait for a client on the game thread: a connection joins the
+    // list, and its request is read on the frame it has arrived. A browser
+    // opens spare connections that send nothing; they go after 2 s.
+    while (s_n < MAX_WAIT && (fd = accept(s_listen, NULL, NULL)) >= 0) {
+        s_fd[s_n] = fd;
+        s_age[s_n++] = 0;
+    }
+    for (i = 0; i < s_n;) {
+        struct pollfd p = {s_fd[i], POLLIN, 0};
+        if (poll(&p, 1, 0) <= 0 && ++s_age[i] < 120) {
+            i++;
+            continue;
         }
-        Handle(fd);
-        close(fd);
+        if (p.revents & POLLIN) {
+            Handle(s_fd[i]);
+        }
+        close(s_fd[i]);
+        s_n--;
+        s_fd[i] = s_fd[s_n];
+        s_age[i] = s_age[s_n];
     }
 }
 #endif

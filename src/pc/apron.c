@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Apron: extra tiles around a room, shown in the wide view where the room
-// is smaller than the screen. Visual only: collision reads the room layer.
+// is smaller than the screen, and tiles drawn over room cells. Visual only:
+// collision reads the room layer.
 // One patch per stage, apron/<STAGE>.txt next to sotn.ini; a file on disk
 // wins over the copy built into the program (tools/editor/bake_apron.py).
 //
@@ -8,7 +9,8 @@
 //   L 12 fg        layer index 12 (the LoadRoomLayer argument), fg or bg
 //   -3 5 01A7      tx ty tile (hex); tx, ty in layer tiles, may be negative
 //
-// RenderTilemap (4CE2C.c) asks Apron_Tile for the cells outside the room.
+// RenderTilemap (4CE2C.c) asks Apron_Tile for the cells outside the room and,
+// graphics only, for the cells inside it (fg and the first bg layer).
 #include <game.h>
 #include <stdio.h>
 #include <stdlib.h>

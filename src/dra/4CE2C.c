@@ -170,6 +170,10 @@ void RenderTilemap(void) {
     u8 u, v;
 
 #ifdef PLATFORM_PSYZ
+    // the apron patch may also cover cells inside the room: graphics only,
+    // collision keeps reading the room layout (src/pc/apron.c)
+    s32 patched;
+    u16 patch;
     SPRT_16 _sp16;
     TilemapRenderer _r;
     SPRT_16* sp16 = &_sp16;
@@ -216,6 +220,9 @@ void RenderTilemap(void) {
                 r->isSemiTrans = true;
                 r->tpage = r->flags & LAYER_TPAGE_ID;
             }
+#ifdef PLATFORM_PSYZ
+            patched = Apron_Has(0);
+#endif
             y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
             for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS;
                  i++, y0 += TILE_SIZE) {
@@ -245,6 +252,12 @@ void RenderTilemap(void) {
 #endif
 
                     tile = *r->tiles++;
+#ifdef PLATFORM_PSYZ
+                    if (patched &&
+                        (patch = Apron_Tile(0, tx, ty)) != 0xFFFF) {
+                        tile = patch;
+                    }
+#endif
                     if (tile == 0) {
                         continue;
                     }
@@ -325,6 +338,7 @@ void RenderTilemap(void) {
         if (StretchBackdrop(r, bg)) {
             goto draw_modes;
         }
+        patched = l == 0 && !(r->flags & LAYER_WRAP_BG) && Apron_Has(1);
 #endif
         y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
         for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS;
@@ -361,6 +375,11 @@ void RenderTilemap(void) {
 #endif
 
                 tile = *r->tiles++;
+#ifdef PLATFORM_PSYZ
+                if (patched && (patch = Apron_Tile(1, tx, ty)) != 0xFFFF) {
+                    tile = patch;
+                }
+#endif
                 if (tile == 0) {
                     continue;
                 }
