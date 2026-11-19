@@ -811,8 +811,9 @@ void MainGame(void) {
     g_Settings.D_8003CB00 = 0;
     g_Settings.D_8003CB04 = 0;
     g_CurrentBuffer = &g_GpuBuffers[0];
-#if defined(__SWITCH__)
-    // Switch: XA sectors are offsets inside data/SD/XA_STR1 (sotn-xa.cue)
+#ifdef PLATFORM_PSYZ
+    // PC and Switch: XA sectors are offsets inside data/SD/XA_STR1, the
+    // only track of sotn-xa.cue. The disc base would skip past the music.
     SetCdPos(0);
 #elif VERSION >= VER_JP10
     SetCdPos(OFF_SD_XA_STR1);
