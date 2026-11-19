@@ -285,9 +285,6 @@ void LoadStageTileset(u8* pTilesetData, size_t len, s32 y) {
         while (DrawSync(1)) {
         }
     }
-    if (y == 0x100) {
-        Lang_PaintFont8(); // the font sheet at 896,256 (language = uk only)
-    }
 }
 
 void InitPlayerArc(const struct FileUseContent* file);
@@ -313,6 +310,7 @@ s32 LoadFileSimToMem(SimKind kind) {
         break;
     case SIM_1:
         LoadStageTileset(STAGE_PRG_PTR, 0, 0x100);
+        Lang_PaintFont8(); // F_GAME and F_GAME2 only, not the prologue picture
         DrawSync(0);
         LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         LoadImage(&g_Vram.D_800ACDA8, 0x801C0000);
@@ -337,6 +335,7 @@ s32 LoadFileSimToMem(SimKind kind) {
     case SIM_13:
         LoadStageTileset(SIM_CHR0, 0, 0x100);
         if (kind == 13) {
+            Lang_PaintFont8();
             LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         }
         DrawSync(0);
@@ -402,6 +401,7 @@ bool LoadFilePc(const struct FileUseContent* file) {
     case SIM_1:
         // F_GAME: 32 tile blocks, then the CLUTs at 0x40000 (loaded below)
         LoadStageTileset(sim->addr, MIN(file->length, 0x40000), 0x100);
+        Lang_PaintFont8(); // the font sheet at 896,256 (language = uk only)
         LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         LoadImage(&g_Vram.D_800ACDA8, (u8*)sim->addr + 0x40000);
         StoreImage(&g_Vram.D_800ACDA8, g_Clut[1]);
@@ -421,6 +421,7 @@ bool LoadFilePc(const struct FileUseContent* file) {
     case SIM_13:
         // F_GAME2: the same layout as F_GAME
         LoadStageTileset(sim->addr, MIN(file->length, 0x40000), 0x100);
+        Lang_PaintFont8();
         LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         break;
     case 99:

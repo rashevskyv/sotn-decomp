@@ -132,7 +132,7 @@ void EntityCastleDoor(Entity* self) {
 #if defined(INVERTED_STAGE)
         if (1) {
 #else
-        if (g_CastleFlags[PROLOGUE_COMPLETE]) {
+        if (PROLOGUE_DONE()) { // no3.h
 #endif
             self->ext.castleDoor.rotate = 0;
             self->step = 5;

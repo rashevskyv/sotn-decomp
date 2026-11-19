@@ -99,7 +99,7 @@ void EntityCastleDoorTransition(Entity* self) {
 
     switch (self->step) {
     case 0:
-        if (g_CastleFlags[PROLOGUE_COMPLETE]) {
+        if (PROLOGUE_DONE()) {
             DestroyEntity(self);
             return;
         }
@@ -108,7 +108,13 @@ void EntityCastleDoorTransition(Entity* self) {
             true;
         g_Player.padSim = PAD_RIGHT;
         g_Player.demo_timer = 255;
+#ifdef PLATFORM_PSYZ
+        // world x 8: the wide camera can scroll this room already at load,
+        // and the test below would end the push at once
+        player->posX.i.hi = 8 - tilemap->scrollX.i.hi;
+#else
         player->posX.i.hi = 8;
+#endif
         self->ext.castleDoorTransition.playerVelocity = FIX(2.5);
         break;
 

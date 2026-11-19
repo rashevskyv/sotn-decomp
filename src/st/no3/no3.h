@@ -3,6 +3,16 @@
 
 #define STAGE_IS_NO3
 
+#ifdef PLATFORM_PSYZ
+// Saves of 0.8.47 and older can hold the flag with Alucard outside, left of
+// the shut gate (tiles x 80..96 of room 0): the wide camera ended the entry
+// push at once. Then the gate opens and the push runs again, as on the
+// first visit.
+#define PROLOGUE_DONE() (g_CastleFlags[PROLOGUE_COMPLETE] && g_PlayerX >= 80)
+#else
+#define PROLOGUE_DONE() g_CastleFlags[PROLOGUE_COMPLETE]
+#endif
+
 void EntityExplosionVariants(Entity* entity);
 void EntityGreyPuff(Entity* entity);
 
