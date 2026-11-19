@@ -124,8 +124,10 @@ static void GameLoopCallback(void) {
         D_8003C730 = 3;
     }
     // HD pictures are for the title, loading and game-over screens (owner,
-    // 2026-11-18): no HD lookup at all while the player walks the castle
-    Psyz_HdTexEnable(g_GameState != Game_Play || g_GameStep != Play_Default);
+    // 2026-11-18); while the player walks the castle only the dialogue
+    // portraits (main.c, Psyz_HdTexAllow)
+    Psyz_HdTexEnable(
+        g_GameState != Game_Play || g_GameStep != Play_Default ? 1 : 2);
     Replay_OnFrame();
     SpawnPoint_OnFrame();
     Cheat_OnFrame();

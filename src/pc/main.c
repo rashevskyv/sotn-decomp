@@ -228,6 +228,9 @@ int Main(int argc, char* argv[]) {
         if (g_HdTextures) {
             Psyz_HdTexAddDir(g_Lang ? "data/textures/uk" : "data/textures/en");
             Psyz_HdTexAddDir("data/textures/common");
+            // the two dialogue portrait slots (48x72, 8 bpp): HD in play too
+            Psyz_HdTexAllow(0, 256, 24, 72, 8);
+            Psyz_HdTexAllow(32, 256, 24, 72, 8);
         }
         if (g_HdDump) {
             Psyz_HdTexDump("data/textures/dump");
