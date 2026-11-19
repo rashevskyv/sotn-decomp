@@ -38,6 +38,7 @@ typedef struct {
 #ifdef PLATFORM_PSYZ
 #include "../pc/wide.h"
 #include <math.h>
+#include <stdio.h> // [vignette] log lines
 #include <psyz/gpu.h>
 #include <psyz/video.h>
 
@@ -244,9 +245,15 @@ static s32 VignetteDark(s32 x, s32 w, s32 fade) {
            VIGNETTE_FADE;
 }
 
+// The fade-in waits VIGNETTE_HOLD frames after the range gets narrow (a
+// cutscene or a camera lock narrows it while the camera still pans). No
+// wait in a room narrow from its load, or while the fade-out still runs.
+// The fade-out starts at once.
+#define VIGNETTE_HOLD 60
 static void WideVignette(TilemapRenderer* r) {
-    static s32 fade, init;
-    s32 edge[2], side, k, a, b, ca, cb, xa, xb, y0, y1;
+    static s32 fade, init, hold, room = -1;
+    s32 edge[2], side, k, a, b, ca, cb, xa, xb, y0, y1, narrow;
+    s32 key = g_LastRoom.stage << 8 | g_LastRoom.room;
     POLY_G4* p;
 
     if (!init) {
@@ -257,11 +264,29 @@ static void WideVignette(TilemapRenderer* r) {
     edge[0] = MAX(g_Tilemap.x, 0) - g_Tilemap.scrollX.i.hi + r->x;
     edge[1] = MIN(g_Tilemap.width, g_Tilemap.hSize * 256) -
               g_Tilemap.scrollX.i.hi + r->x;
-    if (g_WideX && (g_Tilemap.flags & LAYER_SHOW) &&
-        edge[1] - edge[0] < DISP_STAGE_W + 2 * g_WideX) {
-        fade = MIN(fade + 1, VIGNETTE_FADE);
+    narrow = g_WideX && (g_Tilemap.flags & LAYER_SHOW) &&
+             edge[1] - edge[0] < DISP_STAGE_W + 2 * g_WideX;
+    if (narrow) {
+        if (fade || room != key) {
+            hold = VIGNETTE_HOLD;
+        }
+        if (hold < VIGNETTE_HOLD) {
+            if (!hold++) {
+                fprintf(stderr, "[vignette] narrow at frame %d\n", g_Timer);
+            }
+        } else if (fade < VIGNETTE_FADE) {
+            fade++;
+            if (fade == 1 || fade == VIGNETTE_FADE) {
+                fprintf(stderr, "[vignette] fade %d at frame %d\n", fade,
+                        g_Timer);
+            }
+        }
     } else {
+        hold = 0;
         fade = MAX(fade - 1, 0);
+    }
+    if (g_Tilemap.flags & LAYER_SHOW) {
+        room = key; // the first frame of a room decides on its hold
     }
     if (!fade || g_GpuUsage.drawModes + 2 > MAX_DRAW_MODES) {
         return;

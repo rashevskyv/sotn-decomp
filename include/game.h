@@ -1159,6 +1159,8 @@ void Wide_ScreenToFrame(float sx, float sy, int* x, int* y);
 void PortMenu_Touch(int n, const int* x, const int* y);
 void PortMenu_Wheel(int dir, int x, int y);
 int PortMenu_IsOpen(void);
+// The main loop asks once a frame: 1 while the menu holds normal play.
+int PortMenu_Freeze(void);
 // Apron tiles around a room (src/pc/apron.c), visual only.
 extern int g_ApronLayer; // the LoadRoomLayer argument of the current room
 void Apron_OnRoomLayer(s32 layerIndex);

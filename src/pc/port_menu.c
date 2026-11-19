@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <psyz/audio.h>
 #include <psyz/input.h>
 #ifdef __SWITCH__
 #include <unistd.h>
@@ -152,6 +153,47 @@ static void Quit(void) {
 }
 
 int PortMenu_IsOpen(void) { return is_open; }
+
+// Once a frame from the main loop (42398.c), before UpdateGame. While the
+// menu is open in normal play the game stands still: the loop skips
+// UpdateGame, the sound commands, the palette steps and the play clock, and
+// the audio device pauses (SFX, XA music and voices stop at one sample). The
+// XA length timer D_8013AEF4 counts vsyncs: it moves by the frozen vsyncs, so
+// a voice line or a track does not end early. The title, the pause menu, the
+// map and the loads draw from UpdateGame and wait for input already: no
+// freeze there. Every way the menu closes ends the freeze on the next frame.
+// psyz pauses the device in the background and resumes it on return only if
+// it played before (sdl3_common.h): open, it stays paused until the close.
+// ponytail: a close while in the background would resume the audio there; the
+// menu closes only by input, which the background does not get
+extern s32 D_8013AEF4;
+int Psyz_AudioIsPaused(void);
+int PortMenu_Freeze(void) {
+    static int frozen, vsync0, was_paused;
+    int on = is_open && g_GameState == Game_Play &&
+             g_GameEngineStep == Engine_Normal;
+    if (on != frozen) {
+        if (on) {
+            vsync0 = VSync(-1);
+            was_paused = Psyz_AudioIsPaused();
+            Psyz_AudioPause();
+        } else {
+            D_8013AEF4 += VSync(-1) - vsync0;
+            if (!was_paused) {
+                Psyz_AudioUnpause();
+            }
+        }
+        fprintf(stderr,
+                "[menu] freeze %s at vsync %d (%d frozen), clock "
+                "%d:%02d:%02d.%02d, player %d,%d\n",
+                on ? "on" : "off", VSync(-1), on ? 0 : VSync(-1) - vsync0,
+                g_Status.timerHours, g_Status.timerMinutes,
+                g_Status.timerSeconds, g_Status.timerFrames,
+                PLAYER.posX.i.hi, PLAYER.posY.i.hi);
+        frozen = on;
+    }
+    return on;
+}
 
 static void Message(const char* s) {
     int i;
@@ -772,7 +814,7 @@ static TILE tiles[2][MAX_TILES];
 static int tile_buf;
 static int tz = 1; // Text zoom: the overlay over a title or menu frame
 static int tile_count, tile_peak;
-static OT_TYPE* menu_ot;
+static P_TAG* menu_tail; // the tiles go after this prim (PortMenu_Draw)
 
 static void Rect(int x, int y, int w, int h, u8 r, u8 g, u8 b) {
     TILE* t;
@@ -786,7 +828,7 @@ static void Rect(int x, int y, int w, int h, u8 r, u8 g, u8 b) {
     t->y0 = y;
     t->w = w;
     t->h = h;
-    addPrim(&menu_ot[0x1FF], t);
+    addPrim(menu_tail, t);
 }
 
 // A button mark: one tile per run of one colour, 11 rows from y - 2 (its
@@ -1646,7 +1688,14 @@ void PortMenu_Cell(int x, int y, int cell, u32 rgb) {
 void PortMenu_Draw(OT_TYPE* ot) {
     int i;
     drawn = 30;
-    menu_ot = ot;
+    // Closed: the head of slot 0x1FF, as the game's own prims. Open: after
+    // the last prim of that slot, so the menu covers the game's 0x1FF prims
+    // too (dialogue text, speaker names). ClearOTag links the slot to a
+    // shared terminator packet: stop at the prim before it, never write it.
+    menu_tail = (P_TAG*)&ot[0x1FF];
+    while (is_open && !isendprim(nextPrim(menu_tail))) {
+        menu_tail = nextPrim(menu_tail);
+    }
     uk = Lang_Port(P_SCALE) && Lang_MenuCell(CH('A'));
     tile_buf ^= 1;
     tile_count = 0;

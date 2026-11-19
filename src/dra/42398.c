@@ -885,6 +885,11 @@ loop_5:
     D_800978C4 = 1;
 
     while (!IS_QUIT_REQUESTED) {
+#ifdef PLATFORM_PSYZ
+        // the port menu holds normal play: no game logic, sound commands,
+        // palette steps or play clock this frame (src/pc/port_menu.c)
+        int frozen = PortMenu_Freeze();
+#endif
         g_BackBuffer = g_CurrentBuffer;
         g_CurrentBuffer = g_CurrentBuffer->next;
         g_Timer++;
@@ -899,7 +904,11 @@ loop_5:
         g_GpuUsage.sp16 = 0;
         g_GpuUsage.tile = 0;
         g_GpuUsage.sp = 0;
+#ifdef PLATFORM_PSYZ
+        if (DebugUpdate() != 0 && !frozen) {
+#else
         if (DebugUpdate() != 0) {
+#endif
             UpdateGame();
         }
         if (D_8003C0EC[3] == 0 && D_800973EC == 0) {
@@ -969,8 +978,15 @@ loop_5:
         PutDrawEnv(&g_CurrentBuffer->draw);
         PutDispEnv(&g_CurrentBuffer->disp);
         DrawOTag(g_CurrentOT);
+#ifdef PLATFORM_PSYZ
+        if (!frozen) {
+            func_800EA7CC();
+            func_801361F8();
+        }
+#else
         func_800EA7CC();
         func_801361F8();
+#endif
         if (func_80131F28() > 900) {
             CdInit();
             MuteSound();
@@ -1007,7 +1023,11 @@ loop_5:
         // Update game timer
         D_801362D4 = (D_801362D4 + 0xFF) >> 8;
         g_MapCursorTimer += D_801362D4;
+#ifdef PLATFORM_PSYZ
+        if (D_800973EC == 0 && D_800974A4 == 0 && !frozen) {
+#else
         if (D_800973EC == 0 && D_800974A4 == 0) {
+#endif
             g_Status.timerFrames += D_801362D4;
             if (g_Status.timerFrames >= REFRESH_RATE) {
                 g_Status.timerFrames -= REFRESH_RATE;
