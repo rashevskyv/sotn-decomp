@@ -15,6 +15,21 @@ static void range(int start, int end, int fb, int m, int p0, int p1, int lo,
     assert(a == lo && b == hi);
 }
 
+// A stage on a w x h screen part at the asked scale: pixel size k, view
+// width, g_WideX and the black pillar on each side (as src/pc/wide.c).
+static void stage(int w, int h, int ask, int k, int view, int wx, int pillar) {
+    int lo, hi, s, v;
+    Wide_ScaleRange(w, h, 207, &lo, &hi);
+    s = ask < lo ? lo : ask > hi ? hi : ask;
+    v = Wide_ViewW(w, s);
+    if (s != k || v != view || (v - 256) / 2 != wx || (w - v * s) / 2 != pillar) {
+        printf("stage %dx%d ask %d: got %d %d %d %d\n", w, h, ask, s, v,
+               (v - 256) / 2, (w - v * s) / 2);
+    }
+    assert(s == k && v == view && (v - 256) / 2 == wx);
+    assert((w - v * s) / 2 == pillar);
+}
+
 int main(void) {
     int x, y, w, h;
 
@@ -98,6 +113,38 @@ int main(void) {
         assert(Wide_MirrorColumn(16, 32, &f) == 0 && !f);
         assert(Wide_MirrorColumn(16, 5, &f) == 5 && !f);
         assert(Wide_MirrorColumn(1, -2, &f) == 0 && !f);
+    }
+
+    // stage pixel size and view on a PC window (the whole window) and
+    // on the 16:9 Switch screens; 99 = max
+    stage(3440, 1440, 2, 4, 860, 302, 0);
+    stage(3440, 1440, 3, 4, 860, 302, 0);
+    stage(3440, 1440, 5, 5, 688, 216, 0);
+    stage(3440, 1440, 99, 6, 572, 158, 4);
+    stage(2560, 1080, 2, 3, 852, 298, 2);
+    stage(2560, 1080, 4, 4, 640, 192, 0);
+    stage(2560, 1080, 99, 5, 512, 128, 0);
+    stage(1920, 1080, 1, 2, 960, 352, 0);
+    stage(1920, 1080, 3, 3, 640, 192, 0);
+    stage(1920, 1080, 4, 4, 480, 112, 0);
+    stage(1920, 1080, 99, 5, 384, 64, 0);
+    stage(1280, 720, 2, 2, 640, 192, 0);
+    stage(1280, 720, 99, 3, 426, 85, 1);
+    stage(5120, 1440, 3, 6, 852, 298, 4);
+    stage(1228, 1033, 2, 2, 614, 179, 0);
+    stage(1228, 1033, 99, 4, 306, 25, 2);
+    stage(2000, 607, 3, 2, 960, 352, 40); // the 960 budget: pillars
+    // a 16:9 screen keeps the old range, where the rows also counted
+    for (w = 256; w <= 4096; w += 16) {
+        int lo, hi, old_hi, old_lo;
+        h = w * 9 / 16;
+        Wide_ScaleRange(w, h, 207, &lo, &hi);
+        old_hi = w / 256 < h / 207 ? w / 256 : h / 207;
+        old_hi = old_hi < 1 ? 1 : old_hi;
+        old_lo = (w + 959) / 960 > (h + 539) / 540 ? (w + 959) / 960
+                                                   : (h + 539) / 540;
+        old_lo = old_lo > old_hi ? old_hi : old_lo;
+        assert(lo == old_lo && hi == old_hi);
     }
 
     puts("wide_test ok");

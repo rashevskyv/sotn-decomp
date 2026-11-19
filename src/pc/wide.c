@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Wide view, always 16:9. The player picks an integer scale. In stage mode
+// Wide view. The Switch uses the 16:9 screen; a PC uses the whole window
+// width (an ultrawide too), up to a 960 game pixel view. The player picks
+// an integer scale. In stage mode
 // psyz draws a canvas of (screen / scale) game pixels; the stage code reads
 // the extra pixels per side in g_WideX. The stage keeps the PS1 rows: the
 // clip of func_800E34DC (rows 20..226) touches only the left and right
@@ -47,7 +49,10 @@ static const char ini_head[] =
     "; the handheld). The stage always shows the PS1 rows with black bars\n"
     "; above and below. At 5 the stage, map and dialogues use 5; the\n"
     "; title, pause menu and other full screens use 4.\n"
-    "; max = always the highest scale that fits the current screen.\n";
+    "; max = always the highest scale that fits the current screen.\n"
+    "; On a PC the stage fills the window width, at most 960 game pixels:\n"
+    ";   3440x1440: 4 = 860, 5 = 688, 6 = 572 wide; 2560x1080: 3 = 852,\n"
+    ";   4 = 640, 5 = 512 wide.\n";
 
 int g_Fullscreen;
 static const char ini_fullscreen[] =
@@ -262,7 +267,7 @@ void Wide_SaveIni(void) {
 // spawn = <spawn point name>, cheat_* = 0|1 (cheat_character 0..2, 4), editor, overlay, fps = 0|1,
 // hd_textures = 0|1 (missing: 1), hd_dump = 0|1.
 // A missing key keeps its default (cheats, editor, overlay and fps off).
-// The view is always 16:9: the aspect key of an old file does nothing.
+// The aspect key of an old file does nothing.
 void Wide_LoadIni(const char* path) {
     int scale = 5, v, i; // docked 5, handheld 3 (ScaleRange)
     char line[128], word[32];
@@ -389,13 +394,17 @@ void Wide_ScreenToFrame(float sx, float sy, int* x, int* y) {
 
 static int Clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 
-// The largest 16:9 rectangle on the screen d.
-static PsyzSize AspectRect(PsyzSize d) {
+// The screen part of a stage frame: on the Switch the largest 16:9
+// rectangle (its screens are 16:9), on a PC the whole window, so the stage
+// fills the width of any monitor.
+static PsyzSize StageRect(PsyzSize d) {
+#ifdef __SWITCH__
     if (d.w * 9 > d.h * 16) {
         d.w = d.h * 16 / 9;
     } else {
         d.h = d.w * 9 / 16;
     }
+#endif
     return d;
 }
 
@@ -403,11 +412,8 @@ static PsyzSize AspectRect(PsyzSize d) {
 #define CLIP_TOP 0x14
 #define CLIP_BOTTOM (0x14 + 0xCF)
 
-// Scales that fit: the 256 columns and the stage clip rows must fit, and
-// above 960x540 game pixels the tile budget runs out.
 static void ScaleRange(PsyzSize req, int* lo, int* hi) {
-    *hi = MAX(MIN(req.w / DISP_STAGE_W, req.h / (CLIP_BOTTOM - CLIP_TOP)), 1);
-    *lo = MIN(MAX((req.w + 959) / 960, (req.h + 539) / 540), *hi);
+    Wide_ScaleRange(req.w, req.h, CLIP_BOTTOM - CLIP_TOP, lo, hi);
 }
 
 // The frame clear covers only the clip: black out the rows y0..y1 of both
@@ -501,7 +507,7 @@ void Wide_OnFrame(void) {
     last_fbh = fbh;
     last_rows = rows;
 
-    req = AspectRect(d);
+    req = StageRect(d);
     ScaleRange(req, &lo, &hi);
     k = Clamp(cfg_scale, lo, hi);
     keep = rows && fbw == DISP_STAGE_W && fbh == DISP_STAGE_H;
@@ -512,7 +518,8 @@ void Wide_OnFrame(void) {
             req.h = MIN(req.h, DISP_STAGE_H * k);
         }
     }
-    g_WideX = ((req.w / k & ~1) - DISP_STAGE_W) / 2;
+    req.w = MIN(req.w, WIDE_VIEW_MAX * k); // pillars past the view budget
+    g_WideX = (Wide_ViewW(req.w, k) - DISP_STAGE_W) / 2;
     Psyz_VideoSetKeepRows(keep ? CLIP_TOP : 0, keep ? CLIP_BOTTOM : 0);
 
     if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
@@ -575,7 +582,7 @@ void Wide_OnFrame(void) {
 
 // Port menu state.
 void Wide_MenuGet(int* scale, int* lo, int* hi) {
-    ScaleRange(AspectRect(Psyz_VideoGetDisplaySize()), lo, hi);
+    ScaleRange(StageRect(Psyz_VideoGetDisplaySize()), lo, hi);
     *scale = cfg_scale == WIDE_SCALE_MAX ? WIDE_SCALE_MAX
              : cfg_scale                ? Clamp(cfg_scale, *lo, *hi)
                                         : 0;

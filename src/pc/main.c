@@ -59,7 +59,7 @@ static void printHelp(void) {
            "ends\n");
     printf("  --replay-fast      disable frame limit during replay or demo\n");
     printf("  --editor           serve the tile editor page on port 8080\n");
-    printf("  --wide <scale>     16:9 wide view at this integer scale "
+    printf("  --wide <scale>     wide view at this integer scale "
            "(default 3, 0 = off)\n");
     printf("  --ini <file>       settings file as sotn.ini on the Switch\n");
     printf("  --help             show this help message\n");

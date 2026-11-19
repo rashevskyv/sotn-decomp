@@ -3,6 +3,25 @@
 #ifndef WIDE_H
 #define WIDE_H
 
+// Above this view width in game pixels the tile budget runs out.
+#define WIDE_VIEW_MAX 960
+
+// Stage scales (size of one game pixel) that fit a screen part of w x h
+// pixels: the 256 columns and the stage clip rows must fit (hi), and the
+// view w / scale must stay within WIDE_VIEW_MAX (lo). lo <= hi always.
+static inline void Wide_ScaleRange(int w, int h, int rows, int* lo, int* hi) {
+    *hi = w / 256 < h / rows ? w / 256 : h / rows;
+    *hi = *hi < 1 ? 1 : *hi;
+    *lo = (w + WIDE_VIEW_MAX - 1) / WIDE_VIEW_MAX;
+    *lo = *lo > *hi ? *hi : *lo;
+}
+
+// The view width in game pixels at scale k: the screen width, at most
+// WIDE_VIEW_MAX (black pillars past it), even.
+static inline int Wide_ViewW(int w, int k) {
+    return (w / k < WIDE_VIEW_MAX ? w / k : WIDE_VIEW_MAX) & ~1;
+}
+
 // Scroll range [*lo, *hi] that keeps the view inside the room [start, end).
 // The view is the fb (256 or 240 px) plus m px on each side. pad0 and pad1
 // are the original clamp insets (x: 0 and 256, y: 4 and 252); m = 0 gives
