@@ -2794,7 +2794,7 @@ endif()
 add_subdirectory(tools/psyz/psyz)
 
 # the port version: the NACP and the boot line of the log
-set(SOTN_VERSION "0.8.48")
+set(SOTN_VERSION "0.8.49")
 set_source_files_properties(src/pc/main.c PROPERTIES
     COMPILE_DEFINITIONS "SOTN_VERSION=\"${SOTN_VERSION}\"")
 

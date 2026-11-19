@@ -2,6 +2,13 @@
 #include "st0.h"
 #include <scratchpad.h>
 
+// The wide view (WIDE_X, 0 on the PS1) shows WIDE_X more pixels per side:
+// the quads there are kept, and a longer focal length makes the funnel
+// larger so that its outer rings reach the sides. The zoom also grows the
+// eye; at most 1.5x (WIDE_X 64..112: 1.25x..1.44x). The PS1 funnel leaves
+// a corner open in some wobble phases; past WIDE_X 128 the sides can too.
+#define VORTEX_H MIN(0xC0 + WIDE_X * 3 / 4, 0x120)
+
 void EntityBackgroundVortex(Entity* self) {
     static SVECTOR D_801C1BC8[0x100];
     static u8 D_801C23C8[0x100];
@@ -185,10 +192,10 @@ void EntityBackgroundVortex(Entity* self) {
             prim = prim->next;
         }
         self->ext.bgVortex.unk80 -= 4;
-        SetGeomScreen(0xC0);
+        SetGeomScreen(VORTEX_H);
         SetGeomOffset(self->posX.i.hi, self->posY.i.hi);
         SetFarColor(0, 0, 0);
-        SetFogNear(0x128, 0xC0);
+        SetFogNear(0x128, VORTEX_H);
         rotVector.vx = 0;
         rotVector.vy = 0;
         rotVector.vz = self->ext.bgVortex.unk80;
@@ -255,11 +262,13 @@ void EntityBackgroundVortex(Entity* self) {
                         gte_stsxy((long*)&prim->x3);
                         gte_ldrgb(&scratchColor[i] + 1);
                         gte_dpcs();
-                        if (prim->x0 <= 0x100 || prim->x1 <= 0x100 ||
-                            prim->x2 <= 0x100 || prim->x3 <= 0x100) {
+                        if (prim->x0 <= 0x100 + WIDE_X ||
+                            prim->x1 <= 0x100 + WIDE_X ||
+                            prim->x2 <= 0x100 + WIDE_X ||
+                            prim->x3 <= 0x100 + WIDE_X) {
                             gte_strgb(&prim->r3);
-                            if (prim->x0 >= 0 || prim->x1 >= 0 ||
-                                prim->x2 >= 0 || prim->x3 >= 0) {
+                            if (prim->x0 >= -WIDE_X || prim->x1 >= -WIDE_X ||
+                                prim->x2 >= -WIDE_X || prim->x3 >= -WIDE_X) {
                                 gte_stszotz((long*)&zSize);
                                 if (zSize < 0x55) {
                                     prim->priority = 0x58 - zSize;

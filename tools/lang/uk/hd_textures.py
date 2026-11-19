@@ -46,6 +46,9 @@ PICTURES = [
      "loading_text__672_488_32x24_4_871f1858.png"),
     ("hd/loading_logo__832_384_64x64_8_00000000.png", None, None,
      "loading_logo__832_384_64x64_8_9adaf1ae.png"),
+    # the prologue title «КАСТЕЛЬВАНІЯ», drawn by prologue_title.py
+    ("hd/prologue_title__704_0_32x128_4_00000000.png", None, None,
+     "prologue_title__704_0_32x128_4_654b2f27.png"),
 ]
 
 

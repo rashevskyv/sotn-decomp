@@ -446,7 +446,7 @@ int Wide_Canvas(int* x0, int* y0, int* x1, int* y1) {
 // Called on every vsync. Follows dock changes and display mode changes.
 void Wide_OnFrame(void) {
     PsyzSize d, req;
-    int fbw, fbh, k, s, lo, hi, rows, keep;
+    int fbw, fbh, k, s, lo, hi, rows, keep, prologue = 0;
     RECT* clip = &g_GpuBuffers[0].draw.clip;
 
     if (!cfg_scale) {
@@ -503,6 +503,14 @@ void Wide_OnFrame(void) {
             // title: the canvas is the whole display at that scale; the
             // title code (src/st/sel/title.c) stretches its background
             req = d;
+            if (g_GameState == Game_PrologueEnd) {
+                // the prologue scroll (src/st/st0/prologue_scroll.c): the
+                // 512 frame in the PS1 4:3 shape, black at the sides
+                prologue = 1;
+                s = MAX(MIN(d.w / 320, d.h / 240), 1);
+                req.w = 320 * s;
+                req.h = 240 * s;
+            }
         }
         if (fbw == DISP_MENU_W && fbh == DISP_MENU_H) {
             // pause menu: the 384 frame stays centred with black margins;
@@ -519,7 +527,13 @@ void Wide_OnFrame(void) {
         canvas[2] = fbw + mx;
         canvas[3] = fbh + my;
         canvas_zoom = MAX((k + s / 2) / s, 1);
+        if (prologue) { // the frame fills the 4:3 picture
+            canvas[0] = canvas[1] = 0;
+            canvas[2] = fbw;
+            canvas[3] = fbh;
+        }
     }
+    Psyz_VideoSetAspectMode(prologue ? PSYZ_ASPECT_DISPLAY : PSYZ_ASPECT_SQUARE);
     Psyz_VideoSetScale(s);
     Psyz_VideoSetResolution(req);
     if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
