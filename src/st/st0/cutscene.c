@@ -457,9 +457,13 @@ void EntityCutscene(Entity* self) {
                     prim = prim->next;
                     prim->y0 = prim->y1 = g_Dialogue.startY;
                     prim->y2 = prim->y3 = g_Dialogue.startY + 72;
+#ifdef PLATFORM_PSYZ
+                    // uk: wider to the right, the 23-cell lines fit
+                    prim->x1 = prim->x3 = LANG_DIALOGUE_BOX_RIGHT();
+#endif
                     prim = prim->next;
                     prim->y0 = g_Dialogue.startY - 1;
-                    prim->u0 = 246;
+                    prim->u0 = LANG_DIALOGUE_BOX_RIGHT() - 2;
                     g_Dialogue.portraitAnimTimer = 24;
                     self->step = DIALOGUE_OPEN_DIALOG_BOX;
                     self->step_s = DIALOG_BOX_INIT;
@@ -840,12 +844,12 @@ void EntityCutscene(Entity* self) {
                  uCoord++, prim = prim->next) {
                 prim->r0 = prim->r1 = 127;
                 prim->b0 = prim->b1 = prim->g0 = prim->g1 = 0;
-                prim->x0 = prim->x1 = 247;
+                prim->x0 = prim->x1 = LANG_DIALOGUE_BOX_RIGHT() - 1;
                 prim->y0 = prim->y1 = g_Dialogue.startY + uCoord;
                 prim->priority = 510;
                 prim->drawMode = DRAW_DEFAULT;
                 prim->x2 = red_line_increment[uCoord];
-                prim->x3 = 3952;
+                prim->x3 = (LANG_DIALOGUE_BOX_RIGHT() - 1) * 16;
             }
             self->step_s++;
             break;

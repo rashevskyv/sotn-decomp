@@ -437,6 +437,16 @@ void Lang_DialogueGlyph(RECT* rect, s32 x, s32 y) {
     LoadImage(&r, (u_long*)buf);
 }
 
+// The right edge (exclusive x) of the blue cutscene box, stock 248. A uk
+// line has up to 23 cells: its ink ends at x 254 (text sprite at 64, first
+// cell at 72, 8 px a cell). The uk box ends at 257, so 2 px of blue follow
+// the text, as 2 px lie between the box and the portrait (x 6). Its border
+// tile (x 3, width = edge - 2, 255 at most) keeps 3 px off the view edge,
+// as on the left: a 256 px view gets 252, and the text there still passes.
+s32 Lang_DialogueBoxRight(void) {
+    return g_Lang ? MIN(257, 252 + g_WideX) : 248;
+}
+
 // The owner's serif 12x16 design for a stock Cyrillic code, or NULL.
 const u8* Lang_Glyph(u16 ch) {
     int i;

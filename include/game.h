@@ -1207,6 +1207,8 @@ const unsigned char* Lang_Glyph(unsigned short ch);
 void Lang_PaintFont8(void);
 void Lang_DialogueGlyph(RECT* rect, s32 x, s32 y);
 #define LANG_DIALOGUE_GLYPH(rect, x, y) Lang_DialogueGlyph(rect, x, y)
+s32 Lang_DialogueBoxRight(void);
+#define LANG_DIALOGUE_BOX_RIGHT() Lang_DialogueBoxRight()
 unsigned char* Lang_ScriptStart(unsigned char* script);
 #define LANG_SCRIPT(script) Lang_ScriptStart(script)
 #define LANG_CELL(s) Lang_Cell(s)
@@ -1248,6 +1250,7 @@ const char* PortWord(int i);
 #define LANG_MENU_FONT(on) 0
 #define LANG_MENU_FONT_ON() 0
 #define LANG_DIALOGUE_GLYPH(rect, x, y) MoveImage(rect, x, y)
+#define LANG_DIALOGUE_BOX_RIGHT() 248
 #define LANG_SCRIPT(script) (script)
 #define LANG_CELL(s) (s)
 #define LANG_SJIS(s) (s)
