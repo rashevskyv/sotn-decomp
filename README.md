@@ -228,7 +228,8 @@ The port menu changes most of them in the game. A missing key keeps its default.
 
 | Key | Values | Default | Effect |
 |---|---|---|---|
-| `scale` | 1 to 8 | 3 | Integer pixel scale of the 16:9 view. |
+| `scale` | 1 to 8, `max` | 3 | Integer pixel scale of the 16:9 view. `max` always takes the highest scale that fits the screen. |
+| `fullscreen` | 0, 1 | 0 | PC: start in borderless fullscreen. F11 (or F4) switches it in the game; Esc leaves it, a second Esc quits. |
 | `voice` | `ps1`, `jp`, `psp` | `ps1` | Voice set. `jp` and `psp` need the clips in `voice/`; a missing clip plays the PS1 voice. |
 | `language` | `en`, `uk` | `en` | Language. A change needs a restart. `uk` without the pack shows English. |
 | `buttons` | `switch`, `xbox`, `psx` | `switch` on Switch, `xbox` on PC | The button icons in the menus. |

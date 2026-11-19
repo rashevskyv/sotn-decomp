@@ -29,11 +29,15 @@
 #include <SDL3/SDL.h>
 #else
 #include <psyz/overlay_sdl3.h>
+#include <psyz/video.h>
 #endif
 
 enum { PAGE_MAIN, PAGE_CHEATS, PAGE_MAP, PAGE_CHOOSE, PAGE_CONTROLS };
 enum {
     ITEM_SCALE,
+#ifndef __SWITCH__
+    ITEM_FULLSCREEN, // the window mode, saved as the mode at the start
+#endif
     ITEM_VOICE,
     ITEM_LANGUAGE,
     ITEM_BUTTONS, // the button marks of the menus
@@ -439,11 +443,23 @@ static void Change(int dir) {
         return;
     }
     Wide_MenuGet(&scale, &lo, &hi);
-    if (sel == ITEM_SCALE) {
-        scale = scale ? scale + dir : (dir > 0 ? lo : hi);
-        if (scale >= lo && scale <= hi) {
+    if (sel == ITEM_SCALE) { // lo .. hi, then MAX
+        scale = scale == WIDE_SCALE_MAX ? (dir < 0 ? hi : 0)
+                : scale                 ? scale + dir
+                                        : (dir > 0 ? lo : hi);
+        if (scale == hi + 1) {
+            scale = WIDE_SCALE_MAX;
+        }
+        if (scale == WIDE_SCALE_MAX || (scale >= lo && scale <= hi)) {
             Wide_MenuSet(scale);
         }
+#ifndef __SWITCH__
+    } else if (sel == ITEM_FULLSCREEN) {
+        g_Fullscreen = !Psyz_VideoGetFullscreen();
+        Psyz_VideoSetFullscreen(g_Fullscreen);
+        fprintf(stderr, "[video] menu: fullscreen %d\n", g_Fullscreen);
+        Wide_SaveIni();
+#endif
     } else if (sel == ITEM_VOICE) {
         // the next spoken line uses the new set
         g_VoiceSet = (g_VoiceSet + dir + VOICE_COUNT) % VOICE_COUNT;
@@ -881,6 +897,8 @@ enum {
     P_GAMEPAD,
     P_PRESS,
     P_DEFAULTS,
+    P_FULLSCREEN, // the main page: after the Controls words
+    P_MAX,
 };
 #define LINE_MAX 64
 #define MARK_ESC 0xFE
@@ -1054,7 +1072,11 @@ static void DrawMain(void) {
         int word;
         const char* en;
     } labels[N_MAIN] = {
-        {P_SCALE, "SCALE"},     {P_VOICE, "VOICE"},   {P_LANGUAGE, "LANGUAGE"},
+        {P_SCALE, "SCALE"},
+#ifndef __SWITCH__
+        {P_FULLSCREEN, "FULLSCREEN"},
+#endif
+        {P_VOICE, "VOICE"},     {P_LANGUAGE, "LANGUAGE"},
         {P_BUTTONS, "BUTTONS"}, {P_OVERLAY, "OVERLAY"}, {-1, "FPS"},
         {P_EDITOR, "EDITOR"},   {P_CONTROLS, "CONTROLS"},
         {P_CHEATS, "CHEATS"},   {P_EXIT, "EXIT GAME"},
@@ -1083,20 +1105,26 @@ static void DrawMain(void) {
             col = Width(lines[i]);
         }
     }
-    // the values in one column: en 9 cells (LANGUAGE has a gap), uk one
-    // cell after the longest label
-    col = uk ? col + SERIF_W : 9 * CELL_W;
+    // the values in one column: en 9 cells (LANGUAGE has a gap) or one
+    // cell after a longer label (FULLSCREEN), uk one cell after the longest
+    col = uk ? col + SERIF_W : MAX(9 * CELL_W, col + CELL_W);
     for (i = 0; i < ITEM_CONTROLS; i++) {
         PadTo(lines[i], col);
     }
-    if (scale) {
-        sprintf(tmp, "%c %d %c", scale > lo ? '<' : ' ', scale,
-                scale < hi ? '>' : ' ');
+    if (scale == WIDE_SCALE_MAX) {
+        Add(lines[ITEM_SCALE], "< ");
+        AddW(lines[ITEM_SCALE], P_MAX, "MAX");
+    } else if (scale) { // MAX follows hi
+        sprintf(tmp, "%c %d >", scale > lo ? '<' : ' ', scale);
         Add(lines[ITEM_SCALE], tmp);
     } else {
         Add(lines[ITEM_SCALE], "< ");
         AddW(lines[ITEM_SCALE], P_AUTO, "AUTO");
     }
+#ifndef __SWITCH__
+    i = Psyz_VideoGetFullscreen(); // F11 and Esc change it too
+    AddValue(lines[ITEM_FULLSCREEN], i ? P_ON : P_OFF, i ? "ON" : "OFF");
+#endif
     AddValue(lines[ITEM_VOICE], -1, voices[g_VoiceSet]);
     AddValue(lines[ITEM_LANGUAGE], -1, g_LangNext ? "UK" : "EN");
     if (g_LangNext != g_Lang) {

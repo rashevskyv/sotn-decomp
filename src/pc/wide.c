@@ -46,7 +46,14 @@ static const char ini_head[] =
     "; The game picks the nearest value that fits the screen (5 is 3 on\n"
     "; the handheld). The stage always shows the PS1 rows with black bars\n"
     "; above and below. At 5 the stage, map and dialogues use 5; the\n"
-    "; title, pause menu and other full screens use 4.\n";
+    "; title, pause menu and other full screens use 4.\n"
+    "; max = always the highest scale that fits the current screen.\n";
+
+int g_Fullscreen;
+static const char ini_fullscreen[] =
+    "\n"
+    "; fullscreen: 1 = the game starts in borderless fullscreen, 0 = in a\n"
+    "; window. F11 (or F4) switches it during the game, Esc leaves it.\n";
 
 static const char ini_voice[] =
     "\n"
@@ -182,6 +189,7 @@ static const struct {
     {"editor", &g_EditorOn},
     {"overlay", &g_OverlayOn},
     {"fps", &g_FpsOn},
+    {"fullscreen", &g_Fullscreen},
 };
 
 static const char ini_overlay[] =
@@ -203,7 +211,15 @@ void Wide_SaveIni(void) {
         return;
     }
     fputs(ini_head, f);
-    fprintf(f, "scale = %d\n", cfg_scale);
+    if (cfg_scale == WIDE_SCALE_MAX) {
+        fputs("scale = max\n", f);
+    } else {
+        fprintf(f, "scale = %d\n", cfg_scale);
+    }
+#ifndef __SWITCH__
+    fputs(ini_fullscreen, f);
+    fprintf(f, "fullscreen = %d\n", g_Fullscreen);
+#endif
     fputs(ini_voice, f);
     fprintf(f, "voice = %s\n", g_VoiceSetNames[g_VoiceSet]);
     fputs(ini_language, f);
@@ -259,6 +275,10 @@ void Wide_LoadIni(const char* path) {
                 if (v >= 1 && v <= 8) {
                     scale = v;
                 }
+            } else if (sscanf(line, " scale = %15s", word) == 1) {
+                if (!strcmp(word, "max")) {
+                    scale = WIDE_SCALE_MAX;
+                }
             } else if (sscanf(line, " aspect = %15s", word) == 1) {
                 // an old key: ignored
             } else if (sscanf(line, " voice = %15s", word) == 1) {
@@ -300,7 +320,11 @@ void Wide_LoadIni(const char* path) {
         }
         fclose(f);
     }
-    fprintf(stderr, "[video] settings: scale %d\n", scale);
+    fprintf(stderr, "[video] settings: scale %d fullscreen %d\n", scale,
+            g_Fullscreen);
+#ifndef __SWITCH__
+    Psyz_VideoSetFullscreen(g_Fullscreen); // before the window is shown
+#endif
     fprintf(
         stderr, "[voice] settings: voice %s\n", g_VoiceSetNames[g_VoiceSet]);
     fprintf(stderr, "[lang] settings: language %s\n", g_LangNext ? "uk" : "en");
@@ -534,6 +558,9 @@ void Wide_OnFrame(void) {
         }
     }
     Psyz_VideoSetAspectMode(prologue ? PSYZ_ASPECT_DISPLAY : PSYZ_ASPECT_SQUARE);
+    // 512 columns in a 4:3 picture: nearest repeats every 8th column, so
+    // the prologue text is smoothed (sharp bilinear); the rest stays nearest
+    Psyz_VideoSetLinearPresent(prologue);
     Psyz_VideoSetScale(s);
     Psyz_VideoSetResolution(req);
     if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
@@ -549,7 +576,9 @@ void Wide_OnFrame(void) {
 // Port menu state.
 void Wide_MenuGet(int* scale, int* lo, int* hi) {
     ScaleRange(AspectRect(Psyz_VideoGetDisplaySize()), lo, hi);
-    *scale = cfg_scale ? Clamp(cfg_scale, *lo, *hi) : 0;
+    *scale = cfg_scale == WIDE_SCALE_MAX ? WIDE_SCALE_MAX
+             : cfg_scale                ? Clamp(cfg_scale, *lo, *hi)
+                                        : 0;
 }
 
 void Wide_MenuSet(int scale) {

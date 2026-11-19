@@ -97,9 +97,17 @@ void func_801B1198(s16 yVal) {
     ClearImage(&rect, 0, 0, 0);
 }
 
+#ifdef PLATFORM_PSYZ
+// uk: the script of tools/lang/uk/prologue.txt (tools/lang/uk/prologue_text.py)
+#include "prologue_uk.h"
+#endif
+
 u16* func_801B11E8(u8 ch) {
     u16 jCh;
 #ifdef PLATFORM_PSYZ
+    if (g_Lang && ch >= 0x80) { // a uk glyph: its Shift-JIS code
+        return g_api.func_80106A28(prologue_uk_map[ch - 0x80], 0);
+    }
 // use raw Shift-JIS values
 #define SJIS_A 0x8260
 #define SJIS_a 0x8281
@@ -150,7 +158,15 @@ void func_801B1298(Entity* self) {
 
     switch (self->step) {
     case 0:
+#ifdef PLATFORM_PSYZ
+        if (func_801B101C(g_Lang ? (u8*)prologue_uk_script
+                                 : (u8*)prologue_script_en)) {
+            if (g_Lang) { // the first line centred, as the next ones
+                g_Dialogue.startY = g_Dialogue.nextCharX + PROLOGUE_UK_COL0;
+            }
+#else
         if (func_801B101C((u8*)prologue_script_en)) {
+#endif
             self->flags |= FLAG_HAS_PRIMS;
             self->primIndex = g_Dialogue.primIndex;
             ++self->step;

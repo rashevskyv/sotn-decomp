@@ -2794,7 +2794,7 @@ endif()
 add_subdirectory(tools/psyz/psyz)
 
 # the port version: the NACP and the boot line of the log
-set(SOTN_VERSION "0.8.49")
+set(SOTN_VERSION "0.8.50")
 set_source_files_properties(src/pc/main.c PROPERTIES
     COMPILE_DEFINITIONS "SOTN_VERSION=\"${SOTN_VERSION}\"")
 
@@ -3056,6 +3056,16 @@ add_overlay(bo5 ${SOURCE_FILES_BOSS_BO5})
 add_overlay(bo3 ${SOURCE_FILES_BOSS_BO3})
 add_overlay(bo1 ${SOURCE_FILES_BOSS_BO1})
 add_overlay(st0 ${SOURCE_FILES_STAGE_ST0})
+# The uk prologue scroll text (src/st/st0/3101C_psx.c)
+add_custom_command(
+    OUTPUT "${SOTN_GEN_DIR}/st0/prologue_uk.h"
+    COMMAND "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/lang/uk/prologue_text.py"
+        "${CMAKE_SOURCE_DIR}/tools/lang/uk/prologue.txt"
+        "${SOTN_GEN_DIR}/st0/prologue_uk.h"
+    DEPENDS tools/lang/uk/prologue_text.py tools/lang/uk/prologue.txt
+    VERBATIM)
+target_sources(st0 PRIVATE "${SOTN_GEN_DIR}/st0/prologue_uk.h")
+target_include_directories(st0 PRIVATE "${SOTN_GEN_DIR}/st0")
 add_overlay(rno0 ${SOURCE_FILES_STAGE_RNO0})
 add_overlay(rno1 ${SOURCE_FILES_STAGE_RNO1})
 add_overlay(rlib ${SOURCE_FILES_STAGE_RLIB})

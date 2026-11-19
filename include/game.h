@@ -1003,6 +1003,11 @@ void Hud_GetPrims(s32* index1, s32* index2);
 // Port menu (src/pc/port_menu.c): L3+R3 opens it.
 u16 PortMenu_Pad(u16 pressed);
 void Wide_LoadIni(const char* path);
+// scale = max: always the highest scale the output allows
+#define WIDE_SCALE_MAX 99
+// fullscreen = 0|1 (PC): the window mode at the start; F4, F11 and Esc
+// change the mode of this run only
+extern int g_Fullscreen;
 void Wide_MenuGet(int* scale, int* lo, int* hi);
 void Wide_MenuSet(int scale);
 void Wide_SaveIni(void);
