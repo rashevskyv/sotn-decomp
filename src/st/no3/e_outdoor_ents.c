@@ -144,6 +144,69 @@ void EntityCastleDoorTransition(Entity* self) {
     }
 }
 
+#ifdef PLATFORM_PSYZ
+// Wide view (WIDE_X more px per side). The makers below stream the entries
+// of a parallax table (x, value; 0xFFFF ends it) in from the right of the
+// 256 px PS1 view: entry p is at screen x p - scroll * rate / 256. At the
+// room load the PS1 fills x 0..right and assumes scroll 0, but the wide
+// camera starts at scroll WIDE_X (a warp anywhere). This first fill uses the
+// real scroll and covers -64 - WIDE_X .. right + WIDE_X. Left of the table
+// start the first nwrap entries repeat (two copies, period = their span
+// plus one mean gap), so a slow layer has no gap at the left view edge.
+// Returns the index of the first entry right of the view: the next one the
+// maker streams in.
+typedef void (*WideSpawn)(Entity* self, s16 x, u16* entry);
+static u16 WideFill(Entity* self, u16* table, s32 stride, s32 nwrap, s32 rate,
+                    s32 right, s32 dx, WideSpawn spawn) {
+    s32 sx = g_Tilemap.scrollX.i.hi * rate / 256;
+    s32 i, k, x, len;
+
+    if (!nwrap) {
+        while (table[nwrap * stride] != 0xFFFF) {
+            nwrap++;
+        }
+    }
+    len = table[(nwrap - 1) * stride] - table[0];
+    len += len / (nwrap - 1);
+    for (k = 2; k > 0; k--) {
+        for (i = 0; i < nwrap; i++) {
+            x = table[i * stride] - k * len - sx;
+            if (x >= -64 - WIDE_X && x <= right + WIDE_X) {
+                spawn(self, x + dx, &table[i * stride]);
+            }
+        }
+    }
+    for (i = 0; (x = table[i * stride] - sx) <= right + WIDE_X; i++) {
+        if (x >= -64 - WIDE_X) {
+            spawn(self, x + dx, &table[i * stride]);
+        }
+    }
+    return i;
+}
+
+static Entity* WideBlock(s16 x, s32 params, s32 unk68) {
+    Entity* ent = AllocEntity(&g_Entities[192], &g_Entities[256]);
+    if (ent != NULL) {
+        CreateEntityFromCurrentEntity(E_BACKGROUND_BLOCK, ent);
+        ent->posX.i.hi = x;
+        ent->params = params;
+        ent->unk68 = unk68;
+    }
+    return ent;
+}
+
+static void WideTreeSpawn(Entity* self, s16 x, u16* e) {
+    Entity* ent =
+        WideBlock(x, ((e[1] >> 8) & 0xFF) + self->params, self->unk68);
+    if (ent != NULL) {
+        ent->posY.i.hi = e[1] & 255;
+        if (self->params) {
+            ent->opacity = 0x60;
+        }
+    }
+}
+#endif
+
 static u16 foregroundTreeData1[] = {
     0x0080, 0x0290, 0x0130, 0x0498, 0x01E0, 0x0480, 0x0290, 0x028A, 0x0340,
     0x0298, 0x03F8, 0x0290, 0x04A0, 0x0480, 0x0554, 0x0288, 0x0608, 0x0498,
@@ -183,6 +246,12 @@ void EntityForegroundTree(Entity* self) {
         InitializeEntity(g_EInitSpawner);
         self->flags |= FLAG_POS_CAMERA_LOCKED;
         self->unk68 = var_s4;
+#ifdef PLATFORM_PSYZ
+        self->ext.utimer.t = WideFill(
+            self, self->params ? foregroundTreeData2 : foregroundTreeData1, 2,
+            0, var_s4, 352, 16, WideTreeSpawn);
+        break;
+#endif
         // This is a weird way to make a while-loop.
         while (true) {
             if (*ptrParams > 352) {
@@ -208,12 +277,12 @@ void EntityForegroundTree(Entity* self) {
 
     case 1:
         self->posX.i.hi = 128;
-        var_s3 = tilemap->scrollX.i.hi * var_s4 / 256 + 352;
+        var_s3 = tilemap->scrollX.i.hi * var_s4 / 256 + 352 + WIDE_X;
         if (var_s3 >= *ptrParams) {
             ent = AllocEntity(&g_Entities[192], &g_Entities[256]);
             if (ent != NULL) {
                 CreateEntityFromCurrentEntity(E_BACKGROUND_BLOCK, ent);
-                ent->posX.i.hi = var_s3 - *ptrParams++ + 368;
+                ent->posX.i.hi = var_s3 - *ptrParams++ + 368 + WIDE_X;
                 var_s3 = *ptrParams;
                 ent->params = ((var_s3 >> 8) & 0xFF) + self->params;
                 ent->posY.i.hi = var_s3 & 255;
@@ -270,6 +339,12 @@ static u16 foliageParams[] = {
     XP(2876, 9), XP(2992, 6), XP(3022, 7), XP(3054, 7), XP(3086, 8),
     XP(3116, 9), XP(65535, 2)};
 
+#ifdef PLATFORM_PSYZ
+static void WideFoliageSpawn(Entity* self, s16 x, u16* e) {
+    WideBlock(x, e[1], 0xC0);
+}
+#endif
+
 // Uses the table above to create a lot of E_BACKGROUND_BLOCK entities.
 void EntityFoliageMaker(Entity* self) {
     Tilemap* tilemap = &g_Tilemap;
@@ -283,6 +358,11 @@ void EntityFoliageMaker(Entity* self) {
         self->flags |= FLAG_POS_CAMERA_LOCKED;
         self->unk68 = 0xC0;
         self->ext.utimer.t = 0;
+#ifdef PLATFORM_PSYZ
+        self->ext.utimer.t =
+            WideFill(self, foliageParams, 2, 0, 0xC0, 288, 0, WideFoliageSpawn);
+        break;
+#endif
         ptr = foliageParams;
         while (true) {
             if (*ptr > 288) {
@@ -304,12 +384,12 @@ void EntityFoliageMaker(Entity* self) {
     case 1:
         self->posX.i.hi = 128;
         ptr = &foliageParams[self->ext.utimer.t * 2];
-        temp_s3 = tilemap->scrollX.i.hi * 0xC0 / 0x100 + 288;
+        temp_s3 = tilemap->scrollX.i.hi * 0xC0 / 0x100 + 288 + WIDE_X;
         if (temp_s3 >= ptr[0]) {
             newEntity = AllocEntity(&g_Entities[192], &g_Entities[256]);
             if (newEntity != NULL) {
                 CreateEntityFromCurrentEntity(E_BACKGROUND_BLOCK, newEntity);
-                newEntity->posX.i.hi = temp_s3 - *ptr++ + 288;
+                newEntity->posX.i.hi = temp_s3 - *ptr++ + 288 + WIDE_X;
                 newEntity->posX.i.lo = self->posX.i.lo;
                 newEntity->params = *ptr++;
                 newEntity->unk68 = 0xC0;
@@ -356,6 +436,49 @@ static u8 pineColors[] = {0x80, 0x60, 0x40};
 static u16 pineCluts[] = {0x17, 0x49};
 static u16* pineSets[] = {pineSet1, pineSet2, pineSet3};
 
+#ifdef PLATFORM_PSYZ
+// one pine (WideFill): the two prims of the PS1 code below, in the first two
+// hidden prims of the pool
+static void WidePineSpawn(Entity* self, s16 x, u16* e) {
+    u16 w = pineWidths[self->params];
+    Primitive* p0;
+    Primitive* p1;
+
+    for (p0 = &g_PrimBuf[self->primIndex]; p0 && p0->drawMode != DRAW_HIDE;
+         p0 = p0->next) {
+    }
+    for (p1 = p0 ? p0->next : NULL; p1 && p1->drawMode != DRAW_HIDE;
+         p1 = p1->next) {
+    }
+    if (p1 == NULL) {
+        return;
+    }
+    p0->tpage = 0xE;
+    p0->u0 = p0->u2 = 0x80;
+    p0->u1 = p0->u3 = 0x80 + 0x28;
+    p0->v0 = p0->v1 = 0x80;
+    p0->v2 = p0->v3 = 0x80 + 0x50;
+    p1->tpage = 0xF;
+    p1->u0 = p1->u2 = 0xB0;
+    p1->u1 = p1->u3 = 0xB0 + 0x08;
+    p1->v0 = p1->v1 = 0xC8;
+    p1->v2 = p1->v3 = 0xC8 + 0x30;
+    p0->x0 = p0->x2 = x - w * 20 / 256;
+    p0->x1 = p0->x3 = x + w * 20 / 256;
+    p1->x0 = p1->x2 = x - w * 4 / 256 + 1;
+    p1->x1 = p1->x3 = x + w * 4 / 256 + 1;
+    p0->clut = p1->clut = pineCluts[(e[1] >> 8) & 0xFF];
+    p0->y2 = p0->y3 = 0x9C - ((0x2C - (e[1] & 0xFF)) * w / 256);
+    p0->y0 = p0->y1 = p0->y2 - (w * 80 / 256);
+    p1->y2 = p1->y3 = 0x9C;
+    p1->y0 = p1->y1 = 0x9C - 0x30;
+    PCOL(p0) = PCOL(p1) = pineColors[self->params];
+    p0->priority = 0x3F - (self->params * 2);
+    p1->priority = p0->priority - 1;
+    p0->drawMode = p1->drawMode = DRAW_COLORS;
+}
+#endif
+
 // part of parallax background with pine trees
 void EntityBackgroundPineTrees(Entity* self) {
     Tilemap* gTilemap = &g_Tilemap;
@@ -378,8 +501,9 @@ void EntityBackgroundPineTrees(Entity* self) {
         InitializeEntity(g_EInitSpawner);
         self->flags |= FLAG_POS_CAMERA_LOCKED;
         self->unk68 = selfUnk68;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 32);
-        if (primIndex == 0) {
+        // wide view: 16 pines fill 256 px; a 960 px view needs about 40
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(32, 96));
+        if (primIndex == 0 || (WIDE_X && primIndex == -1)) {
             DestroyEntity(self);
             return;
         }
@@ -390,6 +514,11 @@ void EntityBackgroundPineTrees(Entity* self) {
              prim_s0 = prim_s0->next) {
             prim_s0->drawMode = DRAW_HIDE;
         }
+#ifdef PLATFORM_PSYZ
+        self->ext.utimer.t = WideFill(self, pineSets[self->params], 2, 0,
+                                      selfUnk68, 0x120, 0, WidePineSpawn);
+        return;
+#endif
 
         for (prim_s0 = &g_PrimBuf[primIndex]; true; prim_s0 = prim_s1->next) {
             if (*var_s5 >= 0x121) {
@@ -463,12 +592,12 @@ void EntityBackgroundPineTrees(Entity* self) {
             if (prim_s0->drawMode != DRAW_HIDE) {
                 prim_s0->x0 = prim_s0->x2 -= xpos;
                 prim_s0->x1 = prim_s0->x3 -= xpos;
-                if (prim_s0->x1 <= 0) {
+                if (prim_s0->x1 <= -WIDE_X) {
                     prim_s0->drawMode = DRAW_HIDE;
                 }
             }
         }
-        xpos = gTilemap->scrollX.i.hi * selfUnk68 / 256 + 0x120;
+        xpos = gTilemap->scrollX.i.hi * selfUnk68 / 256 + 0x120 + WIDE_X;
 
         if (xpos < *var_s5) {
             return;
@@ -492,7 +621,7 @@ void EntityBackgroundPineTrees(Entity* self) {
                         prim_s1->v0 = prim_s1->v1 = 0xC8;
                         prim_s1->v2 = prim_s1->v3 = 0xC8 + 0x30;
 
-                        xpos = 0x120 - (xpos - *var_s5++);
+                        xpos = 0x120 + WIDE_X - (xpos - *var_s5++);
                         width = var_s4 * 20 / 256;
 
                         prim_s0->x0 = prim_s0->x2 = xpos - width;
@@ -534,6 +663,13 @@ void EntityBackgroundPineTrees(Entity* self) {
 // animation frame number 0x2D, or 45. That's distant background trees.
 static u16 treeXLocations[] = {0x20, 0x60, 0xA0, 0xE0, 0x120, 0x15F, 0xFFFF};
 
+#ifdef PLATFORM_PSYZ
+static void WideDistantTreeSpawn(Entity* self, s16 x, u16* e) {
+    // entry 5 is the castle (params 0x11, as in the stream below)
+    WideBlock(x, e == &treeXLocations[5] ? 0x11 : 0x10, 0x18);
+}
+#endif
+
 void EntityDistantTreeMaker(Entity* self) {
     Tilemap* tilemap = &g_Tilemap;
     Entity* newEntity;
@@ -545,6 +681,12 @@ void EntityDistantTreeMaker(Entity* self) {
         InitializeEntity(g_EInitSpawner);
         self->flags |= FLAG_POS_CAMERA_LOCKED;
         self->ext.utimer.t = 0;
+#ifdef PLATFORM_PSYZ
+        // only the five trees repeat to the left, not the castle
+        self->ext.utimer.t = WideFill(
+            self, treeXLocations, 1, 5, 0x18, 288, 0, WideDistantTreeSpawn);
+        break;
+#endif
         ptr = treeXLocations;
         while (true) {
             if (*ptr > 288) {
@@ -565,12 +707,12 @@ void EntityDistantTreeMaker(Entity* self) {
     case 1:
         self->posX.i.hi = 0x80;
         ptr = &treeXLocations[self->ext.utimer.t];
-        temp_s3 = tilemap->scrollX.i.hi * 0x18 / 0x100 + 288;
+        temp_s3 = tilemap->scrollX.i.hi * 0x18 / 0x100 + 288 + WIDE_X;
         if (temp_s3 >= *ptr) {
             newEntity = AllocEntity(&g_Entities[192], &g_Entities[256]);
             if (newEntity != NULL) {
                 CreateEntityFromCurrentEntity(E_BACKGROUND_BLOCK, newEntity);
-                newEntity->posX.i.hi = temp_s3 - *ptr + 288;
+                newEntity->posX.i.hi = temp_s3 - *ptr + 288 + WIDE_X;
                 newEntity->posX.i.lo = self->posX.i.lo;
                 newEntity->params = 0x10;
                 if (self->ext.utimer.t == 5) {
@@ -840,7 +982,8 @@ void EntityDistantBackgroundTrees(Entity* self) {
     switch (self->step) {
     case 0:
         InitializeEntity(g_EInitSpawner);
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 9);
+        // wide view: 12 more 30 px tiles per side (WIDE_X up to 352)
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(9, 33));
         if (primIndex == 0) {
             DestroyEntity(self);
             return;
@@ -849,8 +992,8 @@ void EntityDistantBackgroundTrees(Entity* self) {
         self->primIndex = primIndex;
         self->posX.i.hi = 128;
         self->unk68 = 0x10;
-        for (prim = &g_PrimBuf[primIndex], xPos = 0; prim != NULL;
-             prim = prim->next) {
+        for (prim = &g_PrimBuf[primIndex], xPos = WIDE_POOL(0, -12 * X_SPACING);
+             prim != NULL; prim = prim->next) {
             prim->tpage = 0xE;
             prim->clut = 0x67;
             prim->u0 = prim->u2 = 0x61;

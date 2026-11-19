@@ -59,7 +59,7 @@ void EntityBackgroundBushes(Entity* self) {
 
     if (!self->step) {
         InitializeEntity(E_INIT);
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 0x48);
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(0x48, 0xD8));
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -98,9 +98,12 @@ void EntityBackgroundBushes(Entity* self) {
         yPos = rotTransXYResult >> 16;
         xPos = xPos % var_s5[3];
         xPos -= var_s5[3];
+        // wide view: start whole pattern periods further left (the period
+        // is var_s5[3]) and run WIDE_X further right
+        xPos -= (WIDE_X + var_s5[3] - 1) / var_s5[3] * var_s5[3];
         yPos = self->posY.i.hi;
         var_s4 = *var_s8;
-        while (xPos < 0x140) {
+        while (xPos < 0x140 + WIDE_X) {
             var_s1 = &bush_uvwh[0];
             var_s1 += ((*var_s4++) * 4);
             prim->u0 = prim->u2 = var_s1[0];
@@ -213,8 +216,9 @@ void EntityBackgroundTrees(Entity* self) {
     posX %= 64;
     posX -= 64;
     posX -= backgroundTreePositions[self->params & 0xF][1];
+    posX -= (WIDE_X + 63) / 64 * 64; // wide view: whole 64 px trees
     prim = self->ext.prim;
-    while (posX < 320) {
+    while (posX < 320 + WIDE_X && !WIDE_NO_PRIM(prim)) {
         prim->x0 = prim->x2 = posX;
         prim->x1 = prim->x3 = posX + 64;
         prim->y0 = prim->y1 = posY PLUSMINUS 56;
