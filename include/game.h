@@ -1033,6 +1033,14 @@ enum { VOICE_PS1, VOICE_JP, VOICE_PSP, VOICE_COUNT };
 extern int g_VoiceSet;
 extern const char* const g_VoiceSetNames[VOICE_COUNT];
 s32 Voice_Open(s32 id, s32 isVoice);
+// Music files music/<ID>.mp3|flac in place of the XA (src/pc/music.c)
+s32 Music_Start(s32 id, s32 mode);
+s32 Music_Loop(void);
+void Music_Save(s32 slot);
+s32 Music_Resume(s32 slot);
+bool Music_Playing(void);
+double Music_WallMs(void);
+unsigned Psyz_SpuTicks(void); // psyz/audio.h: output frames mixed so far
 // Button marks of the menus (src/pc/buttons.c), saved as buttons = in
 // sotn.ini. Mark b: the PS button of g_ChButtons (0..7), 8 Select, 9 Start,
 // 10 the d-pad. The pause menu atlas holds them under its cells.

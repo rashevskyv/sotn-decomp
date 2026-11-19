@@ -215,6 +215,7 @@ The port uses its own folder, `/switch/sotn-native/`, on the SD card:
 | `/switch/sotn-native/data/` | The game files | `build/switch/data/` (all of it) |
 | `/switch/sotn-native/data/ST/<STAGE>/F_<STAGE>.BIN` | Saturn stitched rooms (only with Saturn stages) | `build/switch/saturn_stitches/disks/us/ST/` (copy over `data/ST/`) |
 | `/switch/sotn-native/voice/jp/`, `voice/psp/` | Voice sets (optional) | see "Voice sets" |
+| `/switch/sotn-native/music/` | Music files (optional) | see "Music files" |
 | `/switch/sotn-native/sotn.ini` | Settings | written by the game at the first start |
 
 The game also writes these files there: `sotn-xa.cue` (music; it points at `data/SD/XA_STR1`),
@@ -246,6 +247,7 @@ The port menu changes most of them in the game. A missing key keeps its default.
 | `editor` | 0, 1 | 0 | Tile editor page on port 8080. No password: use it only on a trusted network. |
 | `overlay` | 0, 1 | 0 | A corner shows the stage, the room and the cheats. |
 | `fps` | 0, 1 | 0 | A corner shows the frames per second. |
+| `music_files` | 0, 1 | 1 | Play the music from `music/` when a file is there (see "Music files"). 0 always plays the disc music. |
 
 The key `aspect` of old files is ignored: the view is always 16:9.
 Saturn stages and Maria are build options, not settings. Rumble is always on (Switch).
@@ -256,6 +258,20 @@ Saturn stages and Maria are build options, not settings. Rumble is always on (Sw
 It needs two manifest files that map each sound to a clip in the image.
 The manifests are not in this repository yet, so the voice sets cannot be made from it alone.
 Without them the game uses the PS1 voices.
+
+## Music files
+
+The game can play each music track from a file in `music/` next to the game.
+The name is the track number in hex: `music/30F.mp3` or `music/30F.flac`.
+The file must be 44100 Hz, mono or stereo. A FLAC file is used before an MP3 file.
+Without a file the game plays the disc music (XA), as on the PS1.
+The game's volume, fade, pause and loop commands work on both.
+
+`music/loops.txt` is optional. Each line is `id start loop_start loop_end level`:
+frames at 44100 Hz, and a gain in 1/256 (256 = no change). A loop end of 0 plays the track once.
+Without a line, a looping track repeats the whole file.
+`tools/music/ost_map.py copy <ost folder> <game>/music` names the tracks of the soundtrack album
+and writes `loops.txt` for them. No audio is in this repository.
 
 ## Ukrainian language
 
@@ -273,6 +289,7 @@ The mod files are not public yet.
 - sotn-vita by artesanalintelligence: the PC data templates (`tools/pcdata`), the boss links and the static module scheme of psyz.
 - sotn-ultimate: the Saturn stages and the Saturn character select screen are ported from its translation of the Saturn code.
 - devkitPro and its SDL fork for the Switch.
+- [dr_mp3](https://github.com/mackron/dr_libs) v0.7.5 and dr_flac v0.13.5 by David Reid (public domain or MIT-0, `src/pc/dr_mp3.h`, `src/pc/dr_flac.h`, dr_libs commit 7f032b9): the music file decoders.
 - [Alegreya Sans](https://github.com/huertatipografica/Alegreya-Sans) by The Alegreya Sans Project Authors (SIL Open Font License 1.1, `tools/lang/fonts/OFL-AlegreyaSans.txt`).
 - Picoripi: the Ukrainian translation tool.
 

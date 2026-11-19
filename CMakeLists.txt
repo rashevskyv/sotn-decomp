@@ -254,6 +254,7 @@ set(SOURCE_FILES_PC
     src/pc/port_menu.c
     src/pc/buttons.c
     src/pc/voice.c
+    src/pc/music.c
     src/pc/lang.c
     src/pc/cheats.c
     src/pc/apron.c
@@ -2794,7 +2795,7 @@ endif()
 add_subdirectory(tools/psyz/psyz)
 
 # the port version: the NACP and the boot line of the log
-set(SOTN_VERSION "0.8.56")
+set(SOTN_VERSION "0.8.57")
 set_source_files_properties(src/pc/main.c PROPERTIES
     COMPILE_DEFINITIONS "SOTN_VERSION=\"${SOTN_VERSION}\"")
 

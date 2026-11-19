@@ -119,7 +119,8 @@ bool func_80131F68(void) {
 // box. The uk boxes are shorter than the clips, and the JP and PSP clips
 // are longer than the PS1 times.
 bool Cutscene_VoiceBusy(void) {
-    if (func_80131F68() && D_80139014 == 2) {
+    // a music file (music/<ID>.mp3) is not a voice line
+    if (func_80131F68() && D_80139014 == 2 && !Music_Playing()) {
         return true;
     }
     fprintf(stderr, "[dlg] next box at vsync %d: xa %03X mode %d, %d of %d\n",
@@ -582,14 +583,23 @@ void CdSoundCommand4(void) {
             s32 n = Voice_Open(g_CurrentXaConfigId + 0x300, D_80139014 == 2);
             if (n > 0) {
                 D_8013AE90 = n + 20;
+            } else {
+                // music file: the length of a one-shot is the file's; the
+                // looping file keeps the loop timers of the table
+                n = Music_Start(g_CurrentXaConfigId + 0x300, D_80139014);
+                if (n > 0 && D_80139014 == 2) {
+                    D_8013AE90 = n + 20;
+                }
             }
         }
 #endif
         address += g_CurCdPos;
 #ifdef PLATFORM_PSYZ
-        fprintf(stderr, "[xa] start %03X sector %d, mode %d in %d frames\n",
-                g_CurrentXaConfigId + 0x300, (s32)address - 150,
-                D_80139014, D_8013AE90);
+        fprintf(stderr,
+                "[xa] start %03X sector %d, mode %d in %d frames, vsync %d, "
+                "audio frame %u, wall %.1f ms\n",
+                g_CurrentXaConfigId + 0x300, (s32)address - 150, D_80139014,
+                D_8013AE90, VSync(-1), Psyz_SpuTicks(), Music_WallMs());
 #endif
         MakeCdLoc(address, &D_8013B640);
         g_CdSoundCommandStep++;
@@ -675,6 +685,7 @@ void CdSoundCommand6(void) {
     case 2:
 #ifdef PLATFORM_PSYZ
         Voice_Open(0, 0); // music: no voice clip on this read
+        Music_Loop();     // a music file loops by itself: keep its position
 #endif
         if (DoCdCommand(CdlReadN, NULL, NULL) == 0) {
             g_CdSoundCommandStep++;
@@ -905,6 +916,9 @@ void CdSoundCommand12(void) {
         break;
 
     case 4:
+#ifdef PLATFORM_PSYZ
+        Music_Save(g_CdSoundCommand16); // a music file keeps its position
+#endif
         g_CdSoundCommand16++;
         g_PlayingXaBgmId = 0;
         D_801390A0 = 0;
@@ -972,6 +986,7 @@ void CdSoundStartXaPlayback(void) {
     case 4:
 #ifdef PLATFORM_PSYZ
         Voice_Open(0, 0); // resume by sector: no voice clip on this read
+        Music_Resume(g_CdSoundCommand16 - 1); // or a music file at its frame
 #endif
         if (DoCdCommand(CdlReadN, NULL, NULL) == 0) {
             g_CdSoundCommandStep++;
