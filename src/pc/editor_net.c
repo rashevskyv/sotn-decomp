@@ -155,10 +155,11 @@ static void State(void) {
     PutJsonString(why ? why : "");
     Putf(",\"cheats\":{\"refill\":%d,\"invincible\":%d,\"walls\":%d,"
          "\"items\":%d,\"map\":%d,\"skip_prologue\":%d,\"character\":%d},"
-         "\"char\":%d,\"saveChar\":%d,\"sub\":[%d,%u]}",
+         "\"char\":%d,\"saveChar\":%d,\"sub\":[%d,%u],\"leap\":%d}",
          g_Cheat.refill, g_Cheat.invincible, g_Cheat.walls, g_Cheat.items,
          g_Cheat.map, g_Cheat.skipPrologue, g_Cheat.character, g_PlayableCharacter,
-         g_CheatSaveChar, g_Status.subWeapon, g_Status.D_80097C40);
+         g_CheatSaveChar, g_Status.subWeapon, g_Status.D_80097C40,
+         g_Status.relics[RELIC_LEAP_STONE]);
 }
 
 static void Castle(void) {
@@ -388,16 +389,24 @@ static void Handle(int fd) {
         // tests: a candle of the room moves next to the player and drops
         // this item (e_breakable.h, e_collect.h)
         Entity* e = NULL;
-        int item = Arg(query, "item", -1);
+        int item = Arg(query, "item", -1), slot = Arg(query, "slot", -1);
+        // slot=N moves that entity (an enemy) instead, items unchanged
+        if (slot >= STAGE_ENTITY_START && slot < TOTAL_ENTITY_COUNT &&
+            g_Entities[slot].entityId) {
+            e = &g_Entities[slot];
+            item = 0;
+        }
         for (k = STAGE_ENTITY_START; k < TOTAL_ENTITY_COUNT && !e; k++) {
             if (g_Entities[k].entityId == 1 && g_Entities[k].step) {
                 e = &g_Entities[k]; // E_BREAKABLE in every stage
             }
         }
         code = 409;
-        if (e && item > 0 && item < 0x80) {
-            e->params = (e->params & 0xF000) | item;
-            e->posX.i.hi = PLAYER.posX.i.hi + 24;
+        if (e && item >= 0 && item < 0x80) {
+            if (item) {
+                e->params = (e->params & 0xF000) | item;
+            }
+            e->posX.i.hi = PLAYER.posX.i.hi + Arg(query, "dx", 24);
             e->posY.i.hi = PLAYER.posY.i.hi;
             g_Status.relics[RELIC_CUBE_OF_ZOE] |=
                 RELIC_FLAG_FOUND | RELIC_FLAG_ACTIVE;
@@ -407,6 +416,28 @@ static void Handle(int fd) {
                 e ? "moved" : "none");
         State();
         ReplyOut(fd, code, "application/json");
+    } else if (!strcmp(path, "/relic") && !strcmp(method, "POST")) {
+        // tests: set one relic byte (RELIC_FLAG_FOUND 1, RELIC_FLAG_ACTIVE 2)
+        k = Arg(query, "id", -1);
+        code = k >= 0 && k < LEN(g_Status.relics) ? 200 : 400;
+        if (code == 200) {
+            g_Status.relics[k] = Arg(query, "v", 0);
+        }
+        State();
+        ReplyOut(fd, code, "application/json");
+    } else if (!strcmp(path, "/ents")) {
+        // tests: the live entities (slot, id, screen x y, hp, hitbox, step)
+        Put("[", 1);
+        for (k = 0, code = 0; k < TOTAL_ENTITY_COUNT; k++) {
+            Entity* e = &g_Entities[k];
+            if (e->entityId) {
+                Putf("%s[%d,%d,%d,%d,%d,%d,%d]", code++ ? "," : "", k,
+                     e->entityId, e->posX.i.hi, e->posY.i.hi, e->hitPoints,
+                     e->hitboxState, e->step);
+            }
+        }
+        Put("]", 1);
+        ReplyOut(fd, 200, "application/json");
     } else if (!strcmp(path, "/c40") && !strcmp(method, "POST")) {
         // tests: set D_80097C40 (Alucard's Muramasa counter, Maria's slot)
         g_Status.D_80097C40 = Arg(query, "v", 0);

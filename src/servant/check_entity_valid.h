@@ -2,9 +2,9 @@
 s32 CheckEntityValid(Entity* entity) {
     if (entity->hitboxState == 0)
         return 0;
-    if (entity->posX.i.hi < -16)
+    if (entity->posX.i.hi < -16 - WIDE_X)
         return 0;
-    if (entity->posX.i.hi > 272)
+    if (entity->posX.i.hi > 272 + WIDE_X)
         return 0;
     if (entity->posY.i.hi > 240)
         return 0;

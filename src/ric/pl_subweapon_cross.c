@@ -299,8 +299,8 @@ void RicEntitySubwpnCross(Entity* self) {
             return;
         }
         // Alternatively, if we're offscreen, we will also be destroyed.
-        if ((self->facingLeft == 0 && self->posX.i.hi < -0x20) ||
-            (self->facingLeft && self->posX.i.hi > 0x120)) {
+        if ((self->facingLeft == 0 && self->posX.i.hi < -0x20 - WIDE_X) ||
+            (self->facingLeft && self->posX.i.hi > 0x120 + WIDE_X)) {
             self->step = 7;
             self->ext.crossBoomerang.timer = 0x20;
             return;

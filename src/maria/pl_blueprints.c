@@ -292,7 +292,8 @@ void MarUpdatePlayerEntities(void) {
                 entity = g_CurrentEntity;
                 if (entity->entityId != 0) {
                     if (!(entity->flags & FLAG_KEEP_ALIVE_OFFCAMERA) &&
-                        (entity->posX.i.hi > 288 || entity->posX.i.hi < -32 ||
+                        (entity->posX.i.hi > 288 + WIDE_X ||
+                         entity->posX.i.hi < -32 - WIDE_X ||
                          entity->posY.i.hi > 256 || entity->posY.i.hi < -16)) {
                         DestroyEntity(g_CurrentEntity);
                     } else if (entity->flags & FLAG_UNK_100000) {

@@ -78,10 +78,10 @@ Entity* func_80118970(void) {
         if (ent->flags & FLAG_UNK_00200000) {
             continue;
         }
-        if (ent->posX.i.hi < -0x10) {
+        if (ent->posX.i.hi < -0x10 - WIDE_X) {
             continue;
         }
-        if (ent->posX.i.hi > 0x110) {
+        if (ent->posX.i.hi > 0x110 + WIDE_X) {
             continue;
         }
         if (ent->posY.i.hi > 0xF0) {
@@ -153,11 +153,11 @@ s16 func_80118B18(Entity* ent1, Entity* ent2, s16 facingLeft) {
             var_a1 = 0x3000;
         }
     }
-    if (ent1->posX.i.hi > 288) {
+    if (ent1->posX.i.hi > 288 + WIDE_X) {
         var_a1 = 0x4000;
     }
 
-    if (ent1->posX.i.hi < -32) {
+    if (ent1->posX.i.hi < -32 - WIDE_X) {
         var_a1 = 0x5000;
     }
     if (ent1->posY.i.hi > 240) {
@@ -1678,7 +1678,8 @@ void UpdatePlayerEntities(void) {
             entity = g_CurrentEntity;
             if (entity->entityId != 0) {
                 if (!(entity->flags & FLAG_KEEP_ALIVE_OFFCAMERA) &&
-                    (entity->posX.i.hi > 288 || entity->posX.i.hi < -32 ||
+                    (entity->posX.i.hi > 288 + WIDE_X ||
+                     entity->posX.i.hi < -32 - WIDE_X ||
                      entity->posY.i.hi > 256 || entity->posY.i.hi < -16)) {
                     DestroyEntity(g_CurrentEntity);
                 } else {
@@ -1759,7 +1760,8 @@ void func_8011A870(void) {
             if (entity->entityId != 0) {
 
                 if (!(entity->flags & FLAG_KEEP_ALIVE_OFFCAMERA) &&
-                    (entity->posX.i.hi > 0x120 || entity->posX.i.hi < -0x20 ||
+                    (entity->posX.i.hi > 0x120 + WIDE_X ||
+                     entity->posX.i.hi < -0x20 - WIDE_X ||
                      entity->posY.i.hi > 0x100 || entity->posY.i.hi < -0x10)) {
                     DestroyEntity(g_CurrentEntity);
                 } else if (entity->flags & FLAG_UNK_100000) {

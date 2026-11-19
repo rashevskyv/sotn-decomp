@@ -244,7 +244,7 @@ void HitDetection(void) {
                 *spHitbox += entity->hitboxOffX;
             }
             hitboxHeight = entity->posY.i.hi + entity->hitboxOffY;
-            if ((*spHitbox < -32) || (*spHitbox > 288) ||
+            if ((*spHitbox < -32 - WIDE_X) || (*spHitbox > 288 + WIDE_X) ||
                 (hitboxHeight < -32) || (hitboxHeight > 256) ||
                 !entity->hitboxWidth || !entity->hitboxHeight) {
                 *spHitboxState = 0;
@@ -277,7 +277,7 @@ void HitDetection(void) {
             x += entity->hitboxOffX;
         }
         y = entity->posY.i.hi + entity->hitboxOffY;
-        if (x <= -32 || x >= 288 || y <= -32 || y >= 256) {
+        if (x <= -32 - WIDE_X || x >= 288 + WIDE_X || y <= -32 || y >= 256) {
             continue;
         }
         miscVar2 = 0;

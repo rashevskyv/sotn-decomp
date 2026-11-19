@@ -1687,7 +1687,8 @@ void EntitySubwpnReboundStone(Entity* self) {
             CreateEntFactoryFromEntity(self, 10, 0);
             PlaySfx(SFX_UI_SUBWEAPON_TINK);
         }
-        if (self->posX.i.hi < -0x40 || self->posX.i.hi > 0x140 ||
+        if (self->posX.i.hi < -0x40 - WIDE_X ||
+            self->posX.i.hi > 0x140 + WIDE_X ||
             self->posY.i.hi < -0x40 || self->posY.i.hi > 0x140 ||
             self->ext.reboundStone.unk80 == 15) {
             self->step = 2;
@@ -1956,7 +1957,8 @@ void EntitySubwpnAgunea(Entity* self) {
         break;
     case 1:
         self->posX.val += self->velocityX;
-        if (self->posX.i.hi < -0x40 || self->posX.i.hi > 0x140 ||
+        if (self->posX.i.hi < -0x40 - WIDE_X ||
+            self->posX.i.hi > 0x140 + WIDE_X ||
             self->posY.i.hi < -0x20 || self->posY.i.hi > 0x120) {
             self->step = 2;
         }

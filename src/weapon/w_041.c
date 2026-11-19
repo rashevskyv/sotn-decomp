@@ -185,10 +185,10 @@ Entity* func_123000_8017A994(Entity* self, s16 angleTarget, s16 tolerance) {
             (other->flags & FLAG_UNK_00200000)) {
             continue;
         }
-        if (other->posX.i.hi < -16) {
+        if (other->posX.i.hi < -16 - WIDE_X) {
             continue;
         }
-        if (other->posX.i.hi > 272) {
+        if (other->posX.i.hi > 272 + WIDE_X) {
             continue;
         }
         if (other->posY.i.hi > 240) {

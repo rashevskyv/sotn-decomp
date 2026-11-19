@@ -609,7 +609,8 @@ Entity* func_us_80173AA0(Entity* self) {
         D_us_80178344[i] = 0;
         if (entity->entityId && entity->hitboxState != 0 &&
             !(entity->flags & FLAG_UNK_00200000) &&
-            LOH(entity->posX.i.hi) >= -16 && entity->posX.i.hi <= 272 &&
+            LOH(entity->posX.i.hi) >= -16 - WIDE_X &&
+            entity->posX.i.hi <= 272 + WIDE_X &&
             LOH(entity->posY.i.hi) <= 240 && entity->posY.i.hi >= 0 &&
             entity->hitPoints < 0x7000) {
             if (entity->flags & FLAG_UNK_80000) {

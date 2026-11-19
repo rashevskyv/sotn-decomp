@@ -397,7 +397,7 @@ void EntityMariaCatAttack(Entity* self) {
         break;
     }
     if (self->step != 5) {
-        if (self->posX.i.hi < -8 || self->posX.i.hi > 264 ||
+        if (self->posX.i.hi < -8 - WIDE_X || self->posX.i.hi > 264 + WIDE_X ||
             self->posY.i.hi > 264) {
             self->step = 5;
         }
@@ -523,7 +523,7 @@ void EntityMariaCatCrashAttack(Entity* self) {
         if (self->poseTimer < 0) {
             self->step = 2;
         }
-        if (self->posX.i.hi < -16 || self->posX.i.hi > 272) {
+        if (self->posX.i.hi < -16 - WIDE_X || self->posX.i.hi > 272 + WIDE_X) {
             self->step = 2;
         }
         break;
@@ -587,7 +587,7 @@ void EntityMariaDragonAttack(Entity* self) {
             g_api.PlaySfx(SFX_WING_FLAP_B);
         }
         self->ext.mariaDragon.timer++;
-        if (self->posX.i.hi < -16 || self->posX.i.hi > 272) {
+        if (self->posX.i.hi < -16 - WIDE_X || self->posX.i.hi > 272 + WIDE_X) {
             self->step = 3;
             return;
         }
@@ -626,7 +626,7 @@ static Entity* FindTarget(Entity* self) {
         if (e->flags & FLAG_UNK_00200000) {
             continue;
         }
-        if (e->posX.i.hi < -0x10 || e->posX.i.hi > 0x110) {
+        if (e->posX.i.hi < -0x10 - WIDE_X || e->posX.i.hi > 0x110 + WIDE_X) {
             continue;
         }
         if (e->posY.i.hi > 0xF0 || e->posY.i.hi < 0) {
@@ -667,10 +667,10 @@ static int IsTargetValid(Entity* entity) {
     if (entity->hitboxState == 0) {
         return 0;
     }
-    if (entity->posX.i.hi < -0x10) {
+    if (entity->posX.i.hi < -0x10 - WIDE_X) {
         return 0;
     }
-    if (entity->posX.i.hi > 0x110) {
+    if (entity->posX.i.hi > 0x110 + WIDE_X) {
         return 0;
     }
     if (entity->posY.i.hi > 0xF0) {
@@ -1217,7 +1217,7 @@ static Entity* FindTarget2(Entity* self) {
         if (e->flags & FLAG_UNK_00200000) {
             continue;
         }
-        if (e->posX.i.hi < -0x10 || e->posX.i.hi > 0x110) {
+        if (e->posX.i.hi < -0x10 - WIDE_X || e->posX.i.hi > 0x110 + WIDE_X) {
             continue;
         }
         if (e->posY.i.hi > 0xF0 || e->posY.i.hi < 0) {
@@ -1264,10 +1264,10 @@ static int IsTargetValid2(Entity* entity) {
     if (entity->hitboxState == 0) {
         return 0;
     }
-    if (entity->posX.i.hi < -0x10) {
+    if (entity->posX.i.hi < -0x10 - WIDE_X) {
         return 0;
     }
-    if (entity->posX.i.hi > 0x110) {
+    if (entity->posX.i.hi > 0x110 + WIDE_X) {
         return 0;
     }
     if (entity->posY.i.hi > 0xF0) {
@@ -1529,7 +1529,7 @@ void EntityMariaCardinalCrashFireball(Entity* self) {
                 prim = prim->next;
             }
             if (self->ext.mariaCardinalCrash.timer > 35 &&
-                (self->posX.i.hi < -16 || self->posX.i.hi > 272)) {
+                (self->posX.i.hi < -16 - WIDE_X || self->posX.i.hi > 272 + WIDE_X)) {
                 self->step = 2;
             }
         }

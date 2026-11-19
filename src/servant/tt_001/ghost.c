@@ -138,9 +138,9 @@ static Entity* FindValidTarget(Entity* self) {
             continue;
         if (entity->flags & FLAG_UNK_00200000)
             continue;
-        if (entity->posX.i.hi < -16)
+        if (entity->posX.i.hi < -16 - WIDE_X)
             continue;
-        if (entity->posX.i.hi > 272)
+        if (entity->posX.i.hi > 272 + WIDE_X)
             continue;
         if (entity->posY.i.hi > 240)
             continue;
