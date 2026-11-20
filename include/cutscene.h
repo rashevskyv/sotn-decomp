@@ -55,13 +55,17 @@ enum ActorNameIndices {
 #define CUTSCENE_FLAG_NONE 0
 
 #ifdef PLATFORM_PSYZ
-// 1 while a voice line plays: CSOP_NEXT_DIALOG waits (src/dra/sound.c)
+// 1 while a voice line plays: CSOP_NEXT_DIALOG waits (src/dra/sound.c).
+// Then the next box comes from the script table of the voice set selected
+// now (Lang_NextBox, src/pc/cutscene_pc.c).
 bool Cutscene_VoiceBusy(void);
+u8* Lang_NextBox(u8* p);
 #define CS_VOICE_WAIT()                                                        \
     if (Cutscene_VoiceBusy()) {                                                \
         g_Dialogue.scriptCur--;                                                \
         return;                                                                \
-    }
+    }                                                                          \
+    g_Dialogue.scriptCur = Lang_NextBox(g_Dialogue.scriptCur);
 u8* CutsceneAddrToPc(u32 psxAddr);
 #define CS_NEXT(ptr) (u16*)CutsceneAddrToPc(ptr)
 #define CS_PTR(ptr) CutsceneAddrToPc((u32)(uintptr_t)(ptr) + 0x100000)

@@ -2909,10 +2909,14 @@ add_custom_command(
 # without it those labels stay English.
 set(SOTN_LANG_MEDIA "$ENV{SOTN_LANG_MEDIA}" CACHE PATH "Folder with ps1vram_uk.bin of the Xbox 360 uk mod (optional)")
 file(GLOB_RECURSE SOTN_LANG_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/tools/lang/uk/*"
-    "${CMAKE_SOURCE_DIR}/tools/lang/fonts/*")
+    "${CMAKE_SOURCE_DIR}/tools/lang/en/*" "${CMAKE_SOURCE_DIR}/tools/lang/fonts/*")
 if(SOTN_LANG_MEDIA AND EXISTS "${SOTN_LANG_MEDIA}/ps1vram_uk.bin")
     list(APPEND SOTN_LANG_FILES "${SOTN_LANG_MEDIA}/ps1vram_uk.bin")
 endif()
+# The PSP text of the owner's image (tools/lang/disc_text.py; not in git):
+# the English PSP script table script_psp_en.bin
+file(GLOB SOTN_DISC_TEXT CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/disks/text/*.json")
+list(APPEND SOTN_LANG_FILES ${SOTN_DISC_TEXT})
 add_custom_command(
     OUTPUT "${SOTN_GEN_DIR}/lang_pack_uk.c"
     COMMAND "${CMAKE_COMMAND}" -E env
