@@ -16,7 +16,7 @@ are the pictures).
 uk: the recipe of the 1x labels in tools/lang/uk/labels (26 pt, baseline
 row 27, a 0.3 texel stroke, the widest tracking that fits 224 texels; the
 card 14 pt + 17 pt), so the HD ink sits on the 1x ink.
-en: size, tracking, stroke and place fitted to the stock en art (EN_FIT).
+en: size, tracking and place fitted to the stock en art (EN_FIT).
 
 The stock picture is a 16-level coverage ramp and each pass colours it with
 its own CLUT: fill 0x19F (dark to white), outline 0x19D (inverted: light at
@@ -73,26 +73,25 @@ ZONES = {
 CARD_EN = ("9372167d", (("Final Stage :", "st0a"), ('"Bloodlines"', "st0b")))
 CARD_UK = ("fa122c59", (("Останній етап :", 14), ('"Кровні узи"', 17)))
 
-# en: point size, tracking (texels), stroke (HD px), ink top-left in the
-# strip (HD px), fitted to the stock art by correlation of the 1x box; the
-# banner stroke is 0: the fitted 1..2 px made the HD text bold, the stock
-# strokes are thin
+# en: point size, tracking (texels), ink top-left in the strip (HD px),
+# fitted to the stock art by correlation of the 1x box. No stroke: the
+# stock strokes are thin, a fitted 1..2 px stroke made the HD text bold
 EN_FIT = {
-    "are": (28.5, 1.5, 0, 496, 44),
-    "cat": (29.5, 1.5, 0, 476, 44),
-    "chi": (28.5, 1.5, 0, 168, 44),
-    "dai": (30.5, 1.5, 0, 316, 44),
-    "dre": (31.0, 1.0, 0, 456, 36),
-    "lib": (29.5, 1.5, 0, 360, 44),
-    "no0": (29.5, 1.5, 0, 248, 44),
-    "no1": (29.0, 1.5, 0, 424, 44),
-    "no2": (28.5, 2.0, 0, 192, 44),
-    "no4": (29.0, 0.0, 0, 68, 44),
-    "nz0": (29.5, 0.0, 0, 96, 44),
-    "nz1": (29.0, 1.5, 0, 384, 36),
-    "top": (29.5, 1.5, 0, 416, 44),
-    "st0a": (14.5, 1.0, 2, 236, 12),
-    "st0b": (21.0, 0.5, 2, 148, 116),
+    "are": (28.5, 1.5, 496, 44),
+    "cat": (29.5, 1.5, 476, 44),
+    "chi": (28.5, 1.5, 168, 44),
+    "dai": (30.5, 1.5, 316, 44),
+    "dre": (31.0, 1.0, 456, 36),
+    "lib": (29.5, 1.5, 360, 44),
+    "no0": (29.5, 1.5, 248, 44),
+    "no1": (29.0, 1.5, 424, 44),
+    "no2": (28.5, 2.0, 192, 44),
+    "no4": (29.0, 0.0, 68, 44),
+    "nz0": (29.5, 0.0, 96, 44),
+    "nz1": (29.0, 1.5, 384, 36),
+    "top": (29.5, 1.5, 416, 44),
+    "st0a": (14.5, 1.0, 236, 12),
+    "st0b": (21.0, 0.5, 148, 116),
 }
 
 
@@ -128,8 +127,8 @@ def uk_zone(font_path, text):
 
 
 def en_zone(font_path, text, fit):
-    size, track, stroke, x, y = fit
-    big, box = draw(font_path, text, size, track, stroke)
+    size, track, x, y = fit
+    big, box = draw(font_path, text, size, track, 0)
     strip = Image.new("L", (STRIP_W * Z, STRIP_ROWS * Z))
     strip.paste(big.crop(box), (x, y))
     return strip
@@ -158,8 +157,8 @@ def uk_card(font_path):
 def en_card(font_path):
     page = Image.new("L", (PAGE * Z, PAGE * Z))
     for text, key in CARD_EN[1]:
-        size, track, stroke, x, y = EN_FIT[key]
-        big, box = draw(font_path, text, size, track, stroke)
+        size, track, x, y = EN_FIT[key]
+        big, box = draw(font_path, text, size, track, 0)
         page.paste(big.crop(box), (x, y))
     return page
 
