@@ -30,6 +30,9 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_ID_SATURN_15, 2, 40, 140, "garden-room2"},
     {STAGE_ID_SATURN_15, 3, 40, 140, "garden-room3"},
     {STAGE_ID_SATURN_15, 3, 400, 140, "garden-thornweed"},
+    {STAGE_ID_SATURN_15, 4, 40, 140, "garden-room4"},
+    {STAGE_ID_SATURN_15, 5, 40, 140, "garden-room5"},
+    {STAGE_ID_SATURN_15, 6, 40, 140, "garden-room6"},
 };
 
 enum SpawnPointStep {
