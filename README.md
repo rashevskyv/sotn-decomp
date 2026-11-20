@@ -75,7 +75,7 @@ If you clone with Git for Windows, switch off the line end change: `git clone -c
 | PSP familiar names, the two JP familiar cards | Works (the cards are an option). |
 | Voice sets (Japanese and PSP English) | Works, but see "Voice sets" below: the pack cannot be made from this repository alone yet. |
 | Ukrainian language | Works. Without `ps1vram_uk.bin` ten labels stay in English (see "Ukrainian language" below). |
-| Cheats, teleport list and map, tile editor page (port 8080, no password) | Test tools. |
+| Cheats, teleport list and map, boss list (a rematch of a beaten boss), tile editor page (port 8080, no password) | Test tools. |
 
 Offline tests: `python3 tools/test/run.py offline` (no game data needed).
 Tests with the game and the release checks: see [docs/TESTING.md](docs/TESTING.md). Most game tests are still manual. Expect bugs.

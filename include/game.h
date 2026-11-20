@@ -1129,6 +1129,20 @@ const char* Cheat_Warp(int stage, int room, int cx, int cy);
 const char* Cheat_WarpStart(int stage);
 // NULL when a warp can start now, else the reason.
 const char* Cheat_WarpRefusal(void);
+// The bosses of the teleport list (src/pc/cheats.c): the g_EnemyDefs ids of
+// the name (0 ends), the warp target, the castle room on the map (host 0xFF:
+// none), the time attack event and castle flags it clears for a rematch
+// (0xFF, 0: none), and its record in BIN/MONSTER.BIN (the bestiary picture).
+struct CheatBoss {
+    u16 enemy[3];
+    u8 stage, room;
+    s16 px, py;
+    u8 host, host_room, event, flag[2], bestiary;
+};
+extern const struct CheatBoss g_CheatBosses[];
+extern const int g_CheatBossCount;
+// Teleport into the fight of boss i. NULL when the warp starts, else why not.
+const char* Cheat_WarpBoss(int i);
 // Read by the door path in 5087C.c at the next stage load.
 extern struct WarpTarget {
     int active, stage, room, cx, cy;

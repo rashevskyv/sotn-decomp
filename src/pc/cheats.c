@@ -16,6 +16,12 @@ int g_EditorOn;
 int g_CheatSaveChar = -1;
 static int s_WarpArriving;
 static int s_MusicRestart;
+static void RematchWatch(void);
+// the boss list rematch (Cheat_WarpBoss)
+static struct {
+    int boss, arrived, room, record;
+    u8 old[2], seen;
+} s_Rematch = {-1};
 
 static int Solid(int x, int y) {
     Collider c;
@@ -163,11 +169,17 @@ void Cheat_OnFrame(void) {
     if (g_GameState != Game_Play) {
         filled = mapped = 0;
         g_CheatMistRequest = 0;
+        if (g_GameState != Game_NowLoading) {
+            // game over or title: the next load brings its own record and
+            // flags, a restore would write the old save's into it
+            s_Rematch.boss = -1;
+        }
         return;
     }
     if (g_GameStep != Play_Default || g_GameEngineStep != Engine_Normal) {
         return;
     }
+    RematchWatch();
     if (g_Cheat.map && !mapped && g_StageId != STAGE_ST0) {
         mapped = 1;
         RevealMap();
@@ -349,6 +361,24 @@ static int Crashes(int stage, int room) {
     return 0;
 }
 
+// mist 0: a boss door spot, the player arrives on foot (mist does not start
+// some bosses and falls through floors)
+static void StartWarp(int stage, int room, int cx, int cy, int mist) {
+    g_WarpTarget = (struct WarpTarget){1, stage, room, cx, cy};
+    // arrival in mist inside a wall must be safe: these stay on until the
+    // game ends; not written to sotn.ini, so the next start has them off
+    g_Cheat.items = 1;
+    if (mist) {
+        g_Cheat.refill = g_Cheat.walls = 1;
+        s_WarpArriving = 1;
+    }
+    D_80097C98 = 0;
+    D_8006C374 = 0; // 0x2C would force STAGE_TOP in Engine_Init
+    g_GameStep = Play_PrepareNextStage;
+    fprintf(stderr, "[cheat] warp %s room %d cell %d,%d: start\n",
+            Castle_StageName(stage), room, cx, cy);
+}
+
 const char* Cheat_Warp(int stage, int room, int cx, int cy) {
     const struct CastleRoom* r = FindRoom(stage, room);
     const char* why = Cheat_WarpRefusal();
@@ -367,20 +397,7 @@ const char* Cheat_Warp(int stage, int room, int cx, int cy) {
                 Castle_StageName(stage), room, cx, cy, why);
         return why;
     }
-    g_WarpTarget.active = 1;
-    g_WarpTarget.stage = stage;
-    g_WarpTarget.room = room;
-    g_WarpTarget.cx = cx;
-    g_WarpTarget.cy = cy;
-    // arrival in mist inside a wall must be safe: these stay on until the
-    // game ends; not written to sotn.ini, so the next start has them off
-    g_Cheat.refill = g_Cheat.items = g_Cheat.walls = 1;
-    s_WarpArriving = 1;
-    D_80097C98 = 0;
-    D_8006C374 = 0; // 0x2C would force STAGE_TOP in Engine_Init
-    g_GameStep = Play_PrepareNextStage;
-    fprintf(stderr, "[cheat] warp %s room %d cell %d,%d: start\n",
-            Castle_StageName(stage), room, cx, cy);
+    StartWarp(stage, room, cx, cy, 1);
     return NULL;
 }
 
@@ -407,6 +424,177 @@ const char* Cheat_WarpStart(int stage) {
         }
     }
     return "unknown room";
+}
+
+// The boss list of the port menu. stage, room, px, py: where the game's
+// boss door puts the player (the D_800A245C row that g_RoomBossTeleports
+// names, 5087C.c), or a spot inside the fight trigger of a boss in a castle
+// stage; Scylla: BO3 room 0, past the Wyrm of room 1. Doppleganger10,
+// Lesser Demon, Minotaurus and Olrox come when the player walks in.
+// The player arrives on foot (no mist, no refill: a real fight).
+// host, host_room: its castle room on the map (0xFF: none, DRE).
+// event and flags: what the boss checks to stay away once beaten.
+#define NO_EVENT 0xFF
+#define BOSS(e0, e1, e2, st, rm, x, y, h, hr, ev, f0, f1, b)                   \
+    { {e0, e1, e2}, st, rm, x, y, h, hr, ev, {f0, f1}, b }
+const struct CheatBoss g_CheatBosses[] = {
+    BOSS(0x0F3, 0x0FE, 0, STAGE_NZ0, 16, 672, 384, STAGE_NZ0, 16,
+         TIMEATTACK_EVENT_SLOGRA_GAIBON_DEFEAT, 0, 0, 20),
+    BOSS(0x0FD, 0, 0, STAGE_BO4, 0, 16, 132, STAGE_NO1, 11, NO_EVENT, 0, 0, 33),
+    BOSS(0x017, 0, 0, STAGE_LIB, 0, 512, 640, STAGE_LIB, 0,
+         TIMEATTACK_EVENT_LESSER_DEMON_DEFEAT, 0, 0, 79),
+    BOSS(0x0CB, 0x0CE, 0, STAGE_BO2, 0, 16, 132, STAGE_ARE, 5, NO_EVENT, 0, 0,
+         73),
+    BOSS(0x118, 0, 0, STAGE_NZ1, 0, 128, 160, STAGE_NZ1, 0,
+         TIMEATTACK_EVENT_KARASUMAN_DEFEAT, 0, 0, 86),
+    BOSS(
+        0x032, 0, 0, STAGE_BO0, 0, 496, 132, STAGE_NO2, 12, NO_EVENT, 0, 0, 91),
+    BOSS(0x127, 0, 0, STAGE_BO1, 0, 496, 132, STAGE_CAT, 3, NO_EVENT, 0, 0, 97),
+    BOSS(0x12C, 0, 0, STAGE_BO5, 0, 16, 132, STAGE_DAI, 4, NO_EVENT, 0, 0, 65),
+    BOSS(0x11F, 0, 0, STAGE_BO3, 0, 24, 132, STAGE_NO4, 28,
+         TIMEATTACK_EVENT_SCYLLA_DEFEAT, SCYLLA_DEFEATED, SCYLLA_WYRM_DEFEATED,
+         58),
+    BOSS(0x156, 0, 0, STAGE_DRE, 0, 16, 180, 0xFF, 0, NO_EVENT, 0, 0, 92),
+    BOSS(0x16B, 0, 0, STAGE_BO7, 0, 16, 132, STAGE_CHI, 2, NO_EVENT, 0, 0, 89),
+    BOSS(0x133, 0, 0, STAGE_BO6, 0, 240, 179, STAGE_TOP, 2, NO_EVENT,
+         SHAFT_ORB_DEFEATED, 0, 139),
+    BOSS(0x148, 0x14E, 0x151, STAGE_RBO0, 0, 496, 132, STAGE_RARE, 5, NO_EVENT,
+         0, 0, 132),
+    BOSS(0x144, 0, 0, STAGE_RBO1, 0, 1008, 388, STAGE_RNZ0, 16, NO_EVENT, 0, 0,
+         135),
+    BOSS(0x164, 0, 0, STAGE_RBO2, 0, 16, 132, STAGE_RCHI, 2, NO_EVENT, 0, 0,
+         143),
+    BOSS(0x16E, 0, 0, STAGE_RBO3, 0, 16, 132, STAGE_RDAI, 4, NO_EVENT, 0, 0,
+         129),
+    BOSS(0x172, 0, 0, STAGE_RBO4, 0, 16, 132, STAGE_RNO1, 11, NO_EVENT, 0, 0,
+         130),
+    BOSS(0x174, 0, 0, STAGE_RBO5, 0, 16, 132, STAGE_RNO4, 28, NO_EVENT, 0, 0,
+         128),
+    BOSS(0x10B, 0, 0, STAGE_RBO7, 0, 496, 132, STAGE_RNO2, 12, NO_EVENT, 0, 0,
+         126),
+    BOSS(0x0C6, 0, 0, STAGE_RBO8, 0, 496, 132, STAGE_RCAT, 3, NO_EVENT, 0, 0,
+         141),
+    BOSS(0x111, 0, 0, STAGE_RNZ1, 0, 128, 160, STAGE_RNZ1, 0,
+         TIMEATTACK_EVENT_DARKWING_BAT_DEFEAT, 0, 0, 109),
+    BOSS(0x15F, 0, 0, STAGE_RCEN, 1, 384, 440, STAGE_RCEN, 1, NO_EVENT, 0, 0,
+         144),
+    BOSS(0x17B, 0, 0, STAGE_RBO6, 2, 128, 77, STAGE_RCEN, 1, NO_EVENT, 0, 0,
+         145),
+};
+const int g_CheatBossCount = LEN(g_CheatBosses);
+
+// A rematch: the record and the flags of a beaten boss are 0 while the
+// player stays in its stage (a boss in a castle stage: its room), so the
+// boss comes back; then they get their old values, also after a new win.
+// ponytail: a save made in that time keeps the 0s, the boss then comes again
+
+static void RematchEnd(void) {
+    const struct CheatBoss* b;
+    int k;
+    if (s_Rematch.boss < 0) {
+        return;
+    }
+    b = &g_CheatBosses[s_Rematch.boss];
+    if (b->event != NO_EVENT && s_Rematch.record) {
+        g_Settings.timeAttackRecords[b->event] = s_Rematch.record;
+    }
+    for (k = 0; k < 2; k++) {
+        if (b->flag[k] && s_Rematch.old[k]) {
+            g_CastleFlags[b->flag[k]] = s_Rematch.old[k];
+        }
+    }
+    if (b->stage == STAGE_RCEN) {
+        g_CastleFlags[SHAFT_FIGHT_CS_UNK1] = s_Rematch.seen;
+    }
+    fprintf(stderr, "[cheat] boss %d: record %d and flags back\n",
+            s_Rematch.boss, s_Rematch.record);
+    s_Rematch.boss = -1;
+}
+
+// Once a frame in play: the end of a rematch, and one log line when the
+// boss entity is there (the boss list test).
+static void RematchWatch(void) {
+    const struct CheatBoss* b;
+    int i;
+    if (s_Rematch.boss < 0 || g_WarpTarget.active) {
+        return;
+    }
+    b = &g_CheatBosses[s_Rematch.boss];
+    if (!s_Rematch.arrived) {
+        s_Rematch.arrived = g_StageId == b->stage;
+        s_Rematch.room = g_LastRoom.room;
+        return;
+    }
+    if (g_StageId != b->stage ||
+        (b->stage == b->host && g_LastRoom.room != s_Rematch.room)) {
+        RematchEnd();
+        return;
+    }
+    if (s_Rematch.arrived > 1200) {
+        return;
+    }
+    for (i = 0; i < TOTAL_ENTITY_COUNT; i++) {
+        if (g_Entities[i].entityId && g_Entities[i].enemyId == b->enemy[0] &&
+            g_Entities[i].hitPoints > 0) {
+            fprintf(stderr,
+                    "[cheat] boss %d: enemy %03X in slot %d, hp %d, %d frames "
+                    "after the arrival\n",
+                    s_Rematch.boss, b->enemy[0], i, g_Entities[i].hitPoints,
+                    s_Rematch.arrived);
+            s_Rematch.arrived = 1201;
+            return;
+        }
+    }
+    if (++s_Rematch.arrived > 1200) {
+        fprintf(stderr, "[cheat] boss %d: enemy %03X not seen in 20 s\n",
+                s_Rematch.boss, b->enemy[0]);
+    }
+}
+
+const char* Cheat_WarpBoss(int i) {
+    const struct CheatBoss* b = &g_CheatBosses[i];
+    const char* why = Cheat_WarpRefusal();
+    int k;
+    if (why) {
+        fprintf(stderr, "[cheat] boss %d: refused, %s\n", i, why);
+        return why;
+    }
+    RematchEnd();
+    if (getenv("SOTN_TEST_BEATEN")) { // a test: as on a finished save
+        if (b->event != NO_EVENT) {
+            g_Settings.timeAttackRecords[b->event] = 1;
+        }
+        for (k = 0; k < 2; k++) {
+            g_CastleFlags[b->flag[k]] |= b->flag[k] ? 1 : 0;
+        }
+    }
+    s_Rematch.boss = i;
+    s_Rematch.arrived = 0;
+    s_Rematch.record = 0;
+    if (b->event != NO_EVENT) {
+        s_Rematch.record = g_Settings.timeAttackRecords[b->event];
+        g_Settings.timeAttackRecords[b->event] = 0;
+    }
+    for (k = 0; k < 2; k++) {
+        s_Rematch.old[k] = b->flag[k] ? g_CastleFlags[b->flag[k]] : 0;
+        if (b->flag[k]) {
+            g_CastleFlags[b->flag[k]] = 0;
+        }
+    }
+    fprintf(stderr, "[cheat] boss %d: record %d, flags %d %d cleared\n", i,
+            s_Rematch.record, s_Rematch.old[0], s_Rematch.old[1]);
+    s_Rematch.seen = g_CastleFlags[SHAFT_FIGHT_CS_UNK1];
+    if (b->stage == STAGE_RCEN) {
+        // the warp lands next to Shaft in his chamber, where the talk scene
+        // (spawned below it) does not start: as after the talk, Shaft then
+        // starts the fight when the player is near (e_shaft.c)
+        g_CastleFlags[SHAFT_FIGHT_CS_UNK1] = 1;
+    }
+    StartWarp(b->stage, b->room, -1, -1, 0);
+    g_WarpTarget.exact = 1;
+    g_WarpTarget.px = b->px;
+    g_WarpTarget.py = b->py;
+    return NULL;
 }
 
 // Mode B, APPLY NOW. The full player reload of the demo end (5087C.c,
@@ -471,8 +659,15 @@ RoomHeader* Cheat_WarpRoom(void) {
     g_WarpTarget.active = 0;
     for (n = 0; rooms[n].left != 0x40; n++) {
     }
-    // the table index is a hint: check it against the loaded stage
-    if (g_WarpTarget.room < n && RoomHasCell(&rooms[g_WarpTarget.room], cx, cy)) {
+    // the table index is a hint: check it against the loaded stage; with no
+    // cell (the boss list) the exact pixel names the cell
+    if (cx < 0 && g_WarpTarget.room < n &&
+        rooms[g_WarpTarget.room].load.tilesetId != 0xFF) {
+        room = &rooms[g_WarpTarget.room];
+        cx = room->left + (g_WarpTarget.px >> 8);
+        cy = room->top + (g_WarpTarget.py >> 8);
+    } else if (g_WarpTarget.room < n &&
+               RoomHasCell(&rooms[g_WarpTarget.room], cx, cy)) {
         room = &rooms[g_WarpTarget.room];
     }
     for (i = 0; !room && i < n; i++) {
