@@ -1014,7 +1014,8 @@ static void SaturnGdnUpdate(void) {
     u32 sum = 0;
 
     Update();
-    len = snprintf(line, sizeof(line), "[ent] room=%d", SaturnStageCurrentRoom());
+    len = snprintf(line, sizeof(line), "[ent] room=%d php=%d",
+                   SaturnStageCurrentRoom(), g_Status.hp);
     for (e = &g_Entities[STAGE_ENTITY_START];
          e < &g_Entities[TOTAL_ENTITY_COUNT]; e++) {
         if (!e->entityId || !e->pfnUpdate) {
@@ -1029,6 +1030,7 @@ static void SaturnGdnUpdate(void) {
                   e->step;
         }
     }
+    sum += g_Status.hp * 17;
     if (++s_Frame >= 60 || sum != s_LastSum) {
         fprintf(stderr, "%s n=%d\n", line, count);
         s_Frame = 0;
