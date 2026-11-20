@@ -41,6 +41,7 @@ void EntityModBreakableBase(Entity*);
 void EntityModPillarSwitch(Entity*);
 void EntityModPillar(Entity*);
 void EntityModPillarDebris(Entity*);
+void EntityModBanner(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -52,7 +53,7 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityIntenseExplosion,
     EntitySoulStealOrb,
     EntityDummy, // E_ROOM_FOREGROUND: the native renderer draws it
-    EntityDummy, // E_STAGE_NAME_POPUP: no area name art
+    EntityModBanner, // E_STAGE_NAME_POPUP: Saturn 0x09 (e_mod_banner.c)
     EntityEquipItemDrop,
     EntityRelicOrb,
     EntityPersistentItemDrop,

@@ -149,6 +149,7 @@ set(SATURN_PRISON_SOURCES
     src/st/stage16/e_spear_guard.c
     src/st/stage16/e_bone_archer.c
     src/st/stage16/e_slinger.c
+    src/st/stage16/e_mod_banner.c
     src/st/stage16/e_mod_ghosts.c
     src/st/stage16/e_mod_pillar.c
     src/st/stage16/popup.c

@@ -846,13 +846,15 @@ LayoutEntity* entityLayoutVertical[GDN_LAYOUTS];
 
 #ifdef SATURN_STAGE_PRISON
 // Saturn STAGE_16 entity id -> stage16.h EntityID. The ids without a port
-// (the area name banner) stay idle.
+// stay idle.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
     switch (saturnId) {
     case 0x01:
         return E_BREAKABLE;
     case 0x05:
         return E_RED_DOOR;
+    case 0x09:
+        return E_STAGE_NAME_POPUP;
     case 0x0F:
         return saveRoom ? E_SATURN_MASONRY : E_DUMMY_0F;
     case 0x10:

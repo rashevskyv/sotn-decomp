@@ -66,7 +66,7 @@ ROOMS = 4
 GARDEN = dict(SPRITE_SETS=SPRITE_SETS, DECORATIONS=DECORATIONS,
               DECORATION_GROUPS=DECORATION_GROUPS, PALETTE_BLOCKS=PALETTE_BLOCKS,
               BLEED_BANKS=BLEED_BANKS, STP_BANKS=STP_BANKS, DROPS=DROPS,
-              GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS)
+              GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS, BANNER=None)
 # Cursed Prison: bank and frame table addresses from config/saturn
 # stage_16_user_syms.txt and the gfx segments of stage_16.prg.yaml
 P_BANK16 = (0x060E8F60, 0x060E8F08)
@@ -96,7 +96,10 @@ PRISON = dict(
     STP_BANKS=(0x060ECB58, 0x060EEC7C),
     GROUP_ROOMS={"candles": (0, 1), "gargoyles": (1,), "spearguard": (0,),
                  "archer": (0,), "slinger": (0,), "specter": (1,),
-                 "wisp": (1,), "pillar": (0,)},
+                 "wisp": (1,), "pillar": (0,), "banner": (0, 1)},
+    # the area name banner (Saturn 0x09, rooms 0 and 1): bank 18's two
+    # 128x48 halves of "呪われた牢獄 / Cursed Prison" (e_mod_banner.c)
+    BANNER=(0x060E8FA8, (0, 1), "banner"),
     # Saturn item numbers -> PS1 drop ids (both lists: Saturn hand item n + 2
     # is PS1 item n here; the names and icons match): Mana Prism 292 -> 0x122,
     # Antivenom 274 -> 0x110, Potion 289 -> 0x11F
@@ -160,6 +163,11 @@ def main(disc, out_path, stage="STAGE_15"):
                 dy = e[4] if len(e) > 4 else 0
                 bank.append([dict(p, y=p["y"] + dy) for p in parts])
             out.append((n, bank))
+        if BANNER:
+            bank, imgs, g = BANNER
+            clut = sheets[g]._clut(st.palettes(bank)[0])
+            out.append(("banner", [sheets[g]._place(st, bank, i) + (clut,)
+                                   for i in imgs]))
         return out
 
     seen = {g: PsxSpriteSheet([(0, 0)] * 16, CLUT_BASE) for g in GROUP_ROOMS}
@@ -224,6 +232,8 @@ def main(disc, out_path, stage="STAGE_15"):
     keys = ("flags", "x", "y", "width", "height", "clut", "tileset",
             "left", "top", "right", "bottom")
     table = []
+    banner = [b for n, b in banks if n == "banner"]
+    banks = [(n, b) for n, b in banks if n != "banner"]
     for n, frames in banks:
         for i, parts in enumerate(frames):
             if parts is None:
@@ -275,6 +285,15 @@ def main(disc, out_path, stage="STAGE_15"):
         # the block's first palette, for primitives drawn in its colours
         defs.append("#define MOD_%s_COLORS %s" % (name, ", ".join(
             "0x%04X" % c for c in cluts[base - CLUT_BASE])))
+    # the area name banner's images: {tpage, clut, u, v, width, height} each
+    # (PSX texel coordinates inside the 4bpp tpage)
+    for parts in banner:
+        defs.append("#define MOD_BANNER_PARTS %s" % ", ".join(
+            "{%d, 0x%03X, %d, %d, %d, %d}" % (
+                sheets[BANNER[2]].quadrants[q][0], clut,
+                (sheets[BANNER[2]].quadrants[q][1] & 1) * 128 + u,
+                (sheets[BANNER[2]].quadrants[q][1] >> 1) * 128 + v, w, h)
+            for q, u, v, w, h, clut in parts))
     with open(os.path.join(os.path.dirname(os.path.abspath(out_path)), "gdn_defs.h"), "w") as f:
         f.write("\n".join(defs) + "\n")
     for r in range(ROOMS):
