@@ -465,11 +465,11 @@ static int BoxLineAt(int y, int count) {
     return y >= top - 3 && i >= 0 && i < count ? i : -1;
 }
 
+#ifndef __SWITCH__
 static int InBox(int x, int y) {
     return x >= box_x && x < box_x + box_w && y >= box_y && y < box_y + box_h;
 }
 
-#ifndef __SWITCH__
 // PC: the mouse moved on the list page. Over a line it selects that line,
 // as the D-pad does (its rooms go red on the mini map); over the mini map
 // it selects the line of the room there (MiniPick). The box first: at 4:3
@@ -531,7 +531,7 @@ static void Tap(int x, int y) {
         : page == PAGE_CONTROLS ? CTL_LINES + 1
         : page == PAGE_LIST     ? ListLines() + 1
                                 : n_owners;
-    if (page == PAGE_LIST && !InBox(x, y)) {
+    if (page == PAGE_LIST && (x < box_x || x >= box_x + box_w)) {
         MiniPick(x, y); // a tap on the mini map selects, Cross then warps
         return;
     }
@@ -1673,13 +1673,9 @@ static void AddEnemy(char* line, int id) {
     Add(line, tmp);
 }
 
-// "NZ0  SLOGRA / GAIBON": the castle stage of the fight and the names; a
-// third name is left out ("...")
-static void AddBoss(char* line, const struct CheatBoss* b) {
-    char tmp[8];
-    sprintf(
-        tmp, "%-4s ", Castle_StageName(b->host != 0xFF ? b->host : b->stage));
-    Add(line, tmp);
+// "SLOGRA / GAIBON": the names of a boss fight; a third name is left out
+// ("...")
+static void AddNames(char* line, const struct CheatBoss* b) {
     AddEnemy(line, b->enemy[0]);
     if (b->enemy[1]) {
         Add(line, " / ");
@@ -1688,6 +1684,15 @@ static void AddBoss(char* line, const struct CheatBoss* b) {
     if (b->enemy[2]) {
         Add(line, " ...");
     }
+}
+
+// "NZ0  SLOGRA / GAIBON": the castle stage of the fight and the names
+static void AddBoss(char* line, const struct CheatBoss* b) {
+    char tmp[8];
+    sprintf(
+        tmp, "%-4s ", Castle_StageName(b->host != 0xFF ? b->host : b->stage));
+    Add(line, tmp);
+    AddNames(line, b);
 }
 
 // The bestiary picture of a boss (the librarian's, BIN/MONSTER.BIN: 96x112
@@ -1849,12 +1854,9 @@ static void DrawMini(int it) {
     Rect(vx0, vy0, vx1 - vx0, vy1 - vy0, 8, 8, 24); // the background last
 }
 
-// "NO0  MARBLE GALLERY" onto a line
-static void AddPlace(char* line, int id) {
-    char tmp[8];
+// "MARBLE GALLERY": the area name of a stage
+static void AddZone(char* line, int id) {
     const char* uk_name = uk ? Lang_Zone(id) : NULL;
-    sprintf(tmp, "%-4s ", Castle_StageName(id));
-    Add(line, tmp);
     if (uk_name) {
         AddCells(line, uk_name, "");
     } else {
@@ -1862,35 +1864,56 @@ static void AddPlace(char* line, int id) {
     }
 }
 
-// the widest place or boss line: both list pages are as wide, whatever the
-// lines on screen and the header say, so the mini map beside them never
-// moves under the pointer
+// the line of list item id: "NO0  MARBLE GALLERY", "NZ0  SLOGRA / GAIBON"
+static void ItemLine(char* line, int id) {
+    char tmp[8];
+    if (id == ITEM_MAP) {
+        AddW(line, P_CASTLE_MAP, "CASTLE MAP");
+    } else if (id == ITEM_BOSSES) {
+        AddW(line, P_BOSS, "BOSS");
+        Add(line, " >");
+    } else if (id >= ITEM_BOSS) {
+        AddBoss(line, &g_CheatBosses[id - ITEM_BOSS]);
+    } else {
+        sprintf(tmp, "%-4s ", Castle_StageName(id));
+        Add(line, tmp);
+        AddZone(line, id);
+    }
+}
+
+// The widest line a list page can show: its lines, and the header with the
+// names of the other list (the boss names on the place list, the area names
+// on the boss list). So the box keeps one width while the list scrolls and
+// the pointer moves, and the mini map beside it stays put under the pointer.
 static int ListWidth(void) {
-    static int w, w_uk = -1;
+    static int w[2], w_uk[2] = {-1, -1};
     char line[LINE_MAX];
-    int i;
-    if (w_uk == uk) {
-        return w;
+    int i, *pw = &w[list_boss];
+    if (w_uk[list_boss] == uk) {
+        return *pw;
     }
-    w_uk = uk;
-    w = 0;
-    for (i = 0; i < g_CastleStageCount + g_CheatBossCount; i++) {
+    w_uk[list_boss] = uk;
+    *pw = 0;
+    for (i = 0; i < n_items + MAX(g_CastleStageCount, g_CheatBossCount);
+         i++) {
         Clear(line);
-        if (i < g_CastleStageCount) {
-            AddPlace(line, g_CastleStages[i].id);
-        } else {
-            AddBoss(line, &g_CheatBosses[i - g_CastleStageCount]);
+        if (i < n_items) {
+            ItemLine(line, items[i]);
+        } else if (list_boss && i - n_items < g_CastleStageCount) {
+            AddZone(line, g_CastleStages[i - n_items].id);
+        } else if (!list_boss && i - n_items < g_CheatBossCount) {
+            AddNames(line, &g_CheatBosses[i - n_items]);
         }
-        w = MAX(w, Width(line));
+        *pw = MAX(*pw, Width(line));
     }
-    return w;
+    return *pw;
 }
 
 // "NO0  MARBLE GALLERY" lines, or the boss list with the boss picture
 static void DrawList(void) {
     char lines[CTL_LINES + 1][LINE_MAX], tmp[40];
     const struct CastleRoom* rm = NULL;
-    int i, k, id, vx0, vy0, vx1, vy1, n = ListLines(), b = -1;
+    int i, vx0, vy0, vx1, vy1, id, n = ListLines(), b = -1;
     if (sel < list_top) {
         list_top = sel;
     } else if (sel >= list_top + n) {
@@ -1908,10 +1931,10 @@ static void DrawList(void) {
         snprintf(tmp, sizeof(tmp), uk ? " %.24s" : " %.27s", msg);
         Add(lines[0], tmp);
     } else if (rm) { // the place of the room under the pointer
-        AddPlace(lines[0], rm->stage);
+        AddZone(lines[0], rm->stage);
         box_mark = 0;
     } else if (b >= 0) { // the boss of the room under the pointer
-        AddBoss(lines[0], &g_CheatBosses[b]);
+        AddNames(lines[0], &g_CheatBosses[b]);
         box_mark = 0;
     } else if (list_boss) {
         AddW(lines[0], P_BOSS, "BOSS");
@@ -1919,18 +1942,8 @@ static void DrawList(void) {
         AddW(lines[0], P_TELEPORT, "TELEPORT");
     }
     for (i = 1; i <= n; i++) {
-        id = items[k = list_top + i - 1];
         Clear(lines[i]);
-        if (id == ITEM_MAP) {
-            AddW(lines[i], P_CASTLE_MAP, "CASTLE MAP");
-        } else if (id == ITEM_BOSSES) {
-            AddW(lines[i], P_BOSS, "BOSS");
-            Add(lines[i], " >");
-        } else if (id >= ITEM_BOSS) {
-            AddBoss(lines[i], &g_CheatBosses[id - ITEM_BOSS]);
-        } else {
-            AddPlace(lines[i], id);
-        }
+        ItemLine(lines[i], items[list_top + i - 1]);
     }
     ViewRect(&vx0, &vy0, &vx1, &vy1);
     box_left = 1;
