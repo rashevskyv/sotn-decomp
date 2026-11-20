@@ -57,8 +57,6 @@ PALETTE_BLOCKS = {"GARGOYLE": ("gargoyles", 0x060F2ED8),
                   "TREE": ("tree", 0x060F6DC4)}
 BLEED_BANKS = (0x060F82C8, 0x060F6DC4)
 STP_BANKS = ()
-# Saturn drop item numbers the PC knows (others: no drop)
-DROPS = {}
 # the ordinary rooms (s_SaturnStageRooms 0-3) each group is used in
 GROUP_ROOMS = {
     "candles": (0, 1, 3), "scene": (2,), "drips": (1, 3), "gargoyles": (0,),
@@ -71,7 +69,7 @@ ROOMS = 4
 BANNER = (0x060F08D4, (0, 1, 2, 6), "banner")
 GARDEN = dict(SPRITE_SETS=SPRITE_SETS, DECORATIONS=DECORATIONS,
               DECORATION_GROUPS=DECORATION_GROUPS, PALETTE_BLOCKS=PALETTE_BLOCKS,
-              BLEED_BANKS=BLEED_BANKS, STP_BANKS=STP_BANKS, DROPS=DROPS,
+              BLEED_BANKS=BLEED_BANKS, STP_BANKS=STP_BANKS,
               GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS, BANNER=BANNER)
 # Cursed Prison: bank and frame table addresses from config/saturn
 # stage_16_user_syms.txt and the gfx segments of stage_16.prg.yaml
@@ -106,16 +104,43 @@ PRISON = dict(
     # the area name banner (Saturn 0x09, rooms 0 and 1): bank 18's two
     # 128x48 halves of "呪われた牢獄 / Cursed Prison" (e_mod_banner.c)
     BANNER=(0x060E8FA8, (0, 1), "banner"),
-    # Saturn item numbers -> PS1 drop ids (both lists: Saturn hand item n + 2
-    # is PS1 item n here; the names and icons match): Mana Prism 292 -> 0x122,
-    # Antivenom 274 -> 0x110, Potion 289 -> 0x11F
-    DROPS={292: 0x122, 274: 0x110, 289: 0x11F},
     ROOMS=2,
 )
 STAGES = {"STAGE_15": GARDEN, "STAGE_16": PRISON}
 QUADRANTS = [(t, q) for t in range(18, 24) for q in range(4)]
 CLUT_BASE = 0x210
 GAME_BASE, ENEMY_DEFS, FIRST, COUNT = 0x06066000, 0x06080288, 400, 26
+
+
+def ps1_drop(n):
+    """A Saturn drop number as the PS1's (ItemDrops, items.h); 0: no drop.
+
+    Below 0x80 the prizes (hearts, gold, subweapons) are the PS1's table.
+    0x80 + n: Saturn hand item n (176 of them, GAME.PRG g_EquipDefs). 0-69
+    are the PS1's, 72-168 the PS1's 70-166 (Mana Prism 292 -> 0x122,
+    Antivenom 274 -> 0x110); 70-71, 169-175 are Saturn-only or unchecked.
+    0x130 + n: Saturn armor n (104, g_AccessoryDefs; the names decoded):
+    0-52 are the PS1's (0x129 + n), 55-74 the PS1's 54-73 (Zircon 64 ->
+    0x168); 53-54 and 75 on are Saturn-only or unchecked.
+    """
+    if n < 0x80:
+        return n
+    h = n - 0x80
+    if h < 70:
+        return 0x80 + h
+    if 72 <= h <= 168:
+        return 0x80 + h - 2
+    a = h - 176
+    if 0 <= a <= 52:
+        return 0x129 + a
+    if 55 <= a <= 74:
+        return 0x129 + a - 1
+    return 0
+
+
+assert (ps1_drop(292), ps1_drop(274), ps1_drop(289), ps1_drop(314),
+        ps1_drop(368), ps1_drop(301), ps1_drop(5)) == (
+            0x122, 0x110, 0x11F, 0x133, 0x168, 0, 5)
 
 
 def quad_vram(tpage, quad):
@@ -270,9 +295,9 @@ def main(disc, out_path, stage="STAGE_15"):
                                ENEMY_DEFS - GAME_BASE + i * 0x28)
         (_name, hp, atk, elem, dfn, hbs, weak, strong, imm, absorb, level, exp,
          rare, unc, rr, ur, bw, bh, flags) = r
-        # the Saturn's drops use its own item numbers: DROPS maps the known
-        # ones, the rest drop nothing
-        rare, unc = DROPS.get(rare, 0), DROPS.get(unc, 0)
+        # the Saturn's drops use its own item numbers (ps1_drop): the
+        # Saturn-only items drop nothing
+        rare, unc = ps1_drop(rare), ps1_drop(unc)
         rr, ur = rr if rare else 0, ur if unc else 0
         # _S(): sotn_str ends the name with the 0xFF 0x00 the popup reads
         w("    {_S(\"\"), %d, %d, 0x%X, %d, %d, 0x%X, 0x%X, 0x%X, 0x%X, %d, %d, "
