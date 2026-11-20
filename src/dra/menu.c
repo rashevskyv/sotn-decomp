@@ -1334,9 +1334,14 @@ void MenuButtonConfigDraw(MenuContext* ctx) {
     s32 buttonId;
 
 #if REGION != REGION_JP
-    const s32 startX = 0xC0;
+#ifdef PLATFORM_PSYZ
+    const s32 dx = ctx->cursorX - 148; // ButtonWinPlace
+#else
+    const s32 dx = 0;
+#endif
+    const s32 startX = 0xC0 + dx;
     const s32 W = 0x54;
-    s32 cursorX = 0x98;
+    s32 cursorX = 0x98 + dx;
 #define XVAR x
 #elif TARGET == TARGET_PSP
     const s32 startX = 0xCC;
@@ -2269,13 +2274,11 @@ void func_800F82F4(void) {
     LoadImage(&dstRect, (u_long*)g_imgUnk8013C270->data);
 }
 
-void MenuSystemDraw(MenuContext* ctx) {
-#if REGION == REGION_JP
-    const int Width = 80;
-#elif defined(PLATFORM_PSYZ)
-    // port: the bar from x 30 ends 2 px after the longest label (from x 32),
-    // at least the stock 128. uk: 19 cells, the bar ends at x 186, left of
-    // the cloak colour window (CLOAK_WIN_X).
+#ifdef PLATFORM_PSYZ
+// port: the settings bar from x 30 ends 2 px after the longest label (from
+// x 32), at least the stock 128. uk: 19 cells, the bar ends at x 186, left
+// of the cloak colour window (CLOAK_WIN_X).
+static s32 SettingsBarW(void) {
     static const u8 labels[] = {16, 17, 18, 19, 35, 32, 36};
     s32 Width = 128;
     s32 i;
@@ -2283,6 +2286,32 @@ void MenuSystemDraw(MenuContext* ctx) {
         s32 w = MenuStrWidth(g_MenuStr[labels[i]]) + 4;
         Width = w > Width ? w : Width;
     }
+    return Width;
+}
+
+// port: the button popup (200 wide, stock x 148 covered the end of the uk
+// label) 4 px right of the settings bar when the canvas has room (16:9:
+// x 190 in uk, past the settings window at 360 into the margin). On a
+// canvas without margins (4:3) it ends 2 px before the right edge and its
+// opaque window covers the last 4 px of the uk bar (x 182).
+int Wide_Canvas(int* x0, int* y0, int* x1, int* y1);
+static void ButtonWinPlace(void) {
+    MenuContext* win = &g_Menus[MENU_DG_CFG_BUTTONS];
+    s32 x0, y0, x1, y1, x;
+    if (!Wide_Canvas(&x0, &y0, &x1, &y1)) {
+        x1 = DISP_MENU_W;
+    }
+    x = 30 + SettingsBarW() + 4;
+    x = MIN(x, x1 - win->cursorW - 2);
+    win->cursorX = win->unk1.x = x;
+}
+#endif
+
+void MenuSystemDraw(MenuContext* ctx) {
+#if REGION == REGION_JP
+    const int Width = 80;
+#elif defined(PLATFORM_PSYZ)
+    const s32 Width = SettingsBarW();
 #else
     const int Width = 128;
 #endif
@@ -4767,6 +4796,9 @@ block_4:
         } else if (g_pads[0].tapped & PAD_MENU_CONFIRM) {
             switch (g_MenuNavigation.cursorSettings) {
             case 0:
+#ifdef PLATFORM_PSYZ
+                ButtonWinPlace();
+#endif
                 MenuShow(MENU_DG_CFG_BUTTONS);
                 g_MenuStep = MENU_STEP_SYSTEM_BUTTONS;
                 break;
