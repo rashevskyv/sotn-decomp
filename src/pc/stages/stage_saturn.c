@@ -24,9 +24,14 @@
 
 static SpriteParts* s_SpriteBanks[0x14];
 #ifdef SATURN_STAGE_GDN
-// stage15: the PS1 stage framework (src/st/stage15) runs the layout entities,
-// with the Saturn enemies and their converted sprites (gdn_entities.py)
+// stage15 and stage16: the PS1 stage framework (src/st/stage15, stage16) runs
+// the layout entities, with the Saturn enemies and their converted sprites
+// (gdn_entities.py)
+#ifdef SATURN_STAGE_PRISON
+#include "../../st/stage16/stage16.h"
+#else
 #include "../../st/stage15/stage15.h"
+#endif
 #include "gdn_entities.h"
 static u_long* s_GdnPalDef[] = {
     MAKE_PAL_OP(PAL_BULK_COPY, 0),
@@ -831,13 +836,43 @@ void UpdateStageEntities(void);
 u16 g_GdnSolidTile;
 
 #define GDN_LAYOUTS LEN(s_SaturnStageObjLayouts)
-#define GDN_LAYOUT_MAX 64
+// the head, the entries and the tail (the Prison's room 0 has 68 entries)
+#define GDN_LAYOUT_MAX 80
 static LayoutEntity s_GdnLayoutX[GDN_LAYOUTS][GDN_LAYOUT_MAX];
 static LayoutEntity s_GdnLayoutY[GDN_LAYOUTS][GDN_LAYOUT_MAX];
 // create_entity.h reads these by name on the PC (pfn_entity_update.h)
 LayoutEntity* entityLayoutHorizontal[GDN_LAYOUTS];
 LayoutEntity* entityLayoutVertical[GDN_LAYOUTS];
 
+#ifdef SATURN_STAGE_PRISON
+// Saturn STAGE_16 entity id -> stage16.h EntityID. The ids without a port
+// (Specter 0x20, Will-o'-Wisp 0x28, the bank 19 objects 0x16/0x17, area name)
+// stay idle.
+static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
+    switch (saturnId) {
+    case 0x01:
+        return E_BREAKABLE;
+    case 0x05:
+        return E_RED_DOOR;
+    case 0x0F:
+        return saveRoom ? E_SATURN_MASONRY : E_DUMMY_0F;
+    case 0x10:
+        return E_SATURN_CONTROLLER;
+    case 0x11:
+        return E_ID_11;
+    case 0x18:
+        return E_BONE_ARCHER;
+    case 0x1A:
+        return E_SPEAR_GUARD;
+    case 0x1D:
+        return E_SLINGER;
+    case 0x21:
+        return E_MOD_GARGOYLE;
+    default:
+        return E_DUMMY_0F;
+    }
+}
+#else
 // Saturn STAGE_15 entity id -> stage15.h EntityID. The ids without a port
 // (water, Slinger, Thornweed, area name, CD room foreground) stay idle.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
@@ -872,6 +907,7 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_DUMMY_0F;
     }
 }
+#endif
 
 // insertion sort: stable, so equal positions keep the Saturn order
 static void SaturnGdnSortLayout(LayoutEntity* list, s32 count, bool byY) {

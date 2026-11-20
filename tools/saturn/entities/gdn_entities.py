@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Underground Garden (Saturn STAGE_15) enemy data for the PC stage module.
+"""Underground Garden (Saturn STAGE_15) and Cursed Prison (STAGE_16) enemy
+data for the PC stage modules.
 
 Reads the Saturn disc files and writes one C header into the build folder:
 the converted sprite frames (ANIMSET_OVL banks), their 4bpp pages as one
@@ -13,7 +14,11 @@ saturn_sprites.py. The PC has the whole PS1 sprite area free (tpages 18-23:
 the stage tiles are drawn by the native 8x8 renderer), so each room gets one
 bank and no zone streaming is needed.
 
-usage: gdn_entities.py <saturn disc dir> <output header>
+The Prison's Spear Guard, Bone Archer and Slinger run the PS1 code (NO4,
+NO0): the Saturn frames keep the PS1 frame numbers, so frame n of a Saturn
+bank becomes frame n of its ANIMSET_OVL bank.
+
+usage: gdn_entities.py <saturn disc dir> <output header> [STAGE_15|STAGE_16]
 """
 import os
 import struct
@@ -55,6 +60,31 @@ GROUP_ROOMS = {
     "maneater": (3,), "boss": (2,),
 }
 ROOMS = 4
+GARDEN = dict(SPRITE_SETS=SPRITE_SETS, DECORATIONS=DECORATIONS,
+              DECORATION_GROUPS=DECORATION_GROUPS, PALETTE_BLOCKS=PALETTE_BLOCKS,
+              BLEED_BANKS=BLEED_BANKS, GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS)
+# Cursed Prison: bank and frame table addresses from config/saturn
+# stage_16_user_syms.txt and the gfx segments of stage_16.prg.yaml
+P_BANK16 = (0x060E8F60, 0x060E8F08)
+PRISON = dict(
+    SPRITE_SETS=[
+        # the breakables' frames keep their Saturn numbers (stdata.c)
+        (2, [("candles",) + P_BANK16 + (f,) for f in range(1, 13)]),
+        (3, "decorations"),
+        (7, [("gargoyles", 0x060ECEF0, 0x060EE030, f) for f in range(1, 60)]),
+        (8, [("spearguard", 0x060EB498, 0x060EC46C, f) for f in range(1, 65)]),
+        (9, [("archer", 0x060EABC4, 0x060EB218, f) for f in range(1, 41)]),
+        (10, [("slinger", 0x060EC6AC, 0x060EC9D8, f) for f in range(1, 23)]),
+    ],
+    DECORATIONS=(0x060EA1CC, 6),
+    DECORATION_GROUPS=["candles"] * 6,
+    PALETTE_BLOCKS={"GARGOYLE": ("gargoyles", 0x060ECEF0)},
+    BLEED_BANKS=(),
+    GROUP_ROOMS={"candles": (0, 1), "gargoyles": (1,), "spearguard": (0,),
+                 "archer": (0,), "slinger": (0,)},
+    ROOMS=2,
+)
+STAGES = {"STAGE_15": GARDEN, "STAGE_16": PRISON}
 QUADRANTS = [(t, q) for t in range(18, 24) for q in range(4)]
 CLUT_BASE = 0x210
 GAME_BASE, ENEMY_DEFS, FIRST, COUNT = 0x06066000, 0x06080288, 400, 26
@@ -79,9 +109,11 @@ def allocate(sizes):
     return slots
 
 
-def main(disc, out_path):
-    st = SaturnStage(os.path.join(disc, "STAGE_15.PRG"),
-                     os.path.join(disc, "STAGE_15.CHR"),
+def main(disc, out_path, stage="STAGE_15"):
+    # the stage's tables replace the module's (allocate() reads GROUP_ROOMS)
+    globals().update(STAGES[stage])
+    st = SaturnStage(os.path.join(disc, stage + ".PRG"),
+                     os.path.join(disc, stage + ".CHR"),
                      os.path.join(disc, "0.BIN"))
     decos = []
     for v in range(DECORATIONS[1]):
@@ -224,6 +256,6 @@ def main(disc, out_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4) or sys.argv[3:] and sys.argv[3] not in STAGES:
         raise SystemExit(__doc__)
-    main(sys.argv[1], sys.argv[2])
+    main(*sys.argv[1:])

@@ -107,26 +107,53 @@ find_program(SATURN_GDN_PYTHON python3)
 if(NOT SATURN_GDN_PYTHON)
     message(FATAL_ERROR "python3 is required to convert the Saturn enemies")
 endif()
-set(gdn_dir "${CMAKE_BINARY_DIR}/data/ST/STAGE15")
-set(gdn_disc "${CMAKE_SOURCE_DIR}/disks/saturn")
-add_custom_command(
-    OUTPUT "${gdn_dir}/gdn_entities.h" "${gdn_dir}/gdn_defs.h"
-    COMMAND ${SATURN_GDN_PYTHON} -B
+# gdn_entities.py <disc> <out> <stage>: the stage's enemy sprites, palettes
+# and records into the build folder (data/ST/<NAME>)
+function(add_saturn_gdn_entities name source)
+    string(TOUPPER "${name}" upper)
+    set(gdn_dir "${CMAKE_BINARY_DIR}/data/ST/${upper}")
+    set(gdn_disc "${CMAKE_SOURCE_DIR}/disks/saturn")
+    add_custom_command(
+        OUTPUT "${gdn_dir}/gdn_entities.h" "${gdn_dir}/gdn_defs.h"
+        COMMAND ${SATURN_GDN_PYTHON} -B
+                "${CMAKE_SOURCE_DIR}/tools/saturn/entities/gdn_entities.py"
+                "${gdn_disc}" "${gdn_dir}/gdn_entities.h" "${source}"
+        DEPENDS
             "${CMAKE_SOURCE_DIR}/tools/saturn/entities/gdn_entities.py"
-            "${gdn_disc}" "${gdn_dir}/gdn_entities.h"
-    DEPENDS
-        "${CMAKE_SOURCE_DIR}/tools/saturn/entities/gdn_entities.py"
-        "${CMAKE_SOURCE_DIR}/tools/saturn/entities/saturn_sprites.py"
-        "${gdn_disc}/STAGE_15.PRG"
-        "${gdn_disc}/STAGE_15.CHR"
-        "${gdn_disc}/0.BIN"
-        "${gdn_disc}/GAME.PRG"
-    VERBATIM
-    COMMENT "Converting the Saturn Underground Garden enemies")
-add_custom_target(stage15_gdn_assets
-    DEPENDS "${gdn_dir}/gdn_entities.h" "${gdn_dir}/gdn_defs.h")
-add_dependencies(stage15 stage15_gdn_assets)
-target_compile_definitions(stage15 PRIVATE SATURN_STAGE_GDN)
-add_saturn_stage(stage16 STAGE_16 SD26 TEST_STAGE16)
+            "${CMAKE_SOURCE_DIR}/tools/saturn/entities/saturn_sprites.py"
+            "${gdn_disc}/${source}.PRG"
+            "${gdn_disc}/${source}.CHR"
+            "${gdn_disc}/0.BIN"
+            "${gdn_disc}/GAME.PRG"
+        VERBATIM
+        COMMENT "Converting the Saturn ${source} enemies")
+    add_custom_target(${name}_gdn_assets
+        DEPENDS "${gdn_dir}/gdn_entities.h" "${gdn_dir}/gdn_defs.h")
+    add_dependencies(${name} ${name}_gdn_assets)
+    target_compile_definitions(${name} PRIVATE SATURN_STAGE_GDN ${ARGN})
+endfunction()
+add_saturn_gdn_entities(stage15 STAGE_15)
+# Cursed Prison: the same framework (src/st/stage16) with the Red Gargoyle and
+# the PS1's Spear Guard, Bone Archer and Slinger
+set(SATURN_PRISON_SOURCES
+    src/st/stage16/bss.c
+    src/st/stage16/collision.c
+    src/st/stage16/create_entity.c
+    src/st/stage16/d_prize_drops.c
+    src/st/stage16/e_breakable.c
+    src/st/stage16/e_collect.c
+    src/st/stage16/e_init.c
+    src/st/stage16/e_misc.c
+    src/st/stage16/e_particles.c
+    src/st/stage16/e_room_bg.c
+    src/st/stage16/e_spear_guard.c
+    src/st/stage16/e_bone_archer.c
+    src/st/stage16/e_slinger.c
+    src/st/stage16/popup.c
+    src/st/stage16/prim_helpers.c
+    src/st/stage16/st_common.c
+    src/st/stage16/st_update.c)
+add_saturn_stage(stage16 STAGE_16 SD26 TEST_STAGE16 ${SATURN_PRISON_SOURCES})
+add_saturn_gdn_entities(stage16 STAGE_16 SATURN_STAGE_PRISON)
 add_saturn_stage(rstage15 RSTAGE15 SD29 TEST_RSTAGE15)
 add_saturn_stage(rstage16 RSTAGE16 SD2C TEST_RSTAGE16)
