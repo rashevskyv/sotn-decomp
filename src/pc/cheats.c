@@ -486,26 +486,38 @@ const int g_CheatBossCount = LEN(g_CheatBosses);
 // A rematch: the record and the flags of a beaten boss are 0 while the
 // player stays in its stage (a boss in a castle stage: its room), so the
 // boss comes back; then they get their old values, also after a new win.
-// ponytail: a save made in that time keeps the 0s, the boss then comes again
+// A save made in that time gets the old values too (Cheat_RematchSave).
 
-static void RematchEnd(void) {
-    const struct CheatBoss* b;
+// the old record and flags of the rematch into records and flags
+static void RematchPut(s32* records, u8* flags) {
+    const struct CheatBoss* b = &g_CheatBosses[s_Rematch.boss];
     int k;
-    if (s_Rematch.boss < 0) {
-        return;
-    }
-    b = &g_CheatBosses[s_Rematch.boss];
     if (b->event != NO_EVENT && s_Rematch.record) {
-        g_Settings.timeAttackRecords[b->event] = s_Rematch.record;
+        records[b->event] = s_Rematch.record;
     }
     for (k = 0; k < 2; k++) {
         if (b->flag[k] && s_Rematch.old[k]) {
-            g_CastleFlags[b->flag[k]] = s_Rematch.old[k];
+            flags[b->flag[k]] = s_Rematch.old[k];
         }
     }
     if (b->stage == STAGE_RCEN) {
-        g_CastleFlags[SHAFT_FIGHT_CS_UNK1] = s_Rematch.seen;
+        flags[SHAFT_FIGHT_CS_UNK1] = s_Rematch.seen;
     }
+}
+
+void Cheat_RematchSave(s32* records, u8* flags) {
+    if (s_Rematch.boss >= 0) {
+        RematchPut(records, flags);
+        fprintf(stderr, "[cheat] boss %d: the save keeps record %d\n",
+                s_Rematch.boss, s_Rematch.record);
+    }
+}
+
+static void RematchEnd(void) {
+    if (s_Rematch.boss < 0) {
+        return;
+    }
+    RematchPut(g_Settings.timeAttackRecords, g_CastleFlags);
     fprintf(stderr, "[cheat] boss %d: record %d and flags back\n",
             s_Rematch.boss, s_Rematch.record);
     s_Rematch.boss = -1;

@@ -653,6 +653,9 @@ void StoreSaveData(SaveData* save, s32 block, s32 cardIcon) {
     for (i = 0; i < LEN(g_CastleFlags); i++) {
         dst->castleFlags[i] = g_CastleFlags[i];
     }
+#ifdef PLATFORM_PSYZ
+    Cheat_RematchSave(dstSettings->timeAttackRecords, dst->castleFlags);
+#endif
 
     for (i = 0; i < LEN(g_CastleMap); i++) {
         dst->castleMap[i] = g_CastleMap[i];
