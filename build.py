@@ -32,6 +32,9 @@ SD_DIR = os.path.join(OUT, "sd", "switch", "sotn-native")
 DKP = os.environ.get("DEVKITPRO", "/opt/devkitpro")
 SDL_PATCH = "tools/sdl-switch/0001-switch-SetWindowSize-uses-the-pending-size.patch"
 UK_ART = "ps1vram_uk.bin"  # the Xbox 360 uk mod's labels with stock pixels (optional)
+PSP_IMAGES = []  # every PSP image of The Dracula X Chronicles in games/, any release
+# the clip lists of tools/voicepack/extract_voice.py (optional, not in git: game file names, hashes)
+VOICE_MANIFESTS = ("manifest_voice_jp.json", "manifest_voice_pspen.json")
 # the PSP files the build reads (Maria, her voice, the familiar names)
 PSP_FILES = [f"PSP_GAME/USRDIR/res/ps/{f}" for f in
              ("PSPBIN/dra.bin", "PSPBIN/maria.bin", "PSPBIN/cen.bin", "snd_e/SE/sd_mar2.spk")]
@@ -162,6 +165,8 @@ def scan_games():
                 say("    CHD: sudo apt install mame-tools; chdman extractcd -i <file>.chd -o <file>.cue")
             continue
         version, disc_id = identify(path)
+        if version == "pspeu":  # any PSP release: its cutscene text and voice clips (disc_text)
+            PSP_IMAGES.append(path)
         if version is None:
             if ext != ".bin":  # a .bin without files is an audio track: say nothing
                 say(f"  {name}: not a disc image this build knows. Skipped.")
@@ -169,7 +174,8 @@ def scan_games():
         want, title, _ = WANT[version]
         if disc_id != want:
             say(f"  {name}: {KIND[version]} disc {disc_id or '(no id)'}. "
-                f"Needed: {title} ({want}). Skipped.")
+                f"Needed: {title} ({want}). Skipped"
+                + (" for Maria; its cutscene text and voices are used." if version == "pspeu" else "."))
         elif version in found:
             say(f"  {name}: a second {want} image. Skipped.")
         else:
@@ -363,6 +369,35 @@ def extract_discs(found):
                      f"{WANT['us'][1]} ({WANT['us'][0]}) into games/")
 
 
+def extract_psp_text():
+    """The PSP image -> disks/text/disc_text.json (the English PSP and Japanese cutscene text for
+    the script tables, tools/lang/disc_text.py) and, with the two manifests in games/, disks/voice/
+    (the JP and PSP voice clips). Without them the voice sets jp and psp keep the US voice and the
+    English PSP text stays stock."""
+    if not PSP_IMAGES:
+        say("   no PSP image: no English PSP text, no JP and PSP voice clips")
+        return
+    path = PSP_IMAGES[0]
+    st = os.stat(path)
+    key = f"{os.path.realpath(path)} {st.st_size} {int(st.st_mtime)}"
+    text = os.path.join(DISKS, "text", "disc_text.json")
+    if not (stamp_ok("disc-text", key) and os.path.exists(text)):
+        run([sys.executable, "tools/lang/disc_text.py", "--psp", path, "--out", text])
+        stamp("disc-text", key)
+    manifests = [os.path.join(GAMES, m) for m in VOICE_MANIFESTS]
+    if not all(os.path.exists(m) for m in manifests):
+        say(f"   no {' and '.join(VOICE_MANIFESTS)} in games/: no JP and PSP voice clips")
+        return
+    if stamp_ok("voice", key) and os.path.isdir(os.path.join(DISKS, "voice", "voice")):
+        return
+    try:
+        run([sys.executable, "-I", "tools/voicepack/extract_voice.py", "--iso", path,
+             "--jp", manifests[0], "--psp", manifests[1], "--out", os.path.join(DISKS, "voice")])
+        stamp("voice", key)
+    except Failed as e:  # ffmpeg without atrac3p, a clip that differs: the build goes on
+        say(f"   voice clips: {e} (see {LOG}); the voice sets jp and psp keep the US voice")
+
+
 def extract_assets():
     try:  # the assets follow the PS1 disc
         key = open(os.path.join(WORK, "stamps", "disc-us")).read()
@@ -408,6 +443,8 @@ def assemble(build, dest, program, saturn):
                   os.path.join(dest, "data", "ST"))
     shutil.copy2(os.path.join(build, program), os.path.join(dest, program))
     write(os.path.join(dest, "sotn-xa.cue"), XA_CUE)
+    if os.path.isdir(os.path.join(DISKS, "voice", "voice")):
+        link_tree(os.path.join(DISKS, "voice", "voice"), os.path.join(dest, "voice"))
 
 
 def main():
@@ -445,6 +482,7 @@ def main():
         found = scan_games()
         step("extract discs", extract_discs, found)
         step("extract assets", extract_assets)
+        step("extract PSP text and voice", extract_psp_text)
         saturn = all(os.path.exists(os.path.join(DISKS, "saturn", f)) for f in ("0.BIN", "GAME.PRG"))
         maria = all(os.path.exists(os.path.join(DISKS, "pspeu", f)) for f in PSP_FILES)
         for version, flag in (("pspeu", maria), ("saturn", saturn)):

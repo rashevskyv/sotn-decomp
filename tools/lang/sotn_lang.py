@@ -44,6 +44,9 @@ XBLA = os.environ.get("SOTN_LANG_XBLA", "")
 PICO = os.environ.get("SOTN_LANG_PICORIPI", "")
 MEDIA = os.environ.get("SOTN_LANG_MEDIA", "")
 OUT = os.environ.get("SOTN_LANG_OUT") or os.path.join(REPO, "build", "lang", "uk")
+EN = os.path.join(HERE, "en")  # en_jp.json: our English text from the Japanese script
+# the PSP text of the owner's image (disc_text.py; not in git)
+DISC_TEXT = os.environ.get("SOTN_LANG_DISC") or os.path.join(DATA, "disks", "text", "disc_text.json")
 PLACES = os.path.join(UK, "places.json")  # join_sources() without the English text (cmd_vendor)
 GLYPHS = os.path.join(UK, "glyphs.json")  # the char order of dfont.png and bios12.png
 KEEP = 16  # art/<name>.png: the palette index "keep the stock texel"
@@ -128,6 +131,10 @@ def save_json(path, data):
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, ensure_ascii=False, indent=1, sort_keys=True)
         f.write("\n")
+
+
+def load_json_opt(path):
+    return load_json(path) if os.path.exists(path) else {}
 
 
 def xbla_units():
@@ -785,6 +792,50 @@ def enc_dialogue(markup, native_ops):
                     bad.append(ch)
                 else:
                     out.append(c + 0x20)
+        elif t[1] == 1:
+            out.append(1)
+        elif t[1] in (2, 3):
+            out += bytes((t[1], t[2]))
+        else:
+            out.append(NATIVE_OP)
+            n += 1
+    return bytes(out), bad, n == len(native_ops)
+
+
+EN_FIX = {"‘": "'", "’": "'", "“": '"', "”": '"', "…": "...", "—": "-", "–": "-", " ": " "}
+
+
+def wrap_markup(markup, width=DLG_LINE_CELLS):
+    """Breaks each line longer than width at its last space that fits (the PSP lines are wider)."""
+    out = []
+    for line in markup.split("\n"):
+        while len(markup_text(line)) > width:
+            vis, cut = 0, None
+            for m in MARK.finditer(line):
+                if m.group(0).startswith("{"):
+                    continue
+                for k, ch in enumerate(m.group(0)):
+                    if ch == " " and vis <= width:
+                        cut = m.start() + k
+                    vis += 1
+            if cut is None:
+                break
+            out.append(line[:cut])
+            line = line[cut + 1:]
+        out.append(line)
+    return "\n".join(out)
+
+
+def enc_dialogue_en(markup, native_ops):
+    """enc_dialogue for language = en: the text stays ASCII, as the stock 8x8 font draws it."""
+    out, bad, n = bytearray(), [], 0
+    for t in markup_tokens(wrap_markup(markup)):
+        if t[0] == "tx":
+            for ch in "".join(EN_FIX.get(c, c) for c in t[1]):
+                if 0x20 <= ord(ch) < 0x7F:
+                    out.append(ord(ch))
+                else:
+                    bad.append(ch)
         elif t[1] == 1:
             out.append(1)
         elif t[1] in (2, 3):
@@ -1502,18 +1553,15 @@ def build_script(rel, recs):
                 amap.append((len(stock), last))  # text and flow ops: after the previous native op
             stock += by
     amap.append((len(stock), len(new)))
-    if not used:
-        return None
     return {"name": rel, "stock": bytes(stock), "new": bytes(new), "rel": relocs, "map": amap, "boxes": used}
 
 
-def write_scripts(path, recs):
-    files = sorted({k.split("#")[0] for k in recs})
+def write_scripts(path, recs, rels):
+    """A script table: a record for every dialogue yaml of rels, so that a range of several scripts
+    is copied whole; a yaml without boxes of recs keeps its stock bytes."""
     out, n, info = bytearray(), 0, []
-    for rel in files:
+    for rel in rels:
         r = build_script(rel, recs)
-        if not r:
-            continue
         n += 1
         name = r["name"].encode()
         pad = lambda b: b + bytes(-len(b) % 4)
@@ -1576,16 +1624,21 @@ def code_lines():
 
 
 PACK_FILES = ("text.bin", "font8.bin", "dfont.bin", "mfont.bin", "bios.bin", "art.bin", "script.bin", "script_psp.bin")
+PACK_OPTIONAL = ("script_jp.bin", "script_jp_en.bin", "script_psp_en.bin")  # packed when pack made them
 
 
 def write_c(path, folder):
-    """The runtime pack as one C array: "SOTNPACK" u32 n, n x {char name[16]; u32 off; u32 len}, data."""
-    blobs = [] if folder is None else [(n, open(os.path.join(folder, n), "rb").read()) for n in PACK_FILES]
+    """The runtime pack as one C array: "SOTNPACK" u32 n, n x {char name[16]; u32 off; u32 len}, data.
+    name: the first 16 bytes of the file name (Lang_File compares 16 bytes)."""
+    names = list(PACK_FILES) + [n for n in PACK_OPTIONAL if folder and os.path.exists(os.path.join(folder, n))]
+    blobs = [] if folder is None else [(n, open(os.path.join(folder, n), "rb").read()) for n in names]
+    keys = [n.encode()[:16] for n, _b in blobs]
+    assert len(set(keys)) == len(keys), f"two pack names share their first 16 bytes: {keys}"
     head = b"SOTNPACK" + struct.pack("<I", len(blobs))
     off = len(head) + 24 * len(blobs)
     data = bytearray()
     for n, b in blobs:
-        head += n.encode().ljust(16, b"\0") + struct.pack("<II", off + len(data), len(b))
+        head += n.encode()[:16].ljust(16, b"\0") + struct.pack("<II", off + len(data), len(b))
         data += b + bytes(-len(b) % 4)
     blob = head + data if blobs else b""
     with open(path, "w", encoding="ascii", newline="\n") as f:
@@ -1703,10 +1756,14 @@ def cmd_pack(_args):
         f.write(b"SOTNLANG" + struct.pack("<II", 2, len(entries)))
         f.write(ents)
         f.write(blob)
-    # dialogue.bin and dialogue_psp.bin
+    # dialogue*.bin and the uk script tables (FORMAT.md): ps1 script.bin, psp script_psp.bin
+    # (ua_psp.json over ua.json), jp script_jp.bin (ua_jp.json over ua.json; ua.json is from the
+    # Japanese script)
     psp = load_json(os.path.join(UK, "ua_psp.json"))
+    rels = sorted({b["file"] for b in boxes.values()})
     counts = {}
-    for fname, over in (("dialogue.bin", {}), ("dialogue_psp.bin", psp)):
+    for fname, over in (("dialogue.bin", {}), ("dialogue_psp.bin", psp),
+                        ("dialogue_jp.bin", load_json_opt(os.path.join(UK, "ua_jp.json")))):
         recs, nbad = {}, 0
         for l in lines:
             if l["kind"] != "script":
@@ -1730,10 +1787,41 @@ def cmd_pack(_args):
             f.write(ents + names + blob)
         counts[fname] = (len(recs), nbad)
         sname = fname.replace("dialogue", "script")
-        info = write_scripts(os.path.join(OUT, sname), recs)
+        info = write_scripts(os.path.join(OUT, sname), recs, rels)
         print(f"{sname}: {len(info)} scripts")
         for s in info:
             print("   ", s)
+    # The en script tables: jp script_jp_en.bin (en/en_jp.json: {ua.json id or box key: markup}),
+    # psp script_psp_en.bin (the PSP English boxes of the owner's image, disc_text.py). Without
+    # them en keeps the stock text for that voice.
+    by_id = {l["id"]: l["key"] for l in lines if l["kind"] == "script"}
+    disc = load_json_opt(DISC_TEXT)
+    for sname, src in (("script_jp_en.bin", load_json_opt(os.path.join(EN, "en_jp.json"))),
+                       ("script_psp_en.bin", disc.get("psp_en", {}))):
+        path = os.path.join(OUT, sname)
+        if os.path.exists(path):
+            os.remove(path)
+        recs, nbad, wrapped = {}, 0, 0
+        for k, markup in sorted(src.items()):
+            key = k if k in boxes else by_id.get(k)
+            if key not in boxes:
+                nbad += 1
+                continue
+            data, bad, ok = enc_dialogue_en(markup, boxes[key]["ops"])
+            for ch in bad:
+                bad_chars[ch] = bad_chars.get(ch, 0) + 1
+            if bad or not ok:
+                nbad += 1
+                continue
+            wrapped += wrap_markup(markup) != markup
+            recs[key] = data
+        counts[sname] = (len(recs), nbad)
+        if recs:
+            info = write_scripts(path, recs, rels)
+            print(f"{sname}: {len(recs)} boxes ({wrapped} with lines broken at {DLG_LINE_CELLS} cells),"
+                  f" {nbad} left stock, {len(info)} scripts")
+        else:
+            print(f"{sname}: no boxes: en keeps the stock text for this voice")
     # font8.bin
     from PIL import Image
     im = Image.open(os.path.join(UK, "font8.png"))
@@ -1864,19 +1952,28 @@ def cmd_vendor(_args):
 # ---------------------------------------------------------------- guard
 
 def cmd_guard(_args):
+    """The stock strings: the Xbox text (SOTN_LANG_XBLA) when it is there, and the US, PSP English and
+    Japanese boxes of disc_text.py when that file is there."""
     needles = set()
-    for x in xbla_units():
-        for field in ("en", "ja", "de", "fr", "it", "es"):
-            s = x.get(field) or ""
-            for run in re.split(r"\{[^}]*\}|\n|@", s):
-                run = run.strip()
-                if len(run) >= 8 and sum(c.isalpha() for c in run) >= 4 and not has_cyrillic(run):
-                    needles.add(run)
-    for x in xbla_psp_units():
-        for field in ("psp", "en_stock"):
-            for run in re.split(r"\{[^}]*\}|\n|@", x.get(field) or ""):
-                if len(run.strip()) >= 8 and sum(c.isalpha() for c in run) >= 4 and not has_cyrillic(run):
-                    needles.add(run.strip())
+
+    def add(s):
+        for run in re.split(r"\{[^}]*\}|\n|@", s or ""):
+            run = run.strip()
+            if len(run) >= 8 and sum(c.isalpha() for c in run) >= 4 and not has_cyrillic(run):
+                needles.add(run)
+    if XBLA and os.path.isdir(XBLA):
+        for x in xbla_units():
+            for field in ("en", "ja", "de", "fr", "it", "es"):
+                add(x.get(field))
+        for x in xbla_psp_units():
+            for field in ("psp", "en_stock"):
+                add(x.get(field))
+    disc = load_json_opt(DISC_TEXT)
+    for field in ("stock", "psp_en", "jp"):
+        for s in disc.get(field, {}).values():
+            add(s)
+    if not needles:
+        sys.exit("guard: no stock strings: set SOTN_LANG_XBLA or run tools/lang/disc_text.py")
     files = subprocess.run(["git", "-C", REPO, "diff", "--cached", "--name-only"], capture_output=True, text=True).stdout.split()
     files += [os.path.relpath(p, REPO) for p in glob.glob(os.path.join(HERE, "**", "*"), recursive=True) if os.path.isfile(p)]
     bad = []
@@ -1904,6 +2001,9 @@ def cmd_selftest(_args):
     assert to_markup("{0C 82 D5 57 84}{02 04}Б\n{03 1C}{19}{06}") == "{}{s4}Б\n{w28}{}"
     assert enc_cells("АБ")[0] == bytes((0x21, 0x66, 0xFF))
     assert enc_dialogue("Б\n{s4}{}", [12]) == (bytes((0x81, 1, 2, 4, NATIVE_OP)), [], True)  # dfont byte
+    assert enc_dialogue_en("A’…\n{s4}{}", [12]) == (b"A'...\x01\x02\x04" + bytes((NATIVE_OP,)), [], True)
+    assert enc_dialogue_en("Б{}", [12])[1] == ["Б"]
+    assert wrap_markup("aaaa bb{}b cc", 5) == "aaaa\nbb{}b\ncc" and wrap_markup("abcdefgh", 4) == "abcdefgh"
     assert enc_bios("Ґa і")[0] == b"\x85\x40a i\x00"
     assert enc_bios("1”")[0] == b"\x82\x50\x81\x68\x81\x68\x00"
     assert advance([0] * 15) == 1 and advance([0xFFFF] * 15) == 6
