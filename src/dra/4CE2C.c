@@ -36,6 +36,7 @@ typedef struct {
 } TilemapRenderer;
 
 #ifdef PLATFORM_PSYZ
+#include "../pc/room_stitch.h"
 #include "../pc/wide.h"
 #include <math.h>
 #include <stdio.h> // [vignette] log lines
@@ -100,7 +101,7 @@ static s32 NextRoomTile(TilemapRenderer* r, s32 bg, s32 tx, s32 ty,
                 mx > room->right || my < room->top || my > room->bottom) {
                 continue;
             }
-            def = &g_api.o.tileLayers[room->load.tileLayoutId];
+            def = RoomStitch_TileLayer(room->load.tileLayoutId);
             l = bg ? def->bg : def->fg;
             if (room != cur &&
                 room->load.tilesetId == cur->load.tilesetId &&
@@ -780,13 +781,21 @@ static void SetRoomBackgroundLayer(s32 index, LayerDef* layerDef) {
 void LoadRoomLayer(s32 layerIndex) {
     s32 i;
 
+#ifdef PLATFORM_PSYZ
+    // a stitched room has merged layers and no apron patch (src/pc)
+    const RoomDef* def = RoomStitch_TileLayer(layerIndex);
+    SetRoomForegroundLayer(def->fg);
+    SetRoomBackgroundLayer(0, def->bg);
+#else
     SetRoomForegroundLayer(g_api.o.tileLayers[layerIndex].fg);
     SetRoomBackgroundLayer(0, g_api.o.tileLayers[layerIndex].bg);
+#endif
 
     for (i = 1; i < MAX_BG_LAYER_COUNT; i++) {
         g_BgLayers[i].flags = 0;
     }
 #ifdef PLATFORM_PSYZ
-    Apron_OnRoomLayer(layerIndex);
+    Apron_OnRoomLayer(def == &g_api.o.tileLayers[layerIndex] ? layerIndex
+                                                             : -1);
 #endif
 }

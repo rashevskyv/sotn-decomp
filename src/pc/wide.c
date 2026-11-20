@@ -15,6 +15,7 @@
 #include <psyz/video.h>
 #include <stdio.h>
 #include <string.h>
+#include "room_stitch.h"
 #include "wide.h"
 
 s32 g_WideX;
@@ -199,7 +200,13 @@ static const struct {
     {"overlay", &g_OverlayOn},
     {"fps", &g_FpsOn},
     {"fullscreen", &g_Fullscreen},
+    {"room_stitch", &g_RoomStitch},
 };
+
+static const char ini_stitch[] =
+    "\n"
+    "; room_stitch: 1 = some rooms side by side play as one wide room, with\n"
+    "; no fade between them (a test: src/pc/room_stitch.c lists them).\n";
 
 static const char ini_overlay[] =
     "\n"
@@ -261,6 +268,8 @@ void Wide_SaveIni(void) {
     fputs(ini_hd, f);
     fprintf(f, "hd_textures = %d\nhd_dump = %d\nmusic_files = %d\n",
             g_HdTextures, g_HdDump, g_MusicFiles);
+    fputs(ini_stitch, f);
+    fprintf(f, "room_stitch = %d\n", g_RoomStitch);
     fclose(f);
 }
 
@@ -270,7 +279,8 @@ void Wide_SaveIni(void) {
 // pad_<button> = <input name> (IniInput),
 // jp_cards = extra|jp|off, relic_toggle = modern|stock,
 // spawn = <spawn point name>, cheat_* = 0|1 (cheat_character 0..2, 4), editor, overlay, fps = 0|1,
-// hd_textures = 0|1 (missing: 1), hd_dump = 0|1, music_files = 0|1 (1).
+// hd_textures = 0|1 (missing: 1), hd_dump = 0|1, music_files = 0|1 (1),
+// room_stitch = 0|1 (0).
 // A missing key keeps its default (cheats, editor, overlay and fps off).
 // The aspect key of an old file does nothing.
 void Wide_LoadIni(const char* path) {

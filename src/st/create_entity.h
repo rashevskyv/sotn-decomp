@@ -459,6 +459,9 @@ static void CreateEntitiesBelow(s16 posY) {
  * - Parameters:
  *   - objLayoutId - the room to initialize
  */
+#ifdef PLATFORM_PSYZ
+void RoomStitch_Layouts(u16** horizontal, u16** vertical, u16** h, u16** v);
+#endif
 void InitRoomEntities(s32 objLayoutId) {
     Tilemap* tilemap = &g_Tilemap;
     s16 rightEdge;
@@ -467,6 +470,12 @@ void InitRoomEntities(s32 objLayoutId) {
 
     g_LayoutObjHorizontal = (u16*)OBJ_LAYOUT_HORIZONTAL[objLayoutId];
     g_LayoutObjVertical = (u16*)OBJ_LAYOUT_VERTICAL[objLayoutId];
+#ifdef PLATFORM_PSYZ
+    // a stitched room takes merged lists (sotn.ini room_stitch)
+    RoomStitch_Layouts((u16**)OBJ_LAYOUT_HORIZONTAL,
+                       (u16**)OBJ_LAYOUT_VERTICAL, &g_LayoutObjHorizontal,
+                       &g_LayoutObjVertical);
+#endif
 
 #ifdef PSP_RNZ0_WTF
     if (objLayoutId == 8 && g_LayoutObjHorizontal[15] == 0x78) {
