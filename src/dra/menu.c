@@ -58,6 +58,10 @@ static u32 g_MenuTint;
                          : ((up) ? CH('+') : CH('-')))
 // The status page in the layout of the PSP version: STPOS(ps1, psp)
 #define STPOS(ps1, psp) (psp)
+// The cloak colour rows have their own window right of the settings list (the
+// uk labels reach x 184), over the preview window (g_MenuInit); stock x 168
+#define CLOAK_WIN_X 194
+#define CLOAK_WIN_W 144
 #else
 #define MENU_TINT(rgb)
 #define STAT_SIGN(up) ((up) ? CH('+') : CH('-'))
@@ -909,8 +913,15 @@ void ApplyJosephsCloakPalette(void) {
 }
 
 void MenuDrawAlucardCloakPreview(MenuContext* ctx) {
-    MenuDrawSprite(ctx, 0xC0, 0x80, 0x20, 0x40, 0, 0xB0, 0x100, 7, 1, 0, 2);
-    MenuDrawSprite(ctx, 0x100, 0x80, 0x40, 0x40, 0x80, 0xB0, 0x100, 7, 1, 0, 0);
+#ifdef PLATFORM_PSYZ
+    const s32 dx = CLOAK_WIN_X - 168; // port: the window is further right
+#else
+    const s32 dx = 0;
+#endif
+    MenuDrawSprite(
+        ctx, 0xC0 + dx, 0x80, 0x20, 0x40, 0, 0xB0, 0x100, 7, 1, 0, 2);
+    MenuDrawSprite(
+        ctx, 0x100 + dx, 0x80, 0x40, 0x40, 0x80, 0xB0, 0x100, 7, 1, 0, 0);
 }
 
 void func_800F6508(MenuContext* ctx, s32 x, s32 y) {
@@ -957,6 +968,35 @@ static void MenuDrawQuad(MenuContext* ctx, s32 x0, s32 y0, s32 x1, s32 y1,
     }
 }
 
+void MenuDrawLine(s32 x0, s32 y0, s32 x1, s32 y1, s32 isColorStatic);
+static s32 MenuStrWidth(const char* s);
+
+// A window drawn inside menu dlg at x, y (w x h), as MenuDraw draws one: the
+// gradient of the window colour, dark at the top, and the white border. It
+// hides what the same menu draws under it (the text of the menu is above it).
+static void MenuDrawPanel(s32 dlg, s32 x, s32 y, s32 w, s32 h) {
+    u32 rgb[2] = {0, 0};
+    s32 i, j, c;
+
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < 3; j++) {
+            c = g_Settings.windowColors[j] * 8 + (i ? 0x20 : -0x20);
+            rgb[i] = rgb[i] << 8 | (c < 0 ? 0 : c > 0xFF ? 0xFF : c);
+        }
+    }
+    if (g_StageId >= STAGE_RNO0 && g_StageId < STAGE_MAD) {
+        c = rgb[0];
+        rgb[0] = rgb[1];
+        rgb[1] = c;
+    }
+    // the quad as two columns: the top corners get rgb[0], the bottom rgb[1]
+    MenuDrawQuad(&g_Menus[dlg], x, y, x, y + h, x + w, y, x + w, y + h, rgb[0],
+                 rgb[1]);
+    MenuDrawLine(x, y, x + w - 1, y, dlg + 1);
+    MenuDrawLine(x, y + h - 1, x + w - 1, y + h - 1, dlg + 1);
+    MenuDrawLine(x, y, x, y + h - 1, dlg + 1);
+    MenuDrawLine(x + w - 1, y, x + w - 1, y + h - 1, dlg + 1);
+}
 #endif
 
 // Draw main menu cursor
@@ -1161,6 +1201,17 @@ void MenuJosephsCloakDraw(MenuContext* ctx) {
 #if TARGET == TARGET_PSP
     g_ChRgb = GetLang(rgb_en, rgb_fr, rgb_sp, rgb_ge, rgb_it);
 #endif
+#ifdef PLATFORM_PSYZ
+    // port: the rows in their own window (a gap after the longer label, then
+    // R G B and the value as in stock), and the window under the rows
+    {
+        s32 w20 = MenuStrWidth(g_MenuStr[20]);
+        s32 w21 = MenuStrWidth(g_MenuStr[21]);
+        x_Start = CLOAK_WIN_X + 6;
+        x_RGB = x_Start + (w20 > w21 ? w20 : w21) + 8;
+        number_spacing = x_RGB - x_Start - 72 + 40;
+    }
+#endif
 
     // 3 iterations, each iteration does Exterior and Lining for one letter
     for (i = 0; i < 3; i++) {
@@ -1181,6 +1232,11 @@ void MenuJosephsCloakDraw(MenuContext* ctx) {
     }
     func_800F5E68(menu, g_MenuNavigation.cursorCloak, x_Start - 2, 38,
                   number_spacing + 88, 12, 0, 1);
+#ifdef PLATFORM_PSYZ
+    // added after the cursor: in one OT slot the prim added last is drawn
+    // first, so the cursor is over the window
+    MenuDrawPanel(MENU_DG_SETTINGS, CLOAK_WIN_X, 32, CLOAK_WIN_W, 84);
+#endif
     ApplyJosephsCloakPalette();
     func_800F6A48();
 }
@@ -1327,7 +1383,16 @@ void MenuButtonConfigDraw(MenuContext* ctx) {
 }
 
 void MenuReverseCloakDraw(MenuContext* ctx) {
-#if REGION != REGION_JP
+#ifdef PLATFORM_PSYZ
+    // port: the popup at the cloak colour window x (it covered the end of the
+    // first uk label), and the bar and the popup as wide as the longer label
+    const int StrX = CLOAK_WIN_X + 4;
+    s32 ImgW = MenuStrWidth(g_MenuStr[30]);
+    ImgW = MenuStrWidth(g_MenuStr[31]) > ImgW ? MenuStrWidth(g_MenuStr[31])
+                                               : ImgW;
+    ImgW = ImgW + 4 > 64 ? ImgW + 4 : 64;
+    ctx->cursorW = ImgW + 6; // the window, from x StrX - 4
+#elif REGION != REGION_JP
     const int StrX = 176;
     const int ImgW = 64;
 #elif TARGET == TARGET_PSP
@@ -1400,6 +1465,12 @@ char StatChangeArrow(u16 arg0, u16 arg1) {
     }
 }
 
+// port: the arrow and the new value of a stat change, red up, blue down
+#define STAT_CHANGE_TINT(cur, new)                                             \
+    MENU_TINT((u16)(cur) < (u16)(new)   ? TINT_BONUS_UP                       \
+              : (u16)(cur) > (u16)(new) ? TINT_BONUS_DOWN                     \
+                                        : 0)
+
 void func_800F7244(void) {
     s32 i;
 
@@ -1423,19 +1494,23 @@ void MenuStatChangesDraw(void) {
     if (!g_Menus[MENU_DG_EQUIP_SELECTOR].unk1C && D_80137948) {
         ctx = &g_Menus[MENU_DG_EQUIP_OVERVIEW];
         // Print the destination value for the square attack item
+        STAT_CHANGE_TINT(g_Status.attackHands[0], g_NewAttackRightHand);
         MenuDrawInt(g_NewAttackRightHand, 0x154, 0x50, ctx);
         // Show arrow icon for increasing, decreasing, or staying the same
         arrow = StatChangeArrow(g_Status.attackHands[0], g_NewAttackRightHand);
         MenuDrawChar(arrow, 0x13C, 0x50, ctx);
 
         // Same but for the circle attack item
+        STAT_CHANGE_TINT(g_Status.attackHands[1], g_NewAttackLeftHand);
         MenuDrawInt(g_NewAttackLeftHand, 0x154, 0x5A, ctx);
         arrow = StatChangeArrow(g_Status.attackHands[1], g_NewAttackLeftHand);
         MenuDrawChar(arrow, 0x13C, 0x5A, ctx);
         // And repeat for defense.
+        STAT_CHANGE_TINT(g_Status.defenseEquip, g_NewDefenseEquip);
         MenuDrawInt(g_NewDefenseEquip, 0x154, 0x6A, ctx);
         arrow = StatChangeArrow(g_Status.defenseEquip, g_NewDefenseEquip);
         MenuDrawChar(arrow, 0x13C, 0x6A, ctx);
+        MENU_TINT(0);
 
         // Iterate through the 4 stats (STR CON INT LCK) doing the same.
         xcoord = 0x108;
@@ -1450,9 +1525,12 @@ void MenuStatChangesDraw(void) {
             arrow =
                 StatChangeArrow(g_Status.statsBase[i] + g_Status.statsEquip[i],
                                 g_NewPlayerStatsTotal[i]);
+            STAT_CHANGE_TINT(g_Status.statsBase[i] + g_Status.statsEquip[i],
+                             g_NewPlayerStatsTotal[i]);
             MenuDrawChar(arrow, xcoord + 0x34, ycoord, ctx);
             // Final value for the stat
             MenuDrawInt(g_NewPlayerStatsTotal[i], xcoord + 0x4C, ycoord, ctx);
+            MENU_TINT(0);
         }
     }
 }
@@ -2195,9 +2273,16 @@ void MenuSystemDraw(MenuContext* ctx) {
 #if REGION == REGION_JP
     const int Width = 80;
 #elif defined(PLATFORM_PSYZ)
-    // uk: the longest label has 19 cells (152 px from x 32): the bar from
-    // x 30 must reach x 184
-    const int Width = g_Lang ? 156 : 128;
+    // port: the bar from x 30 ends 2 px after the longest label (from x 32),
+    // at least the stock 128. uk: 19 cells, the bar ends at x 186, left of
+    // the cloak colour window (CLOAK_WIN_X).
+    static const u8 labels[] = {16, 17, 18, 19, 35, 32, 36};
+    s32 Width = 128;
+    s32 i;
+    for (i = 0; i < LEN(labels); i++) {
+        s32 w = MenuStrWidth(g_MenuStr[labels[i]]) + 4;
+        Width = w > Width ? w : Width;
+    }
 #else
     const int Width = 128;
 #endif
@@ -3433,6 +3518,24 @@ void func_800FA3C4(s32 cursorIndex, s32 arg1, s32 arg2) {
     b = cursorIndex / 2;
     x0 = (a * 0xA8) + 0x28;
     limit = -(menu->unk16 / 12);
+#ifdef PLATFORM_PSYZ
+    // port: the list scrolls one row early. The cursor stops on the second
+    // visible row from the edge while more rows are past that edge.
+    {
+        s32 rows = menu->cursorH / 12;
+        s32 top = (func_800FD6C4(D_801375CC) + 1) / 2 - rows; // last top row
+
+        while (b < limit + 1 && limit > 0) {
+            menu->unk16 += 12;
+            limit--;
+        }
+        while (b > limit + rows - 2 && limit < top) {
+            menu->unk16 -= 12;
+            limit++;
+        }
+        y0 = (b - limit) * 12 + menu->cursorY + 1;
+    }
+#else
     if (b < limit) {
         // Below some limit
         menu->unk16 += 12;
@@ -3445,6 +3548,7 @@ void func_800FA3C4(s32 cursorIndex, s32 arg1, s32 arg2) {
         // Somewhere in between
         y0 = (b - limit) * 12 + menu->cursorY + 1;
     }
+#endif
 
     if (D_801375CC == EQUIP_HAND) {
         g_MenuNavigation.scrollEquipType[EQUIP_HAND] = menu->unk16;
@@ -3452,6 +3556,14 @@ void func_800FA3C4(s32 cursorIndex, s32 arg1, s32 arg2) {
         g_MenuNavigation.scrollEquipType[EQUIP_HEAD + D_801375D4] = menu->unk16;
     }
     if (arg2) {
+#ifdef PLATFORM_PSYZ
+        // port: a red bar under the name, as the red bars of the other lists,
+        // not a white frame over the cells. It ends 2 px before the count.
+        if (!arg1) {
+            func_800F5E68(menu, 0, x0, y0, 0x76, 0xB, 0, 1);
+            return;
+        }
+#endif
         if (!arg1) {
             MenuDrawLine(x0, y0, x0 + 0x70, y0, 0);
             MenuDrawLine(x0, y0, x0, y0 + 0xB, 0);
@@ -3830,9 +3942,17 @@ MenuContextInit g_MenuInit[NUM_MENU] = {
     {0, 24, 360, 170, 0x20},   // MENU_DG_RELICS
     {0, 24, 360, 170, 0x20},   // MENU_DG_SPELLS
     {0, 24, 360, 170, 0x20},   // MENU_DG_SETTINGS
+#ifdef PLATFORM_PSYZ
+    {CLOAK_WIN_X, 120, CLOAK_WIN_W, 64, 0x30}, // MENU_DG_CLOAK_COLOR
+#else
     {168, 120, 144, 64, 0x30}, // MENU_DG_CLOAK_COLOR
+#endif
     {148, 44, 200, 112, 0x30}, // MENU_DG_CFG_BUTTONS
+#ifdef PLATFORM_PSYZ
+    {CLOAK_WIN_X, 44, 70, 32, 0x30}, // MENU_DG_CLOAK_LINING (w: MenuReverseCloakDraw)
+#else
     {172, 44, 65, 32, 0x30},   // MENU_DG_CLOAK_LINING
+#endif
     {172, 112, 57, 32, 0x30},  // MENU_DG_CFG_SOUND
     {172, 76, 124, 40, 0x30},  // MENU_DG_WINDOW_COLORS
     {12, 32, 340, 153, 0x30},  // MENU_DG_TIME_ATTACK
