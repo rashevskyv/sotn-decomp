@@ -1,0 +1,7 @@
+# Expected "[hd] <x> <y> <w>x<h> <bpp>: hash <h> clut <c>, no file" log lines (PLANNED test hd_no_leftover).
+# One line: <text the log line contains> -- <reason>. A line that starts with # is a comment.
+hash 03bdc4c5 -- the older loading picture, drawn while the screen is black: no file (tools/lang/uk/hd_textures.py)
+hash bcc31dc5 -- the older loading picture, second key: no file (tools/lang/uk/hd_textures.py)
+[hd] 64 256  -- other stage pictures load to the banner page 64,256: they only log "no file"
+# UNKNOWN: the backdrop rect of the boot log (step 98 report: "one backdrop rect with other content
+# and no file"). The report does not give the rect. Add it after one logged run.
