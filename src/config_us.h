@@ -248,8 +248,9 @@ EnemyDef g_EnemyDefs[] = {
 #include DRA_GEN_VERSION(enemydefs.h)
 #ifdef ENABLE_SATURN_STAGES
     // 400-429: the Saturn stages' enemies (SATURN_ENEMY_DEFS_END, dra.h);
-    // their stage module fills them
-    [429] = {""},
+    // their stage module fills them. The name is an empty cell string
+    // with its end mark: Lang_Init hashes it up to the 0xFF.
+    [429] = {_S("")},
 #endif
 };
 
