@@ -125,6 +125,23 @@ static s32 NextRoomTile(TilemapRenderer* r, s32 bg, s32 tx, s32 ty,
     return n->layout[ty * n->w + tx];
 }
 
+// No next room around a boss fight: its doors are shut, and the next room
+// in the margin is a picture the fight never shows (RNZ1 room 0: grey
+// frames and red brick by the purple room of the Darkwing Bat). The margin
+// keeps the mirror there. A boss in a stage of its own: the whole stage.
+static bool BossRoom(void) {
+    const struct CheatBoss* b;
+    s32 i;
+    for (i = 0; i < g_CheatBossCount; i++) {
+        b = &g_CheatBosses[i];
+        if (g_LastRoom.stage == b->stage &&
+            (b->stage != b->host || g_LastRoom.room == b->room)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // The cells of the wide view outside the room (or layer). The loops below
 // skip them, as on the PS1. bg 0 is the foreground, 1 is bg layer 0: those
 // two take tiles from the apron patch (src/pc/apron.c), and draw here the
@@ -142,12 +159,12 @@ static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
     s32 patched = bg <= 1 && Apron_Has(bg);
     // bg layer 0 shows the next room only on the room grid (see NextRoom)
     s32 nextOk =
-        bg == 0 ||
+        !BossRoom() && (bg == 0 ||
         (bg == 1 && !(r->flags & LAYER_WRAP_BG) &&
          r->roomTileWidth == g_Tilemap.hSize * 16 &&
          r->roomTileHeight == g_Tilemap.vSize * 16 &&
          g_BgLayers[0].scrollX.i.hi == g_Tilemap.scrollX.i.hi &&
-         g_BgLayers[0].scrollY.i.hi == g_Tilemap.scrollY.i.hi);
+         g_BgLayers[0].scrollY.i.hi == g_Tilemap.scrollY.i.hi));
     NextRoom nextRoom = {-999, -999, NULL};
     static s32 logged = -1;
     u32 slots;
