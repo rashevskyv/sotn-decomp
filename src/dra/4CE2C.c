@@ -36,6 +36,7 @@ typedef struct {
 } TilemapRenderer;
 
 #ifdef PLATFORM_PSYZ
+#include "../pc/room_stitch.h"
 #include "../pc/wide.h"
 #include <math.h>
 #include <stdio.h> // [vignette] log lines
@@ -59,6 +60,71 @@ static void FlipMode(TilemapRenderer* r, s32 page, s32 flip) {
     g_GpuUsage.drawModes++;
 }
 
+// The next room in the margin: a cell outside the room shows the tile of
+// the room next to it on the map, when that room has the same tile set
+// and palettes (else the palettes or the art would be wrong) and its
+// layer lies on its map cells. The fg, and bg layer 0 when it lies on the
+// room grid and scrolls with the fg. The vignette darkens it to black.
+typedef struct {
+    s32 mx, my;        // the map cell this entry is for
+    const u16* layout; // NULL: no next room there
+    s32 w, h, ox, oy;  // its layout in tiles, its top left in our tiles
+} NextRoom;
+
+static s32 s_NextCells[2]; // fg cells of the next room, left and right
+
+static bool OnCells(const LayerDef* l, const RoomHeader* room) {
+    return l && l->tileDef && l->rect.left == room->left &&
+           l->rect.top == room->top && l->rect.right == room->right &&
+           l->rect.bottom == room->bottom;
+}
+
+// the tile of the next room at our cell tx, ty, or -1
+static s32 NextRoomTile(TilemapRenderer* r, s32 bg, s32 tx, s32 ty,
+                        NextRoom* n) {
+    s32 mx = g_Tilemap.left + (tx >> 4), my = g_Tilemap.top + (ty >> 4);
+    const RoomHeader *cur, *room;
+    const RoomDef* def;
+    const LayerDef* l;
+
+    if (mx != n->mx || my != n->my) {
+        n->mx = mx;
+        n->my = my;
+        n->layout = NULL;
+        if (g_LastRoom.stage != g_StageId || !g_api.o.rooms ||
+            !g_api.o.tileLayers) {
+            return -1;
+        }
+        cur = &g_api.o.rooms[g_LastRoom.room];
+        for (room = g_api.o.rooms; room->left != 0x40; room++) {
+            if (room->load.tilesetId == 0xFF || mx < room->left ||
+                mx > room->right || my < room->top || my > room->bottom) {
+                continue;
+            }
+            def = RoomStitch_TileLayer(room->load.tileLayoutId);
+            l = bg ? def->bg : def->fg;
+            if (room != cur &&
+                room->load.tilesetId == cur->load.tilesetId &&
+                OnCells(def->fg, room) && !(def->fg->rect.params & 0x80) &&
+                OnCells(l, room) && l->tileDef->gfxPage == r->page &&
+                l->tileDef->gfxIndex == r->gfx && l->tileDef->clut == r->clut) {
+                n->layout = l->layout;
+                n->w = (room->right - room->left + 1) * 16;
+                n->h = (room->bottom - room->top + 1) * 16;
+                n->ox = (room->left - g_Tilemap.left) * 16;
+                n->oy = (room->top - g_Tilemap.top) * 16;
+            }
+            break;
+        }
+    }
+    tx -= n->ox;
+    ty -= n->oy;
+    if (!n->layout || tx < 0 || tx >= n->w || ty < 0 || ty >= n->h) {
+        return -1;
+    }
+    return n->layout[ty * n->w + tx];
+}
+
 // The cells of the wide view outside the room (or layer). The loops below
 // skip them, as on the PS1. bg 0 is the foreground, 1 is bg layer 0: those
 // two take tiles from the apron patch (src/pc/apron.c), and draw here the
@@ -72,13 +138,26 @@ static void FlipMode(TilemapRenderer* r, s32 page, s32 flip) {
 // the last one, so no other prim sees the flip.
 static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
                       s32 startTx, s32 startTy, s32 subX, s32 subY) {
-    s32 i, j, tx, ty, x0, y0, in, flip, pass, page;
+    s32 i, j, tx, ty, x0, y0, in, flip, pass, page, next;
     s32 patched = bg <= 1 && Apron_Has(bg);
+    // bg layer 0 shows the next room only on the room grid (see NextRoom)
+    s32 nextOk =
+        bg == 0 ||
+        (bg == 1 && !(r->flags & LAYER_WRAP_BG) &&
+         r->roomTileWidth == g_Tilemap.hSize * 16 &&
+         r->roomTileHeight == g_Tilemap.vSize * 16 &&
+         g_BgLayers[0].scrollX.i.hi == g_Tilemap.scrollX.i.hi &&
+         g_BgLayers[0].scrollY.i.hi == g_Tilemap.scrollY.i.hi);
+    NextRoom nextRoom = {-999, -999, NULL};
+    static s32 logged = -1;
     u32 slots;
     u16 tile, clut, *row;
 
     if (!WIDE_COLS && !WIDE_ROWS && !patched) {
         return;
+    }
+    if (bg == 0) {
+        s_NextCells[0] = s_NextCells[1] = 0;
     }
     for (pass = 0; pass < 4; pass++) {
         slots = 0;
@@ -99,6 +178,13 @@ static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
                 if (tile != 0xFFFF) {
                     flip = tile >> 12;
                     tile &= APRON_TILE;
+                } else if (nextOk && (next = NextRoomTile(r, bg, tx, ty,
+                                                          &nextRoom)) >= 0) {
+                    flip = 0;
+                    tile = next;
+                    if (bg == 0 && pass == 0) {
+                        s_NextCells[tx >= 0]++;
+                    }
                 } else {
                     row = layout +
                           ClampTile(ty, r->roomTileHeight) * r->roomTileWidth;
@@ -146,6 +232,14 @@ static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
                 FlipMode(r, page, pass);
             }
         }
+    }
+    if (bg == 0 && logged != (g_LastRoom.stage << 8 | g_LastRoom.room)) {
+        logged = g_LastRoom.stage << 8 | g_LastRoom.room;
+        fprintf(stderr,
+                "[preview] stage %02X room %d: next room cells %d left, "
+                "%d right\n",
+                g_LastRoom.stage, g_LastRoom.room, s_NextCells[0],
+                s_NextCells[1]);
     }
 }
 
@@ -214,17 +308,23 @@ static bool StretchBackdrop(TilemapRenderer* r, BgLayer* bg) {
 
 // The wide view outside the camera range: a room, or a lock of the camera,
 // narrower than the view shows the room beyond the range or the edge fill
-// of ApronPass there. Then the view darkens outside the central 256 px
-// (the PS1 view) toward the screen edges, in the psyz darken mode (the
-// picture times 1 - red/255, so the hue stays): darkness
-// d(t) = 0.95 * (1 - (1 - t)^2.5), t 0 at the 4:3 edge, 1 at the screen
-// edge, as gouraud strips. A GP0 command of the port switches the mode on
-// and off in the OT. It fades in and out over 30 frames, below the HUD
-// (0x1EE) and the dialogue (0x1FC), above the stage layers and entities.
+// of ApronPass there. Then the view darkens outward from the range edge
+// (never inside the central 256 px, the PS1 view), in the psyz darken mode
+// (the picture times 1 - red/255, so the hue stays): darkness
+// d(t) = 1 - (1 - t)^2.5, t 0 at the edge, 1 after a ramp, as gouraud
+// strips, then pure black to the screen edge. At a room edge the ramp is
+// VIGNETTE_RAMP (the edge fill is not real art), or VIGNETTE_RAMP_NEXT
+// where ApronPass shows the next room; at a camera lock inside the room it
+// is the whole margin (the room art goes on there).
+// A GP0 command of the port switches the mode on and off in the OT. It
+// fades in and out over 30 frames, below the HUD (0x1EE) and the dialogue
+// (0x1FC), above the stage layers and entities.
 #define VIGNETTE_OT 0x1E0
 #define VIGNETTE_FADE 30
-#define VIGNETTE_STRIPS 12 // a side
-#define VIGNETTE_GP0 0x10  // a NOP on the PS1 GPU
+#define VIGNETTE_STRIPS 12 // a side, and one flat strip
+#define VIGNETTE_RAMP 48      // px, 3 tiles
+#define VIGNETTE_RAMP_NEXT 64 // px, 4 tiles
+#define VIGNETTE_GP0 0x10     // a NOP on the PS1 GPU
 static int VignetteGp0(const u_long* words, int n, void* user) {
     Psyz_VideoSetDarken(words[0] & 1);
     return 1;
@@ -238,21 +338,21 @@ static void VignetteMode(TilemapRenderer* r, s32 on) {
     g_GpuUsage.drawModes++;
 }
 
-// darkness at x of the w px margin, of 0xFF, times fade
+// darkness at x px out of a w px ramp, of 0xFF, times fade
 static s32 VignetteDark(s32 x, s32 w, s32 fade) {
-    float t = (float)x / w;
-    return (s32)(0xFF * 0.95f * (1.0f - powf(1.0f - t, 2.5f)) + 0.5f) * fade /
+    float t = x < w ? (float)x / w : 1.0f;
+    return (s32)(0xFF * (1.0f - powf(1.0f - t, 2.5f)) + 0.5f) * fade /
            VIGNETTE_FADE;
 }
 
 // The fade-in waits VIGNETTE_HOLD frames after the range gets narrow (a
 // cutscene or a camera lock narrows it while the camera still pans). No
 // wait in a room narrow from its load, or while the fade-out still runs.
-// The fade-out starts at once.
+// The fade-out starts at once, at the last narrow edges.
 #define VIGNETTE_HOLD 60
 static void WideVignette(TilemapRenderer* r) {
-    static s32 fade, init, hold, room = -1;
-    s32 edge[2], side, k, a, b, ca, cb, xa, xb, y0, y1, narrow;
+    static s32 fade, init, hold, room = -1, last[2], ramp[2];
+    s32 edge[2], side, k, a, b, ca, cb, xa, xb, y0, y1, narrow, out;
     s32 key = g_LastRoom.stage << 8 | g_LastRoom.room;
     POLY_G4* p;
 
@@ -267,6 +367,14 @@ static void WideVignette(TilemapRenderer* r) {
     narrow = g_WideX && (g_Tilemap.flags & LAYER_SHOW) &&
              edge[1] - edge[0] < DISP_STAGE_W + 2 * g_WideX;
     if (narrow) {
+        last[0] = MIN(edge[0], 0);
+        last[1] = MAX(edge[1], DISP_STAGE_W);
+        ramp[0] = g_Tilemap.x > 0   ? g_WideX
+                  : s_NextCells[0] ? VIGNETTE_RAMP_NEXT
+                                   : VIGNETTE_RAMP;
+        ramp[1] = g_Tilemap.width < g_Tilemap.hSize * 256 ? g_WideX
+                  : s_NextCells[1]                         ? VIGNETTE_RAMP_NEXT
+                                                           : VIGNETTE_RAMP;
         if (fade || room != key) {
             hold = VIGNETTE_HOLD;
         }
@@ -296,17 +404,22 @@ static void WideVignette(TilemapRenderer* r) {
     y0 = -WIDE_Y;
     y1 = DISP_STAGE_H + WIDE_Y;
     for (side = 0; side < 2; side++) {
-        for (k = 0; k < VIGNETTE_STRIPS; k++) {
-            // a..b px from the 4:3 edge, outward
-            a = g_WideX * k / VIGNETTE_STRIPS;
-            b = g_WideX * (k + 1) / VIGNETTE_STRIPS;
+        // px from the edge to the screen edge
+        out = side ? DISP_STAGE_W + g_WideX - last[1] : last[0] + g_WideX;
+        for (k = 0; k <= VIGNETTE_STRIPS; k++) {
+            // a..b px from the edge, outward; strip k = STRIPS is flat
+            a = ramp[side] * MIN(k, VIGNETTE_STRIPS) / VIGNETTE_STRIPS;
+            b = k < VIGNETTE_STRIPS
+                    ? ramp[side] * (k + 1) / VIGNETTE_STRIPS
+                    : out;
+            b = MIN(b, out);
             if (b <= a || g_GpuUsage.g4 >= MAX_POLY_G4_COUNT) {
                 continue;
             }
-            ca = VignetteDark(a, g_WideX, fade);
-            cb = VignetteDark(b, g_WideX, fade);
-            xa = side ? DISP_STAGE_W + a : -b; // the left x of the strip
-            xb = side ? DISP_STAGE_W + b : -a;
+            ca = VignetteDark(a, ramp[side], fade);
+            cb = VignetteDark(b, ramp[side], fade);
+            xa = side ? last[1] + a : last[0] - b; // the left x of the strip
+            xb = side ? last[1] + b : last[0] - a;
             p = &g_CurrentBuffer->polyG4[g_GpuUsage.g4++];
             setPolyG4(p);
             setSemiTrans(p, true);
@@ -668,13 +781,21 @@ static void SetRoomBackgroundLayer(s32 index, LayerDef* layerDef) {
 void LoadRoomLayer(s32 layerIndex) {
     s32 i;
 
+#ifdef PLATFORM_PSYZ
+    // a stitched room has merged layers and no apron patch (src/pc)
+    const RoomDef* def = RoomStitch_TileLayer(layerIndex);
+    SetRoomForegroundLayer(def->fg);
+    SetRoomBackgroundLayer(0, def->bg);
+#else
     SetRoomForegroundLayer(g_api.o.tileLayers[layerIndex].fg);
     SetRoomBackgroundLayer(0, g_api.o.tileLayers[layerIndex].bg);
+#endif
 
     for (i = 1; i < MAX_BG_LAYER_COUNT; i++) {
         g_BgLayers[i].flags = 0;
     }
 #ifdef PLATFORM_PSYZ
-    Apron_OnRoomLayer(layerIndex);
+    Apron_OnRoomLayer(def == &g_api.o.tileLayers[layerIndex] ? layerIndex
+                                                             : -1);
 #endif
 }

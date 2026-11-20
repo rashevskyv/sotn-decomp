@@ -2,6 +2,7 @@
 #include <game.h>
 #include <psyz/module.h>
 #include "overlay.h"
+#include "../room_stitch.h"
 #include "../spawn_point.h"
 
 static const char* OverlayPath(const char* name, char* buf, int len) {
@@ -36,6 +37,7 @@ bool LoadStageOverlay(const char* name, Overlay* o) {
     if (!LoadOverlay(&CurrentStageOverlay, name, o)) {
         return false;
     }
+    RoomStitch_HookOverlay(name, o);
     SpawnPoint_HookOverlay(o);
     return true;
 }
