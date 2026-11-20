@@ -38,7 +38,7 @@ enum {
     T_BESTIARY,
     T_OTHER_CELL,
     T_OTHER_SJIS,
-    T_ZONE, // the area names: no reader since 0.8.19 (the port menu is English)
+    T_ZONE, // the area names: the teleport list of the port menu (Lang_Zone)
     T_PORT
 };
 #define NO_INDEX 0xFFFF
@@ -794,5 +794,11 @@ int Lang_SjisCell(int sj) {
 // cells (FF end), or NULL
 const char* Lang_Port(int index) {
     return g_Lang ? Find(T_PORT, 0, index) : NULL;
+}
+
+// uk: the area name of a stage id (tools/lang/uk/ua_zones.json) as menu
+// cells (FF end), or NULL
+const char* Lang_Zone(int stage) {
+    return g_Lang ? Find(T_ZONE, 0, stage) : NULL;
 }
 

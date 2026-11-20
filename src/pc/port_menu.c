@@ -11,8 +11,10 @@
 //
 // Pages: MAIN -> CONTROLS (the key and gamepad button of each PS button:
 // Cross on a line, then a key or gamepad button sets it; RESET restores the
-// defaults), MAIN -> CHEATS -> MAP (teleport) -> CHOOSE (a cell with more
-// than one room). The map draws one rect per room from g_CastleRooms. Input on
+// defaults), MAIN -> CHEATS -> LIST (teleport: the castle map, then every
+// stage by name; Cross warps to its start, left and right turn a page) ->
+// MAP -> CHOOSE (a cell with more than one room). The map draws one rect per
+// room from g_CastleRooms. Input on
 // the map: D-pad moves the cell cursor, L1/L2 zoom out, R1/R2 zoom in,
 // Square switches normal / inverted castle, Cross teleports, Circle or
 // Triangle goes back. Pointer (PC mouse, Switch touch): tap teleports, drag
@@ -33,7 +35,14 @@
 #include <psyz/video.h>
 #endif
 
-enum { PAGE_MAIN, PAGE_CHEATS, PAGE_MAP, PAGE_CHOOSE, PAGE_CONTROLS };
+enum {
+    PAGE_MAIN,
+    PAGE_CHEATS,
+    PAGE_MAP,
+    PAGE_CHOOSE,
+    PAGE_CONTROLS,
+    PAGE_LIST
+};
 enum {
     ITEM_SCALE,
 #ifndef __SWITCH__
@@ -121,6 +130,13 @@ static int capture_armed; // every input was up since the capture began
 #else
 #define CTL_KEYS 1
 #endif
+
+// the teleport list: line 0 the castle map, then the stages with rooms in
+// g_CastleRooms, the normal castle first; it scrolls under a header line
+static u8 places[64];
+static int n_places;
+static int list_sel, list_top; // list_sel: kept for the next open
+static int ListLines(void) { return MIN(CTL_LINES, n_places + 1); }
 
 // the confirm and back buttons, and their marks in the hints: a byte 1 + b
 // of a Text string is the mark of PS button b in the set of BUTTONS
@@ -309,6 +325,24 @@ static void OpenMap(void) {
     }
 }
 
+static void OpenList(void) {
+    int castle_bit, i, j, id;
+    n_places = 0;
+    for (castle_bit = 0; castle_bit <= 0x20; castle_bit += 0x20) {
+        for (i = 0; i < g_CastleStageCount && n_places < LEN(places); i++) {
+            id = g_CastleStages[i].id;
+            for (j = 0; j < g_CastleRoomCount && g_CastleRooms[j].stage != id;
+                 j++) {
+            }
+            if ((id & 0x20) == castle_bit && j < g_CastleRoomCount) {
+                places[n_places++] = id;
+            }
+        }
+    }
+    page = PAGE_LIST;
+    sel = list_sel <= n_places ? list_sel : 0;
+}
+
 // ---- pointer ----------------------------------------------------------------
 
 static void Activate(void);
@@ -350,11 +384,12 @@ static void Tap(int x, int y) {
     i = page == PAGE_MAIN       ? MainLines()
         : page == PAGE_CHEATS   ? N_CHEATS
         : page == PAGE_CONTROLS ? CTL_LINES + 1
+        : page == PAGE_LIST     ? ListLines() + 1
                                 : n_owners;
     i = BoxLineAt(y, i);
-    if (page == PAGE_CONTROLS) {
+    if (page == PAGE_CONTROLS || page == PAGE_LIST) {
         if (i > 0 && !capture) { // line 0 is the header
-            sel = ctl_top + i - 1;
+            sel = (page == PAGE_LIST ? list_top : ctl_top) + i - 1;
             Activate();
         }
         return;
@@ -457,6 +492,11 @@ static void OnSdlEvent(const SDL_Event* e) {
 
 static void Change(int dir) {
     int scale, lo, hi, *flag;
+    if (page == PAGE_LIST) { // a page up or down, no wrap
+        sel += dir * CTL_LINES;
+        sel = sel < 0 ? 0 : sel > n_places ? n_places : sel;
+        return;
+    }
     if (page == PAGE_CONTROLS) {
         return;
     }
@@ -562,7 +602,7 @@ static void Activate(void) {
         }
     } else if (page == PAGE_CHEATS) {
         if (sel == CH_TELEPORT) {
-            OpenMap();
+            OpenList();
         } else if (sel == CH_APPLY) {
             const char* why = Cheat_ApplyCharacter();
             if (why) {
@@ -591,6 +631,17 @@ static void Activate(void) {
         }
     } else if (page == PAGE_CHOOSE && sel < n_owners) {
         Go(owners[sel]);
+    } else if (page == PAGE_LIST && sel <= n_places) {
+        const char* why = sel ? Cheat_WarpStart(places[sel - 1]) : NULL;
+        list_sel = sel;
+        if (!sel) {
+            OpenMap();
+        } else if (why) {
+            Message(why); // shown in the header line
+        } else {
+            page = PAGE_MAIN;
+            Close();
+        }
     }
 }
 
@@ -660,8 +711,8 @@ static void MapPad(u16 pressed, u16 tap) {
     } else if (tap & PAD_OK) {
         Teleport();
     } else if (tap & PAD_BACK) {
-        page = PAGE_CHEATS;
-        sel = CH_TELEPORT;
+        page = PAGE_LIST;
+        sel = 0;
     }
 }
 
@@ -724,6 +775,7 @@ u16 PortMenu_Pad(u16 pressed) {
     count = page == PAGE_MAIN       ? N_MAIN
             : page == PAGE_CHEATS   ? N_CHEATS
             : page == PAGE_CONTROLS ? N_CTL
+            : page == PAGE_LIST     ? n_places + 1
                                     : n_owners;
     if (tap & ~PAD_OK) {
         exit_armed = 0; // only a second OK on EXIT quits
@@ -746,6 +798,9 @@ u16 PortMenu_Pad(u16 pressed) {
             page = PAGE_MAIN;
         } else if (page == PAGE_CHOOSE) {
             page = PAGE_MAP;
+        } else if (page == PAGE_LIST) {
+            page = PAGE_CHEATS;
+            sel = CH_TELEPORT;
         } else {
             Close();
         }
@@ -807,6 +862,7 @@ static const struct {
     {'(', G("..#..", ".#...", "#....", "#....", "#....", ".#...", "..#..")},
     {')', G("..#..", "...#.", "....#", "....#", "....#", "...#.", "..#..")},
     {'%', G("##..#", "##..#", "...#.", "..#..", ".#...", "#..##", "#..##")},
+    {'\'', G("..#..", "..#..", ".#...", ".....", ".....", ".....", ".....")},
 };
 #undef G
 
@@ -893,6 +949,7 @@ static void Text(int x, int y, const char* s, u8 r, u8 g, u8 b) {
 // line is cell codes with an FF end; MARK_ESC then 1 + b is the mark of PS
 // button b. en lines stay ASCII in the 5x7 font, as does the debug overlay.
 #undef P_OVERLAY // MinGW process.h defines it
+#define P_CASTLE_MAP 74 // a status page word
 enum {
     P_SCALE = 20,
     P_VOICE,
@@ -979,9 +1036,8 @@ static void Add(char* line, const char* a) {
     *d = (char)0xFF;
 }
 
-// the port word i under uk, else the English en
-static void AddW(char* line, int i, const char* en) {
-    const char* w = uk && i >= 0 ? Lang_Port(i) : NULL;
+// uk cells w (FF end) onto the end of a line, else the English en
+static void AddCells(char* line, const char* w, const char* en) {
     char* d;
     if (!w) {
         Add(line, en);
@@ -991,6 +1047,11 @@ static void AddW(char* line, int i, const char* en) {
         *d++ = *w++;
     }
     *d = (char)0xFF;
+}
+
+// the port word i under uk, else the English en
+static void AddW(char* line, int i, const char* en) {
+    AddCells(line, uk && i >= 0 ? Lang_Port(i) : NULL, en);
 }
 
 // the width of a line in pixels
@@ -1395,6 +1456,47 @@ static void DrawChoose(void) {
     Box(lines, n_owners, sel, -1);
 }
 
+// "NO0  MARBLE GALLERY" lines; a stage with no area name (BO4) is a BOSS
+static void DrawList(void) {
+    char lines[CTL_LINES + 1][LINE_MAX], tmp[40];
+    const char* uk_name;
+    int i, k, id, n = ListLines();
+    if (sel < list_top) {
+        list_top = sel;
+    } else if (sel >= list_top + n) {
+        list_top = sel - n + 1;
+    }
+    Clear(lines[0]);
+    if (msg_timer > 0) {
+        msg_timer--;
+        AddW(lines[0], P_NO, "NO:");
+        snprintf(tmp, sizeof(tmp), uk ? " %.24s" : " %.27s", msg);
+        Add(lines[0], tmp);
+    } else {
+        AddW(lines[0], P_TELEPORT, "TELEPORT");
+    }
+    for (i = 1; i <= n; i++) {
+        k = list_top + i - 1;
+        Clear(lines[i]);
+        if (k == 0) {
+            AddW(lines[i], P_CASTLE_MAP, "CASTLE MAP");
+            continue;
+        }
+        id = places[k - 1];
+        sprintf(tmp, "%-4s ", Castle_StageName(id));
+        Add(lines[i], tmp);
+        uk_name = uk ? Lang_Zone(id) : NULL;
+        if (uk_name) {
+            AddCells(lines[i], uk_name, "");
+        } else if (*Castle_ZoneName(id)) {
+            AddUpper(lines[i], Castle_ZoneName(id), 23);
+        } else {
+            AddW(lines[i], P_BOSS, "BOSS");
+        }
+    }
+    Box(lines, n + 1, sel - list_top + 1, 0);
+}
+
 // one colour per stage, the same in both castles
 static void StageColor(int stage, u8* r, u8* g, u8* b) {
     static const u8 pal[16][3] = {
@@ -1720,6 +1822,8 @@ void PortMenu_Draw(OT_TYPE* ot) {
         DrawCheats();
     } else if (page == PAGE_CONTROLS) {
         DrawControls();
+    } else if (page == PAGE_LIST) {
+        DrawList();
     } else {
         if (page == PAGE_CHOOSE) {
             DrawChoose();

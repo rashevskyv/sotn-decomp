@@ -335,22 +335,29 @@ static const struct CastleRoom* FindRoom(int stage, int room) {
     return NULL;
 }
 
+// Rooms where the PC port crashes right after a warp (the warp test of
+// step 13): DAI 0 Maria cutscene (not ported to PC), DAI 7 boss music
+// sequence missing.
+static int Crashes(int stage, int room) {
+    static const u8 crash[][2] = {{STAGE_DAI, 0}, {STAGE_DAI, 7}};
+    int i;
+    for (i = 0; i < LEN(crash); i++) {
+        if (stage == crash[i][0] && room == crash[i][1]) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 const char* Cheat_Warp(int stage, int room, int cx, int cy) {
     const struct CastleRoom* r = FindRoom(stage, room);
     const char* why = Cheat_WarpRefusal();
-    // Rooms where the PC port crashes right after a warp (the warp test of
-    // step 13): DAI 0 Maria cutscene (not ported to PC), DAI 7 boss music
-    // sequence missing.
-    static const u8 crash[][2] = {{STAGE_DAI, 0}, {STAGE_DAI, 7}};
-    int i;
 
     if (!why && !r) {
         why = "unknown room";
     }
-    for (i = 0; !why && i < LEN(crash); i++) {
-        if (stage == crash[i][0] && room == crash[i][1]) {
-            why = "this room crashes the port, pick another";
-        }
+    if (!why && Crashes(stage, room)) {
+        why = "this room crashes the port, pick another";
     }
     if (!why && (cx < r->left || cx > r->right || cy < r->top || cy > r->bottom)) {
         why = "cell is outside the room";
@@ -375,6 +382,31 @@ const char* Cheat_Warp(int stage, int room, int cx, int cy) {
     fprintf(stderr, "[cheat] warp %s room %d cell %d,%d: start\n",
             Castle_StageName(stage), room, cx, cy);
     return NULL;
+}
+
+// The start of a stage (the port menu's list): its first room in the game's
+// room list that does not crash, at the bottom left cell. The arrival in
+// mist (or LandOutsideWalls) takes the player out of a wall. Stages whose
+// first room is no start name their room here: DAI 1 is the spike
+// corridor (DAI 11: the chapel stairs), NZ1 0 the Karasuman room and RNZ1 0
+// the Darkwing Bat room (room 11: next to the Outer Wall).
+const char* Cheat_WarpStart(int stage) {
+    static const u8 start[][2] = {
+        {STAGE_DAI, 11}, {STAGE_NZ1, 11}, {STAGE_RNZ1, 11}};
+    int i, want = -1;
+    for (i = 0; i < LEN(start); i++) {
+        if (stage == start[i][0]) {
+            want = start[i][1];
+        }
+    }
+    for (i = 0; i < g_CastleRoomCount; i++) {
+        const struct CastleRoom* r = &g_CastleRooms[i];
+        if (r->stage == stage && !Crashes(stage, r->room) &&
+            (want < 0 || r->room == want)) {
+            return Cheat_Warp(stage, r->room, r->left, r->bottom);
+        }
+    }
+    return "unknown room";
 }
 
 // Mode B, APPLY NOW. The full player reload of the demo end (5087C.c,

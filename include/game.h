@@ -1125,6 +1125,8 @@ void Cheat_SkipPrologue(void); // game_handlers.c, before a stage load
 // Teleport to room `room` of `stage`, map cell (cx, cy). Returns NULL when
 // the warp starts, else the reason why it is refused.
 const char* Cheat_Warp(int stage, int room, int cx, int cy);
+// The same to the start of `stage` (its first room that does not crash).
+const char* Cheat_WarpStart(int stage);
 // NULL when a warp can start now, else the reason.
 const char* Cheat_WarpRefusal(void);
 // Read by the door path in 5087C.c at the next stage load.
@@ -1240,6 +1242,8 @@ int Lang_MenuFont(int on);
 #define MENU_CELL_GT 0x1B
 int Lang_MenuFontOn(void);
 const char* Lang_Port(int index);
+// uk: the area name of a stage (tools/lang/uk/ua_zones.json), or NULL
+const char* Lang_Zone(int stage);
 // uk: the 11 rows (4 bytes, 4 bits a pixel) of a serif menu cell, or NULL
 const unsigned char* Lang_MenuCell(int code);
 // the same under en too, where only the shared cells (stat arrows) exist
