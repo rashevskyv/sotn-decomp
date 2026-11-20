@@ -523,7 +523,9 @@ static bool StageOwnsAssets(void) {
     if (SaturnStageOverlay(g_StageId) != NULL) {
         return true;
     }
-    if (g_GameParams.stageName == NULL) {
+    // only the stage named by --stage: the stages behind its exits load
+    // their own graphics and sounds
+    if (g_GameParams.stageName == NULL || g_StageId != g_GameParams.stage) {
         return false;
     }
     return g_GameParams.stageOwnsAssets ||
