@@ -214,16 +214,20 @@ static bool StretchBackdrop(TilemapRenderer* r, BgLayer* bg) {
 
 // The wide view outside the camera range: a room, or a lock of the camera,
 // narrower than the view shows the room beyond the range or the edge fill
-// of ApronPass there. Then the view darkens outside the central 256 px
-// (the PS1 view) toward the screen edges, in the psyz darken mode (the
-// picture times 1 - red/255, so the hue stays): darkness
-// d(t) = 0.95 * (1 - (1 - t)^2.5), t 0 at the 4:3 edge, 1 at the screen
-// edge, as gouraud strips. A GP0 command of the port switches the mode on
-// and off in the OT. It fades in and out over 30 frames, below the HUD
-// (0x1EE) and the dialogue (0x1FC), above the stage layers and entities.
+// of ApronPass there. Then the view darkens outward from the range edge
+// (never inside the central 256 px, the PS1 view), in the psyz darken mode
+// (the picture times 1 - red/255, so the hue stays): darkness
+// d(t) = 0.95 * (1 - (1 - t)^2.5), t 0 at the edge, 1 after a ramp, as
+// gouraud strips, then flat 0.95 to the screen edge. At a room edge the
+// ramp is VIGNETTE_RAMP (the edge fill is not real art); at a camera lock
+// inside the room it is the whole margin (the room art goes on there).
+// A GP0 command of the port switches the mode on and off in the OT. It
+// fades in and out over 30 frames, below the HUD (0x1EE) and the dialogue
+// (0x1FC), above the stage layers and entities.
 #define VIGNETTE_OT 0x1E0
 #define VIGNETTE_FADE 30
-#define VIGNETTE_STRIPS 12 // a side
+#define VIGNETTE_STRIPS 12 // a side, and one flat strip
+#define VIGNETTE_RAMP 48   // px, 3 tiles
 #define VIGNETTE_GP0 0x10  // a NOP on the PS1 GPU
 static int VignetteGp0(const u_long* words, int n, void* user) {
     Psyz_VideoSetDarken(words[0] & 1);
@@ -238,9 +242,9 @@ static void VignetteMode(TilemapRenderer* r, s32 on) {
     g_GpuUsage.drawModes++;
 }
 
-// darkness at x of the w px margin, of 0xFF, times fade
+// darkness at x px out of a w px ramp, of 0xFF, times fade
 static s32 VignetteDark(s32 x, s32 w, s32 fade) {
-    float t = (float)x / w;
+    float t = x < w ? (float)x / w : 1.0f;
     return (s32)(0xFF * 0.95f * (1.0f - powf(1.0f - t, 2.5f)) + 0.5f) * fade /
            VIGNETTE_FADE;
 }
@@ -248,11 +252,11 @@ static s32 VignetteDark(s32 x, s32 w, s32 fade) {
 // The fade-in waits VIGNETTE_HOLD frames after the range gets narrow (a
 // cutscene or a camera lock narrows it while the camera still pans). No
 // wait in a room narrow from its load, or while the fade-out still runs.
-// The fade-out starts at once.
+// The fade-out starts at once, at the last narrow edges.
 #define VIGNETTE_HOLD 60
 static void WideVignette(TilemapRenderer* r) {
-    static s32 fade, init, hold, room = -1;
-    s32 edge[2], side, k, a, b, ca, cb, xa, xb, y0, y1, narrow;
+    static s32 fade, init, hold, room = -1, last[2], ramp[2];
+    s32 edge[2], side, k, a, b, ca, cb, xa, xb, y0, y1, narrow, out;
     s32 key = g_LastRoom.stage << 8 | g_LastRoom.room;
     POLY_G4* p;
 
@@ -267,6 +271,11 @@ static void WideVignette(TilemapRenderer* r) {
     narrow = g_WideX && (g_Tilemap.flags & LAYER_SHOW) &&
              edge[1] - edge[0] < DISP_STAGE_W + 2 * g_WideX;
     if (narrow) {
+        last[0] = MIN(edge[0], 0);
+        last[1] = MAX(edge[1], DISP_STAGE_W);
+        ramp[0] = g_Tilemap.x <= 0 ? VIGNETTE_RAMP : g_WideX;
+        ramp[1] = g_Tilemap.width >= g_Tilemap.hSize * 256 ? VIGNETTE_RAMP
+                                                            : g_WideX;
         if (fade || room != key) {
             hold = VIGNETTE_HOLD;
         }
@@ -296,17 +305,22 @@ static void WideVignette(TilemapRenderer* r) {
     y0 = -WIDE_Y;
     y1 = DISP_STAGE_H + WIDE_Y;
     for (side = 0; side < 2; side++) {
-        for (k = 0; k < VIGNETTE_STRIPS; k++) {
-            // a..b px from the 4:3 edge, outward
-            a = g_WideX * k / VIGNETTE_STRIPS;
-            b = g_WideX * (k + 1) / VIGNETTE_STRIPS;
+        // px from the edge to the screen edge
+        out = side ? DISP_STAGE_W + g_WideX - last[1] : last[0] + g_WideX;
+        for (k = 0; k <= VIGNETTE_STRIPS; k++) {
+            // a..b px from the edge, outward; strip k = STRIPS is flat
+            a = ramp[side] * MIN(k, VIGNETTE_STRIPS) / VIGNETTE_STRIPS;
+            b = k < VIGNETTE_STRIPS
+                    ? ramp[side] * (k + 1) / VIGNETTE_STRIPS
+                    : out;
+            b = MIN(b, out);
             if (b <= a || g_GpuUsage.g4 >= MAX_POLY_G4_COUNT) {
                 continue;
             }
-            ca = VignetteDark(a, g_WideX, fade);
-            cb = VignetteDark(b, g_WideX, fade);
-            xa = side ? DISP_STAGE_W + a : -b; // the left x of the strip
-            xb = side ? DISP_STAGE_W + b : -a;
+            ca = VignetteDark(a, ramp[side], fade);
+            cb = VignetteDark(b, ramp[side], fade);
+            xa = side ? last[1] + a : last[0] - b; // the left x of the strip
+            xb = side ? last[1] + b : last[0] - a;
             p = &g_CurrentBuffer->polyG4[g_GpuUsage.g4++];
             setPolyG4(p);
             setSemiTrans(p, true);
