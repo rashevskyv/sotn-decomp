@@ -361,14 +361,35 @@ static int canvas[4], canvas_zoom;
 
 void Wide_Tile(TILE* tile) {
     int x = tile->x0, y = tile->y0, w = tile->w, h = tile->h;
-    // a title or menu frame: a fade tile covers its whole canvas, the side
-    // pieces of the menu and prologue pictures too
-    int mx = MAX(g_WideX, canvas_zoom ? -canvas[0] : 0);
-    int my = MAX(g_WideY, canvas_zoom ? -canvas[1] : 0);
-    if (!mx && !my) {
+    if (canvas_zoom) {
+        // a title or menu frame (384 or 512 wide): a large tile that
+        // touches a frame edge grows to the canvas edge, so a fade covers
+        // the side pieces of the menu and prologue pictures too. Tiles side
+        // by side (the prologue fades: 0..192, 192..384, 384..512) do not
+        // overlap.
+        int fw = canvas[0] + canvas[2], fh = canvas[1] + canvas[3];
+        if (w < 128 || h < 120) {
+            return;
+        }
+        if (x <= 0) {
+            w += x - canvas[0];
+            x = canvas[0];
+        }
+        if (x + w >= fw) {
+            w = canvas[2] - x;
+        }
+        if (y <= 0) {
+            h += y - canvas[1];
+            y = canvas[1];
+        }
+        if (y + h >= fh) {
+            h = canvas[3] - y;
+        }
+    } else if (g_WideX || g_WideY) {
+        Wide_StretchRect(&x, &y, &w, &h, g_WideX, g_WideY);
+    } else {
         return;
     }
-    Wide_StretchRect(&x, &y, &w, &h, mx, my);
     tile->x0 = x;
     tile->y0 = y;
     tile->w = w;

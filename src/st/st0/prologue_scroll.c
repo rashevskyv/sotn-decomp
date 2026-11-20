@@ -43,19 +43,21 @@ STATIC_PAD_BSS(2);
 // HD side pieces continue the castle column: loose PNG files keyed on one
 // 16-bit VRAM column of the stock picture (1x256 at the column's edge), so
 // the stock game, or a pack without them, draws nothing there. Above the
-// sky, slow clouds keyed on a column of the moon picture. The fade tiles
+// sky, slow clouds keyed on a 64x176 rect of the moon picture. The fade tiles
 // grow over all of it (Wide_Tile).
 #define WIDE_PIECES 3
-#define WIDE_CLOUDS 5
-#define CLOUD_W 512   // frame pixels of one cloud picture, it repeats
+#define WIDE_CLOUDS 2
+#define CLOUD_W 1024  // frame pixels of one cloud picture, it repeats
 #define CLOUD_Y 8     // its top row and height
 #define CLOUD_H 176
+#define CLOUD_COLS 64 // 16-bit VRAM columns of the key rect, at 848,0
 #define CLOUD_STEP 6  // frames for one pixel of drift
 static s16 wide_prims = -1;
 static u16 wide_clock;
 
+// cols x rows: the 16-bit VRAM rect the HD file is keyed on
 static void WideQuad(Primitive* p, s32 x, s32 y, s32 w, s32 h, s32 vram_x,
-                     s32 vram_y, s32 rows) {
+                     s32 vram_y, s32 cols, s32 rows) {
     s32 u = vram_x & 0x3F;
     p->tpage = 0x100 | ((vram_y >> 8) << 4) | (vram_x >> 6); // 16-bit texels
     p->x0 = p->x2 = x;
@@ -63,7 +65,7 @@ static void WideQuad(Primitive* p, s32 x, s32 y, s32 w, s32 h, s32 vram_x,
     p->y0 = p->y1 = y;
     p->y2 = p->y3 = y + h;
     p->u0 = p->u2 = u;
-    p->u1 = p->u3 = u + 1;
+    p->u1 = p->u3 = u + cols;
     p->v0 = p->v1 = vram_y & 0xFF;
     p->v2 = p->v3 = (vram_y & 0xFF) + rows - 1;
     p->drawMode = DRAW_DEFAULT;
@@ -77,7 +79,6 @@ static void PrologueWide(void) {
         {767, 9, 7, 1},  // cliff, right
         {1023, 5, 3, 1}, // bridge, right
     };
-    PsyzRect a = Psyz_VideoGetDrawArea();
     Primitive* col[16];
     Primitive* p;
     s32 i, n, x, tw, th;
@@ -103,18 +104,26 @@ static void PrologueWide(void) {
         }
         // the stock column covers x 1..510: the pieces meet it there
         x = k[3] ? 511 : 1 - 432;
-        WideQuad(p, x, col[k[1]]->y0, 432, 256, k[0], 256, 256);
+        WideQuad(p, x, col[k[1]]->y0, 432, 256, k[0], 256, 1, 256);
         p->priority = col[k[1]]->priority;
     }
-    // clouds: behind the column (priority 0, the moon's), while the moon shows
+    // clouds: behind the column (priority 0, the moon's), while the moon shows.
+    // The HD picture is two repeats of a 512 px cloud strip. RenderPrimitives
+    // skips a prim with x0 < -512, and x past 1023 wraps (signed 11-bit), so
+    // both tiles are cut to -512..1023 in whole key columns. They cover
+    // x -497..1008: every canvas up to 32:9.
     wide_clock++;
-    x = a.sx - (s32)(wide_clock / CLOUD_STEP) % CLOUD_W;
+    x = -512 - (s32)(wide_clock / CLOUD_STEP) % 512;
     n = n >= 12 && !(col[0]->drawMode & DRAW_HIDE) &&
-        Psyz_HdTexSize(848, 0, 1, CLOUD_H, 16, &tw, &th);
+        Psyz_HdTexSize(848, 0, CLOUD_COLS, CLOUD_H, 16, &tw, &th);
     for (i = 0; i < WIDE_CLOUDS; i++, p = p->next, x += CLOUD_W) {
+        s32 c = CLOUD_W / CLOUD_COLS; // frame px per key column
+        s32 l = x < -512 ? (-512 - x + c - 1) / c : 0;
+        s32 r = x + CLOUD_W > 1023 ? (x + CLOUD_W - 1023 + c - 1) / c : 0;
         p->drawMode = DRAW_HIDE;
-        if (n) { // 5 x 512 covers the widest canvas (1364 at 32:9)
-            WideQuad(p, x, CLOUD_Y, CLOUD_W, CLOUD_H, 848, 0, CLOUD_H);
+        if (n) {
+            WideQuad(p, x + l * c, CLOUD_Y, CLOUD_W - (l + r) * c, CLOUD_H,
+                     848 + l, 0, CLOUD_COLS - l - r, CLOUD_H);
             p->priority = 0;
         }
     }
