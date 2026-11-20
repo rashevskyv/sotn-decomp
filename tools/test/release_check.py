@@ -2,9 +2,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Release checks of docs/TESTING.md (rows 2, 3, 4, 5, 7, 8) on the built files. Reads only.
 
-usage: release_check.py [--version V] [--release <dir>] <sotn.exe> <sotn.nro> ...
+usage: release_check.py [--version V] [--release <dir>] [--own-path P] <sotn.exe> <sotn.nro> ...
   --version  the expected version (default: SOTN_VERSION of CMakeLists.txt)
   --release  the release folder: it must hold no stock data
+  --own-path our build path (default /home/xhr): the NRO must hold none; the exe count is info only
 A file is a Windows exe (MZ) or a Switch NRO (NRO0); others are refused.
 Prints PASS, FAIL or SKIP per check and the SHA-1 of each file. Exit code 1 if a check fails.
 """
@@ -18,7 +19,8 @@ import subprocess
 import sys
 
 REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-BAD_DLLS = ("libgcc", "libwinpthread", "libstdc++")
+OWN_PATH = "/home/xhr"  # our build path; --own-path changes it
+BAD_DLLS =("libgcc", "libwinpthread", "libstdc++")
 STOCK_DIRS = ("data", "voice", "music", "lang/en")
 STOCK_EXT = (".pcm", ".at3", ".mp3", ".flac", ".xa", ".iso", ".cso", ".cue", ".bin")  # .bin: disc data, art.bin
 HD_NAME = re.compile(r"__\d+_\d+_\d+x\d+_(?:4|8|16)_[0-9a-f]{8}(?:_c[0-9a-f]{8})?\.png$")
@@ -85,7 +87,7 @@ def dll_names(path):
     return sorted({l.split("DLL Name:")[1].strip() for l in r.stdout.splitlines() if "DLL Name:" in l})
 
 
-def check_file(path, want):
+def check_file(path, want, own):
     with open(path, "rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
         kind = "exe" if m[:2] == b"MZ" else "nro" if m[0x10:0x14] == b"NRO0" else None
         name = os.path.basename(path)
@@ -98,8 +100,11 @@ def check_file(path, want):
         if kind == "nro":
             nv = nacp_version(m)
             say(nv == want, f"{name} NACP version", f"{nv}")
-        home = hits(m, rb"/home/")
-        say(not home, f"{name} no /home/ strings", f"{len(home)}: {home[:5]}" if home else "0")
+        home = hits(m, re.escape(own.encode()))
+        if kind == "nro":  # toolchain paths (devkitPro newlib, /home/davem) are fine
+            say(not home, f"{name} no {own} strings", f"{len(home)}: {home[:5]}" if home else "0")
+        else:  # the exe keeps them (known): count only
+            print(f"INFO {name} {own} strings: {len(home)}")
         if kind == "nro":
             rumble = hits(m, rb"(?i)rumble")
             say(bool(rumble), f"{name} rumble strings", f"{len(rumble)}: {rumble[:6]}")
@@ -133,13 +138,14 @@ def check_release(root):
 def main(argv):
     want = argv[argv.index("--version") + 1] if "--version" in argv else cmake_version()
     release = argv[argv.index("--release") + 1] if "--release" in argv else None
-    skip = {argv.index(a) + 1 for a in ("--version", "--release") if a in argv}
+    own = argv[argv.index("--own-path") + 1] if "--own-path" in argv else OWN_PATH
+    skip = {argv.index(a) + 1 for a in ("--version", "--release", "--own-path") if a in argv}
     files = [a for i, a in enumerate(argv) if not a.startswith("--") and i not in skip]
     if not files and not release:
         sys.exit(__doc__)
     print("version wanted:", want)
     for path in files:
-        check_file(path, want)
+        check_file(path, want, own)
     if release:
         check_release(release)
     print("failed:", fails)

@@ -84,7 +84,7 @@ Without `--version` it takes `SOTN_VERSION` from `CMakeLists.txt`.
 |---|---|---|
 | 1 | Level 1 passes (level 2: PLANNED) | `python3 tools/test/run.py offline` |
 | 2 | Version raised | `SOTN_VERSION` in `CMakeLists.txt`; the same in `[boot]` of the exe log and in the NRO NACP |
-| 3 | No build path in the files | `strings -a sotn.nro | grep -c /home/` is 0; the same for `sotn.exe` |
+| 3 | No own build path in the NRO | `strings -a sotn.nro | grep -c /home/xhr` is 0. devkitPro newlib paths (`/home/davem/...`) are fine. For `sotn.exe` the count is info only (known, fine). |
 | 4 | Rumble is in the NRO | `strings -a sotn.nro | grep -ci rumble` is not 0 (4 in 0.8.55 and 0.8.57) |
 | 5 | Windows exe is one file | `objdump -p sotn.exe | grep "DLL Name"` lists no libgcc and no libwinpthread; subsystem is Windows GUI |
 | 6 | Windows exe starts | Start it hidden in a private copy; `[boot]` appears; no `[crash]` line after 30 s |

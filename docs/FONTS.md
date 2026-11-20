@@ -23,11 +23,11 @@ Owner rule: every uk screen (shop, menus) uses the serif font, never the stock 8
 
 | Picture | Font | Font file | Licence of the font | Font in git |
 |---|---|---|---|---|
-| uk stage banners (13), ST0 card «Останній етап», elevator notice; 1x labels and HD | Monotype Corsiva | `C:\Windows\Fonts\MTCORSVA.TTF` (comes with Microsoft Office) | Proprietary (Monotype) | Never |
+| uk stage banners (13), ST0 card, elevator notice; 1x labels and HD | Monotype Corsiva | `C:\Windows\Fonts\MTCORSVA.TTF` (comes with Microsoft Office) | Proprietary (Monotype) | Never |
 | en stage banners, HD | Monotype Corsiva | same | Proprietary | Never |
 | en stage banners, 1x | Stock lettering, a chancery italic of the same class | PS1 disc | Stock | No |
 | "1792" card, uk (1x and the rule for HD) | Alegreya Sans Italic | `tools/lang/fonts/AlegreyaSans-Italic.ttf` | OFL-1.1 (`OFL-AlegreyaSans.txt`) | Yes |
-| Prologue title «КАСТЕЛЬВАНІЯ» (HD) | A serif TTF given on the command line of `prologue_title.py` | UNKNOWN: the run did not record the file | UNKNOWN | No |
+| uk prologue title (HD) | A serif TTF given on the command line of `prologue_title.py` | UNKNOWN: the run did not record the file | UNKNOWN | No |
 | uk title logo, PRESS START, game-over letters, loading text | Drawn art, no font | `tools/lang/uk/local/` | Stock-derived | No |
 
 ### Stage banners: why Corsiva
