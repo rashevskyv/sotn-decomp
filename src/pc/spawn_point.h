@@ -6,6 +6,8 @@
 #include "pc.h"
 
 int SpawnPoint_StageForName(const char* name);
+// the --spawn-point name given at start, or NULL
+const char* SpawnPoint_Name(void);
 void SpawnPoint_Init(const struct InitGameParams* params);
 void SpawnPoint_OnFrame(void);
 void SpawnPoint_HookOverlay(Overlay* o);

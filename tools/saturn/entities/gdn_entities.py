@@ -98,6 +98,11 @@ PRISON = dict(
         # bank 19: the room 0 stone pillar (1) and its switch (2), Saturn
         # 0x17 / 0x16 (e_mod_pillar.c)
         (13, [("pillar", 0x060E900C, 0x060E9000, f) for f in (1, 2)]),
+        # Saturn 0x24, the Skeleton Breeder: the Garden's bank byte for byte
+        # (frame table at bank + 0x7AC), no layout places it
+        (14, [("skbreeder", 0x060EE2A0, 0x060EEA4C, f,
+               32 if 13 <= f <= 31 else 16 if f <= 12 else 0)
+              for f in range(1, 38)]),
     ],
     DECORATIONS=(0x060EA1CC, 6),
     DECORATION_GROUPS=["candles"] * 6,
@@ -109,7 +114,8 @@ PRISON = dict(
     STP_BANKS=(0x060ECB58, 0x060EEC7C),
     GROUP_ROOMS={"candles": (0, 1), "gargoyles": (1,), "spearguard": (0,),
                  "archer": (0,), "slinger": (0,), "specter": (1,),
-                 "wisp": (1,), "pillar": (0,), "banner": (0, 1)},
+                 "wisp": (1,), "pillar": (0,), "banner": (0, 1),
+                 "skbreeder": (0,)},
     # the area name banner (Saturn 0x09, rooms 0 and 1): bank 18's two
     # 128x48 halves of "呪われた牢獄 / Cursed Prison" (e_mod_banner.c)
     BANNER=(0x060E8FA8, (0, 1), "banner"),

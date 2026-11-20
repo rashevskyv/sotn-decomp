@@ -42,6 +42,10 @@ void EntityModPillarSwitch(Entity*);
 void EntityModPillar(Entity*);
 void EntityModPillarDebris(Entity*);
 void EntityModBanner(Entity*);
+void EntityModSkBreeder(Entity*);
+void EntityModSkBreederWeapon(Entity*);
+void EntityModSkBreederBeast(Entity*);
+void EntityModSkBreederDebris(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -88,6 +92,10 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityModPillarSwitch,
     EntityModPillar,
     EntityModPillarDebris,
+    EntityModSkBreeder,
+    EntityModSkBreederWeapon,
+    EntityModSkBreederBeast,
+    EntityModSkBreederDebris,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_PRISON_ENTITIES - 1, "EntityUpdates");
 

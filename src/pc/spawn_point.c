@@ -24,6 +24,8 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_ID_SATURN_16, 0, 560, 140, "prison-banner"},
     {STAGE_ID_SATURN_16, 1, 200, 150, "prison-specter"},
     {STAGE_ID_SATURN_16, 1, 640, 150, "prison-wisp"},
+    // adds a Skeleton Breeder to room 0 (no Saturn layout places one)
+    {STAGE_ID_SATURN_16, 0, 280, 525, "prison-breeder"},
     {STAGE_ID_SATURN_15, 0, 40, 140, "garden-room0"},
     {STAGE_ID_SATURN_15, 0, 600, 360, "garden-slinger"},
     {STAGE_ID_SATURN_15, 1, 40, 140, "garden-room1"},
@@ -66,6 +68,8 @@ static const struct SpawnPoint* FindSpawnPoint(const char* name) {
     }
     return NULL;
 }
+
+const char* SpawnPoint_Name(void) { return s_Spawn ? s_Spawn->name : NULL; }
 
 int SpawnPoint_StageForName(const char* name) {
     const struct SpawnPoint* spawn = FindSpawnPoint(name);
