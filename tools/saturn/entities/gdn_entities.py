@@ -60,13 +60,16 @@ DROPS = {}
 GROUP_ROOMS = {
     "candles": (0, 1, 3), "scene": (2,), "drips": (1, 3), "gargoyles": (0,),
     "skbreeder": (0,), "leaper": (0,), "gardener": (1,), "tree": (0,),
-    "maneater": (3,), "boss": (2,),
+    "maneater": (3,), "boss": (2,), "banner": (0,),
 }
 ROOMS = 4
+# the area name banner (Saturn 0x09, room 0): bank 18's three 64x48 thirds of
+# "地下庭園 / Underground Garden" and its 16x16 star (e_mod_banner.c)
+BANNER = (0x060F08D4, (0, 1, 2, 6), "banner")
 GARDEN = dict(SPRITE_SETS=SPRITE_SETS, DECORATIONS=DECORATIONS,
               DECORATION_GROUPS=DECORATION_GROUPS, PALETTE_BLOCKS=PALETTE_BLOCKS,
               BLEED_BANKS=BLEED_BANKS, STP_BANKS=STP_BANKS, DROPS=DROPS,
-              GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS, BANNER=None)
+              GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS, BANNER=BANNER)
 # Cursed Prison: bank and frame table addresses from config/saturn
 # stage_16_user_syms.txt and the gfx segments of stage_16.prg.yaml
 P_BANK16 = (0x060E8F60, 0x060E8F08)
