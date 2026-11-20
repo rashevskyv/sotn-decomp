@@ -2793,6 +2793,13 @@ if(USE_PLAYER_MARIA)
         OBJECT_DEPENDS "${MARIA_SFX_DIR}/maria_vo.h")
 endif()
 
+# The port draws with sdl3_gl only: the HD textures and the vignette darken
+# mode (Psyz_HdTex*, Psyz_VideoSetDarken, Psyz_VideoKeepCanvas) are not in
+# sdl3_gpu, so a plain `cmake -B dir` must not take the psyz default.
+set(PSYZ_RENDERER "sdl3_gl" CACHE STRING "Rendering backend: sdl3_gl")
+if(NOT PSYZ_RENDERER STREQUAL "sdl3_gl")
+    message(FATAL_ERROR "the port needs PSYZ_RENDERER=sdl3_gl, not '${PSYZ_RENDERER}'")
+endif()
 add_subdirectory(tools/psyz/psyz)
 
 # the port version: the NACP and the boot line of the log
