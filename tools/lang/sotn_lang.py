@@ -1801,17 +1801,19 @@ def cmd_pack(_args):
         path = os.path.join(OUT, sname)
         if os.path.exists(path):
             os.remove(path)
-        recs, nbad, wrapped = {}, 0, 0
+        recs, nbad, wrapped, left = {}, 0, 0, []
         for k, markup in sorted(src.items()):
             key = k if k in boxes else by_id.get(k)
             if key not in boxes:
                 nbad += 1
+                left.append(f"{k} (no box)")
                 continue
             data, bad, ok = enc_dialogue_en(markup, boxes[key]["ops"])
             for ch in bad:
                 bad_chars[ch] = bad_chars.get(ch, 0) + 1
             if bad or not ok:
                 nbad += 1
+                left.append(f"{k} ({'chars ' + ''.join(bad) if bad else 'ops differ'})")
                 continue
             wrapped += wrap_markup(markup) != markup
             recs[key] = data
@@ -1820,6 +1822,8 @@ def cmd_pack(_args):
             info = write_scripts(path, recs, rels)
             print(f"{sname}: {len(recs)} boxes ({wrapped} with lines broken at {DLG_LINE_CELLS} cells),"
                   f" {nbad} left stock, {len(info)} scripts")
+            for s in left:
+                print("    left stock:", s)
         else:
             print(f"{sname}: no boxes: en keeps the stock text for this voice")
     # font8.bin
