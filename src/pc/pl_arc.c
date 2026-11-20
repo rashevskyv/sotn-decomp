@@ -29,6 +29,31 @@ static void ParseSpritesheetTable(
     }
 }
 
+// The cloak colour preview (func_800F82F4) loads the two frames that the
+// pointers at 0x8013C200 and 0x8013C270 name: entries 120 and 148 of the
+// sprite table at 0x8013C020. The stub (stubs.c) stays when a pointer or
+// its frame is not in the file.
+extern ImgSrc g_imgUnk8013C200_impl;
+extern ImgSrc* g_imgUnk8013C200;
+extern ImgSrc* g_imgUnk8013C270;
+
+static ImgSrc* PreviewFrame(u32 tableOffset, u32 fileLength) {
+    u32 pos;
+    ImgSrc* img;
+    if (fileLength < tableOffset + 4) {
+        return &g_imgUnk8013C200_impl;
+    }
+    pos = *(u32*)(sprite_data + tableOffset) - BaseAddr;
+    if (pos > fileLength - 4) {
+        return &g_imgUnk8013C200_impl;
+    }
+    img = (ImgSrc*)(sprite_data + pos);
+    if (img->width / 2 * img->height > fileLength - 4 - pos) {
+        return &g_imgUnk8013C200_impl;
+    }
+    return img;
+}
+
 void InitPlayerArc(const struct FileUseContent* file) {
     if (sprite_data) {
         free(sprite_data);
@@ -52,4 +77,6 @@ void InitPlayerArc(const struct FileUseContent* file) {
 
     ParseSpritesheetTable(8 * sizeof(u32), file->length, g_PlOvlSpritesheet,
                           LEN(g_PlOvlSpritesheet));
+    g_imgUnk8013C200 = PreviewFrame(0x200, file->length);
+    g_imgUnk8013C270 = PreviewFrame(0x270, file->length);
 }
