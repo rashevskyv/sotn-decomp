@@ -10,6 +10,8 @@
 // crossfade; a track without loop points loops the whole file. The game's
 // timers (D_8013AE90, D_8013AEF4) still run: their loop reads keep the file
 // at its position. The pause stack of CdSoundCommand12 keeps the position.
+// The Saturn boss track SATURN_BOSS_MUSIC plays data/ST/STAGE15/music/535.wav
+// (tools/saturn/saturn_audio.py) the same way, also with music_files = 0.
 #include <game.h>
 #include <psyz/audio.h>
 #include <psyz/cd.h>
@@ -118,11 +120,11 @@ static void Collect(void) {
 
 // music/loops.txt: "ID start loop_start loop_end [level]", frames at 44100 Hz
 // and the gain in 1/256 (ost_map.py matches the soundtrack to the XA level)
-static void Loops(Track* t) {
+static void Loops(Track* t, const char* path) {
     char line[96];
     unsigned id, s, a, b, l;
     int n;
-    FILE* f = fopen("music/loops.txt", "r");
+    FILE* f = fopen(path, "r");
     if (!f) {
         return;
     }
@@ -136,6 +138,41 @@ static void Loops(Track* t) {
         }
     }
     fclose(f);
+}
+
+// the Saturn boss track (tools/saturn/saturn_audio.py): one WAV, read whole
+#define SATURN_MUSIC_DIR SOTN_DATA_DIR "/ST/STAGE15/music"
+static bool OpenSaturn(Track* t) {
+    char path[256];
+    SDL_AudioSpec spec;
+    Uint8* wav;
+    Uint32 len;
+
+    snprintf(path, sizeof(path), SATURN_MUSIC_DIR "/%03X.wav", t->id);
+    if (!SDL_LoadWAV(path, &spec, &wav, &len)) {
+        return false;
+    }
+    t->pcm = spec.format == SDL_AUDIO_S16 && spec.channels == 2 &&
+                     spec.freq == RATE && len >= RATE * 4
+                 ? malloc(len)
+                 : NULL;
+    if (t->pcm) {
+        memcpy(t->pcm, wav, len);
+        t->frames = t->ready = len / 4;
+        t->level = 256;
+        Loops(t, SATURN_MUSIC_DIR "/loops.txt");
+        if (t->loop_b > t->frames || t->loop_a >= t->loop_b) {
+            t->loop_a = t->loop_b = 0;
+        }
+        fprintf(stderr, "[music] %03X: file %s, %.1f s, %s\n", t->id, path,
+                (double)t->frames / RATE,
+                t->loop_b ? "loop points" : "no loop points");
+    } else {
+        fprintf(stderr, "[music] %03X: %s: not 44100 Hz s16 stereo\n", t->id,
+                path);
+    }
+    SDL_free(wav);
+    return t->pcm != NULL;
 }
 
 static Track* Open(s32 id) {
@@ -153,6 +190,13 @@ static Track* Open(s32 id) {
         return NULL; // all held: the XA plays
     }
     t->id = id;
+    if (id == SATURN_BOSS_MUSIC) {
+        if (OpenSaturn(t)) {
+            return t;
+        }
+        memset(t, 0, sizeof(*t));
+        return NULL;
+    }
     snprintf(path, sizeof(path), "music/%03X.flac", id);
     t->flac = drflac_open_file(path, NULL);
     if (t->flac) {
@@ -183,7 +227,7 @@ static Track* Open(s32 id) {
     }
     t->frames = (size_t)n;
     t->level = 256;
-    Loops(t);
+    Loops(t, "music/loops.txt");
     if (t->start >= t->frames) {
         t->start = 0;
     }
@@ -232,7 +276,9 @@ s32 Music_Start(s32 id, s32 mode) {
         // CdSoundCommand4 empties the pause stack for these ids
         saved[0].track = saved[1].track = NULL;
     }
-    if (!g_MusicFiles || id < 0x300 || id > 0x340) {
+    // the Saturn boss track has no disc music to keep: music_files 0 too
+    if (id != SATURN_BOSS_MUSIC &&
+        (!g_MusicFiles || id < 0x300 || id > 0x340)) {
         return 0;
     }
     Collect();
@@ -243,7 +289,9 @@ s32 Music_Start(s32 id, s32 mode) {
         t = Open(id);
     }
     if (!t) {
-        if (!missing_logged[id - 0x300]) {
+        if (id == SATURN_BOSS_MUSIC) {
+            fprintf(stderr, "[music] %03X: no file, the XA plays\n", id);
+        } else if (!missing_logged[id - 0x300]) {
             missing_logged[id - 0x300] = 1;
             fprintf(stderr, "[music] %03X: no file, the XA plays\n", id);
         }

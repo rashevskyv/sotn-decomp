@@ -256,6 +256,7 @@ set(SOURCE_FILES_PC
     src/pc/buttons.c
     src/pc/voice.c
     src/pc/music.c
+    src/pc/saturn_sfx.c
     src/pc/lang.c
     src/pc/cheats.c
     src/pc/apron.c

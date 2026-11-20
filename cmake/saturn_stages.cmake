@@ -159,3 +159,41 @@ add_saturn_stage(stage16 STAGE_16 SD26 TEST_STAGE16 ${SATURN_PRISON_SOURCES})
 add_saturn_gdn_entities(stage16 STAGE_16 SATURN_STAGE_PRISON)
 add_saturn_stage(rstage15 RSTAGE15 SD29 TEST_RSTAGE15)
 add_saturn_stage(rstage16 RSTAGE16 SD2C TEST_RSTAGE16)
+
+# Saturn-only sounds and the boss track (tools/saturn/saturn_audio.py): WAVs
+# in data/ST/<STAGE>/sfx/ and data/ST/STAGE15/music/, played by
+# src/pc/saturn_sfx.c and src/pc/music.c. saturn-sfx (tools/saturn/sound-player
+# with Ymir's SCSP) renders the sequenced sounds from the stage CRTs.
+# OFF, or no Saturn files: the PS1 stand-ins play.
+option(SATURN_STAGE_AUDIO "Convert the Saturn stage sounds and boss track" OFF)
+set(SATURN_SOUND_PLAYER_DIR "${CMAKE_SOURCE_DIR}/tools/saturn/sound-player"
+    CACHE PATH "saturn-sound-player source (a git submodule, with Ymir)")
+if(SATURN_STAGE_AUDIO)
+    if(NOT EXISTS "${SATURN_SOUND_PLAYER_DIR}/ymir/CMakeLists.txt")
+        message(WARNING "SATURN_STAGE_AUDIO: ${SATURN_SOUND_PLAYER_DIR} has "
+            "no source (git submodule update --init --recursive "
+            "tools/saturn/sound-player): the PS1 stand-in sounds play")
+    else()
+        include(ExternalProject)
+        set(player_dir "${CMAKE_BINARY_DIR}/saturn-sound-player")
+        # a host program: no toolchain file, also in Switch and Windows builds
+        ExternalProject_Add(saturn_sound_player
+            SOURCE_DIR "${SATURN_SOUND_PLAYER_DIR}"
+            BINARY_DIR "${player_dir}"
+            CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+            BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target saturn-sfx
+            INSTALL_COMMAND ""
+            BUILD_BYPRODUCTS "${player_dir}/saturn-sfx")
+        add_custom_target(saturn_stage_audio ALL
+            COMMAND ${SATURN_GDN_PYTHON} -B
+                    "${CMAKE_SOURCE_DIR}/tools/saturn/saturn_audio.py"
+                    --disc "${CMAKE_SOURCE_DIR}/disks/saturn"
+                    --data "${CMAKE_BINARY_DIR}/data"
+                    --player "${player_dir}/saturn-sfx"
+                    --cargo "${SATURN_STAGE_CARGO_BIN}"
+                    --assets "${CMAKE_SOURCE_DIR}/tools/saturn/assets/Cargo.toml"
+            DEPENDS saturn_sound_player
+            VERBATIM
+            COMMENT "Converting the Saturn stage sounds and boss track")
+    endif()
+endif()

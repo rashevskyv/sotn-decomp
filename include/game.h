@@ -1040,6 +1040,13 @@ void Music_Save(s32 slot);
 s32 Music_Resume(s32 slot);
 bool Music_Playing(void);
 double Music_WallMs(void);
+// Saturn stages (src/pc/saturn_sfx.c). PlaySfx and PlaySfxVolPan ask first:
+// true = the Saturn WAV of *id plays; false = the PS1 engine plays *id (it
+// can now hold the PS1 stand-in).
+bool SaturnSfx_Play(s16* id, s32 vol, s32 pan);
+// the Skeleton Leader's track (Saturn SD2B.PCM): the music id after the
+// Saturn stage pair 0x533/0x534, file data/ST/STAGE15/music/535.wav
+#define SATURN_BOSS_MUSIC 0x535
 unsigned Psyz_SpuTicks(void); // psyz/audio.h: output frames mixed so far
 // Button marks of the menus (src/pc/buttons.c), saved as buttons = in
 // sotn.ini. Mark b: the PS button of g_ChButtons (0..7), 8 Select, 9 Start,
