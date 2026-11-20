@@ -22,6 +22,9 @@ static s32 D_801BAFC0;
 static s32 MainMenuMaskPrimIndex;
 static s32 g_SelNextCrossPressEngStep;
 static s32 g_SelEng220NextStep;
+#ifdef PLATFORM_PSYZ
+static s32 sel_wings = -1; // SelBackdropWings
+#endif
 
 void Update(void);
 void HandleTitleScreen(void);
@@ -475,7 +478,57 @@ void InitMainMenuBackgroundAndFadeMask(void) {
         prim->priority = 0x1FD;
         prim->drawMode = DRAW_UNK_40 | DRAW_TPAGE | DRAW_TRANSP;
     }
+#ifdef PLATFORM_PSYZ
+    sel_wings = g_api.AllocPrimitives(PRIM_GT4, 2);
+#endif
 }
+
+#ifdef PLATFORM_PSYZ
+#include <psyz/video.h>
+// The wide view shows the whole display around the 384 frame
+// (src/pc/wide.c). The HD backdrop gets one more stone wall at each side,
+// 240x240 frame pixels. They are loose PNG files keyed on the first and the
+// last 16-bit column of the backdrop (576,0 and 767,0, 1x240): the stock
+// game, or a pack without them, draws nothing there. The fade mask (a TILE)
+// grows over them (Wide_Tile).
+static void SelBackdropWings(void) {
+    static const s16 col[] = {576, 767};
+    Primitive* bg = &g_PrimBuf[D_801BAFC0];
+    Primitive* prim;
+    s32 i, x0, u, tw, th;
+
+    if (g_GameEngineStep <= Upd_Eng_Init) { // the prims are not made yet
+        sel_wings = -1;
+    }
+    if (sel_wings < 0) {
+        return;
+    }
+    prim = &g_PrimBuf[sel_wings];
+    for (i = 0; i < 2; i++, prim = prim->next) {
+        prim->drawMode = DRAW_HIDE;
+        if ((bg->drawMode & DRAW_HIDE) ||
+            !Psyz_HdTexSize(col[i], 0, 1, 0xF0, 16, &tw, &th)) {
+            continue;
+        }
+        x0 = i ? DISP_MENU_W : -0xF0;
+        u = col[i] & 0x3F;
+        prim->tpage = 0x100 | (col[i] >> 6); // 16-bit texels
+        prim->x0 = prim->x2 = x0;
+        prim->x1 = prim->x3 = x0 + 0xF0;
+        prim->y0 = prim->y1 = 0;
+        prim->y2 = prim->y3 = 0xF0;
+        prim->u0 = prim->u2 = u;
+        prim->u1 = prim->u3 = u + 1;
+        prim->v0 = prim->v1 = 0;
+        prim->v2 = prim->v3 = 0xF0;
+        prim->r0 = prim->r1 = prim->r2 = prim->r3 = bg->r0;
+        prim->g0 = prim->g1 = prim->g2 = prim->g3 = bg->g0;
+        prim->b0 = prim->b1 = prim->b2 = prim->b3 = bg->b0;
+        prim->priority = bg->priority;
+        prim->drawMode = bg->drawMode;
+    }
+}
+#endif
 
 // On title screen, you press START. Then the screen goes black,
 // and fades in gradually. This function handles that fade. Returns false
@@ -2592,6 +2645,7 @@ void Update(void) {
         break;
     }
 #ifdef PLATFORM_PSYZ
+    SelBackdropWings();
     SelPlateCaptions();
     Buttons_SelPrims(&g_PrimBuf[D_801BAF18[GFX_UNK_6][0]]);
 #endif

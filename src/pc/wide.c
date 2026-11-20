@@ -364,12 +364,42 @@ void Wide_LoadIni(const char* path) {
     }
 }
 
+// A title or menu frame: the part of the canvas the screen shows, in the
+// frame's pixels, and the zoom that draws the overlay text about as large
+// as on a stage. zoom 0: a stage, or no wide view.
+static int canvas[4], canvas_zoom;
+
 void Wide_Tile(TILE* tile) {
     int x = tile->x0, y = tile->y0, w = tile->w, h = tile->h;
-    if (!g_WideX && !g_WideY) {
+    if (canvas_zoom) {
+        // a title or menu frame (384 or 512 wide): a large tile that
+        // touches a frame edge grows to the canvas edge, so a fade covers
+        // the side pieces of the menu and prologue pictures too. Tiles side
+        // by side (the prologue fades: 0..192, 192..384, 384..512) do not
+        // overlap.
+        int fw = canvas[0] + canvas[2], fh = canvas[1] + canvas[3];
+        if (w < 128 || h < 120) {
+            return;
+        }
+        if (x <= 0) {
+            w += x - canvas[0];
+            x = canvas[0];
+        }
+        if (x + w >= fw) {
+            w = canvas[2] - x;
+        }
+        if (y <= 0) {
+            h += y - canvas[1];
+            y = canvas[1];
+        }
+        if (y + h >= fh) {
+            h = canvas[3] - y;
+        }
+    } else if (g_WideX || g_WideY) {
+        Wide_StretchRect(&x, &y, &w, &h, g_WideX, g_WideY);
+    } else {
         return;
     }
-    Wide_StretchRect(&x, &y, &w, &h, g_WideX, g_WideY);
     tile->x0 = x;
     tile->y0 = y;
     tile->w = w;
@@ -475,11 +505,6 @@ void Wide_BandClip(int y0, int y1) {
     }
 }
 
-// A title or menu frame: the part of the canvas the screen shows, in the
-// frame's pixels, and the zoom that draws the overlay text about as large
-// as on a stage. zoom 0: a stage, or no wide view.
-static int canvas[4], canvas_zoom;
-
 int Wide_Canvas(int* x0, int* y0, int* x1, int* y1) {
     *x0 = canvas[0];
     *y0 = canvas[1];
@@ -551,11 +576,10 @@ void Wide_OnFrame(void) {
             req = d;
             if (g_GameState == Game_PrologueEnd) {
                 // the prologue scroll (src/st/st0/prologue_scroll.c): the
-                // 512 frame in the PS1 4:3 shape, black at the sides
+                // 512 frame in the PS1 4:3 shape; the canvas is the whole
+                // display, the scroll code fills the sides (HD side pieces)
                 prologue = 1;
                 s = MAX(MIN(d.w / 320, d.h / 240), 1);
-                req.w = 320 * s;
-                req.h = 240 * s;
             }
         }
         if (fbw == DISP_MENU_W && fbh == DISP_MENU_H) {
@@ -567,17 +591,14 @@ void Wide_OnFrame(void) {
     }
     canvas_zoom = 0;
     if (fbw != DISP_STAGE_W || fbh != DISP_STAGE_H) {
-        int mx = (req.w / s - fbw) / 2, my = (req.h / s - fbh) / 2;
+        // the prologue frame shows 4:3, so a frame pixel is fbh*4/3 / fbw wide
+        int cw = prologue ? req.w * fbw * 3 / (s * fbh * 4) : req.w / s;
+        int mx = (cw - fbw) / 2, my = (req.h / s - fbh) / 2;
         canvas[0] = -mx;
         canvas[1] = -my;
         canvas[2] = fbw + mx;
         canvas[3] = fbh + my;
         canvas_zoom = MAX((k + s / 2) / s, 1);
-        if (prologue) { // the frame fills the 4:3 picture
-            canvas[0] = canvas[1] = 0;
-            canvas[2] = fbw;
-            canvas[3] = fbh;
-        }
     }
     Psyz_VideoSetAspectMode(prologue ? PSYZ_ASPECT_DISPLAY : PSYZ_ASPECT_SQUARE);
     // 512 columns in a 4:3 picture: nearest repeats every 8th column, so
