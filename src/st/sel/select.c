@@ -497,14 +497,15 @@ static void SelBackdropWings(void) {
     Primitive* prim;
     s32 i, x0, u, tw, th;
 
-    if (g_GameEngineStep <= Upd_Eng_Init) { // the prims are not made yet
+    // not made yet, or gone: the new game start (Upd_Eng_18) clears the whole
+    // prim buffer (func_801B2D1C), so the second prim has no next
+    if (g_GameEngineStep <= Upd_Eng_Init || sel_wings < 0 ||
+        g_PrimBuf[sel_wings].type != PRIM_GT4) {
         sel_wings = -1;
-    }
-    if (sel_wings < 0) {
         return;
     }
     prim = &g_PrimBuf[sel_wings];
-    for (i = 0; i < 2; i++, prim = prim->next) {
+    for (i = 0; i < 2 && prim; i++, prim = prim->next) {
         prim->drawMode = DRAW_HIDE;
         if ((bg->drawMode & DRAW_HIDE) ||
             !Psyz_HdTexSize(col[i], 0, 1, 0xF0, 16, &tw, &th)) {
