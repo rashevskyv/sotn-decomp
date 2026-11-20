@@ -37,6 +37,10 @@ void EntityModWisp(Entity*);
 void EntityModWispFlame(Entity*);
 void EntityModWispTrail(Entity*);
 void EntityModWispBurst(Entity*);
+void EntityModBreakableBase(Entity*);
+void EntityModPillarSwitch(Entity*);
+void EntityModPillar(Entity*);
+void EntityModPillarDebris(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -57,7 +61,7 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityDummy,
     EntityDummy,
     EntityBackgroundBlock,
-    EntityDummy,
+    EntityModBreakableBase, // Saturn 0x12
     EntityUnkId13,
     EntityExplosionVariants,
     EntityGreyPuff,
@@ -80,6 +84,9 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityModWispFlame,
     EntityModWispTrail,
     EntityModWispBurst,
+    EntityModPillarSwitch,
+    EntityModPillar,
+    EntityModPillarDebris,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_PRISON_ENTITIES - 1, "EntityUpdates");
 

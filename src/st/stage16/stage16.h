@@ -59,6 +59,10 @@ typedef enum EntityID {
     E_MOD_WISP_FLAME,
     E_MOD_WISP_TRAIL,
     E_MOD_WISP_BURST,
+    // Saturn 0x16, 0x17, 0x15 (e_mod_pillar.c)
+    E_MOD_PILLAR_SWITCH,
+    E_MOD_PILLAR,
+    E_MOD_PILLAR_DEBRIS,
     NUM_PRISON_ENTITIES,
 } EntityID;
 
@@ -74,6 +78,7 @@ typedef enum EntityID {
 #define MOD_SLINGER_ANIMSET ANIMSET_OVL(10)
 #define MOD_SPECTER_ANIMSET ANIMSET_OVL(11)
 #define MOD_WISP_ANIMSET ANIMSET_OVL(12)
+#define MOD_PILLAR_ANIMSET ANIMSET_OVL(13)
 // the palette blocks (generated in the build folder by gdn_entities.py)
 #include "gdn_defs.h"
 

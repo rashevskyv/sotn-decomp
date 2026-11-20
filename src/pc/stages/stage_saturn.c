@@ -846,7 +846,7 @@ LayoutEntity* entityLayoutVertical[GDN_LAYOUTS];
 
 #ifdef SATURN_STAGE_PRISON
 // Saturn STAGE_16 entity id -> stage16.h EntityID. The ids without a port
-// (the bank 19 objects 0x16/0x17, area name) stay idle.
+// (the area name banner) stay idle.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
     switch (saturnId) {
     case 0x01:
@@ -871,6 +871,10 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_MOD_GARGOYLE;
     case 0x28:
         return E_MOD_WISP_SPAWNER;
+    case 0x16:
+        return E_MOD_PILLAR_SWITCH;
+    case 0x17:
+        return E_MOD_PILLAR;
     default:
         return E_DUMMY_0F;
     }
@@ -1002,8 +1006,17 @@ static void SaturnGdnStart(void) {
     }
 }
 
-// [ent] log: the live stage entities and the enemies (slot:id hp/step),
-// once a second and when an enemy's hp or step changes
+// [ent] log: the live stage entities and the enemies (slot:id
+// hp/step@screen x,y), the player's screen x,y, the breakables (id 1), and in
+// the Prison the pillar and its switch too, once a second and when an entity
+// comes or goes or an hp or a step changes
+#ifdef SATURN_STAGE_PRISON
+#define SATURN_LOGGED(e)                                                       \
+    ((e)->enemyId || (e)->entityId == E_BREAKABLE ||                           \
+     (e)->entityId == E_MOD_PILLAR || (e)->entityId == E_MOD_PILLAR_SWITCH)
+#else
+#define SATURN_LOGGED(e) ((e)->enemyId || (e)->entityId == E_BREAKABLE)
+#endif
 static void SaturnGdnUpdate(void) {
     static u32 s_LastSum;
     static s32 s_Frame;
@@ -1014,18 +1027,19 @@ static void SaturnGdnUpdate(void) {
     u32 sum = 0;
 
     Update();
-    len = snprintf(line, sizeof(line), "[ent] room=%d php=%d",
-                   SaturnStageCurrentRoom(), g_Status.hp);
+    len = snprintf(line, sizeof(line), "[ent] room=%d php=%d pl=%d,%d",
+                   SaturnStageCurrentRoom(), g_Status.hp, PLAYER.posX.i.hi,
+                   PLAYER.posY.i.hi);
     for (e = &g_Entities[STAGE_ENTITY_START];
          e < &g_Entities[TOTAL_ENTITY_COUNT]; e++) {
         if (!e->entityId || !e->pfnUpdate) {
             continue;
         }
         count++;
-        if (e->enemyId && len < sizeof(line) - 32) {
-            len += snprintf(line + len, sizeof(line) - len, " %d:%d/%d/%d",
+        if (SATURN_LOGGED(e) && len < sizeof(line) - 48) {
+            len += snprintf(line + len, sizeof(line) - len, " %d:%d/%d/%d@%d,%d",
                             (s32)(e - g_Entities), e->entityId, e->hitPoints,
-                            e->step);
+                            e->step, e->posX.i.hi, e->posY.i.hi);
             sum = sum * 31 + (e - g_Entities) * 7 + e->hitPoints * 131 +
                   e->step;
         }

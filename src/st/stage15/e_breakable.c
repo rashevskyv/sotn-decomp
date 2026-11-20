@@ -5,6 +5,9 @@
 // 0x26-0x29 at 5 ticks: ANIMSET_OVL(2) frames 1-4, gdn_entities.py). Type 1
 // is the Saturn's item candle, drawn and dropped the same here.
 static u8 anim_1[] = {5, 1, 5, 2, 5, 3, 5, 4, 0, 0};
+// the hitbox (Saturn g_Stage15BreakableConfigs): 8 x 8, raised by 16
+static s16 hitbox_offy[] = {-16, -16};
+#define BREAKABLE_HITBOX_OFFY hitbox_offy
 static u8* g_eBreakableAnimations[8] = {anim_1, anim_1};
 static u8 g_eBreakableHitboxes[8] = {8, 8};
 static u8 g_eBreakableExplosionTypes[8] = {0, 0};

@@ -82,6 +82,9 @@ PRISON = dict(
         # Specter (Saturn 0x20) and Will-o'-Wisp (0x28-0x2C): e_mod_ghosts.c
         (11, [("specter", 0x060ECB58, 0x060ECE10, f) for f in range(1, 25)]),
         (12, [("wisp", 0x060EEC7C, 0x060EEFBC, f) for f in range(1, 42)]),
+        # bank 19: the room 0 stone pillar (1) and its switch (2), Saturn
+        # 0x17 / 0x16 (e_mod_pillar.c)
+        (13, [("pillar", 0x060E900C, 0x060E9000, f) for f in (1, 2)]),
     ],
     DECORATIONS=(0x060EA1CC, 6),
     DECORATION_GROUPS=["candles"] * 6,
@@ -93,7 +96,7 @@ PRISON = dict(
     STP_BANKS=(0x060ECB58, 0x060EEC7C),
     GROUP_ROOMS={"candles": (0, 1), "gargoyles": (1,), "spearguard": (0,),
                  "archer": (0,), "slinger": (0,), "specter": (1,),
-                 "wisp": (1,)},
+                 "wisp": (1,), "pillar": (0,)},
     # Saturn item numbers -> PS1 drop ids (both lists: Saturn hand item n + 2
     # is PS1 item n here; the names and icons match): Mana Prism 292 -> 0x122,
     # Antivenom 274 -> 0x110, Potion 289 -> 0x11F
