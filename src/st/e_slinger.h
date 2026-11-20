@@ -41,7 +41,13 @@ static u8 attack_timer_cycles[2][4] = {
     {0xF0, 0xC0, 0xA0, 0x80},
 };
 
+#ifdef PLATFORM_PSYZ
+// UnkCollisionFunc3 reads four pairs; on the PS1 the last two are the start
+// of sensors_move, which follows in .data. The PC does not keep that order.
+static s16 sensors_ground[][2] = {{0, 19}, {8, 0}, {-12, 16}, {0, -16}};
+#else
 static s16 sensors_ground[][2] = {{0, 19}, {8, 0}};
+#endif
 static s16 sensors_move[][2] = {{-12, 16}, {0, -16}, {0, -16}};
 
 void SlingerAttackCheck(Entity* self) {

@@ -237,9 +237,12 @@ EInit g_EInitCommon = {ANIMSET_DRA(0), 0x00, 0x00, PAL_NONE, ENEMY_COMMON};
 // clang-format on
 #endif
 u16 g_RedDoorTiles[2][8];
-static u16 s_SaturnStageRedDoorTiles[32];
+// The door's tile writes land here, not in the native-layer stage. With
+// hSize 0 the index is (screen x >> 4): an s16 screen x gives -2048..2047
+// (a door far off screen, as in the inverted castle's right-hand doors).
+static u16 s_SaturnStageRedDoorTiles[4096];
 static Tilemap s_SaturnStageRedDoorTilemap = {
-    .fg = &s_SaturnStageRedDoorTiles[4],
+    .fg = &s_SaturnStageRedDoorTiles[2048],
     .hSize = 0,
 };
 

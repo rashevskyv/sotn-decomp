@@ -33,6 +33,13 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_ID_SATURN_15, 4, 40, 140, "garden-room4"},
     {STAGE_ID_SATURN_15, 5, 40, 140, "garden-room5"},
     {STAGE_ID_SATURN_15, 6, 40, 140, "garden-room6"},
+    // the inverted castle's Saturn stages
+    {STAGE_ID_REVERSE_SATURN_15, 0, 2200, 392, "hell-garden-room0"},
+    {STAGE_ID_REVERSE_SATURN_15, 1, 40, 136, "hell-garden-room1"},
+    {STAGE_ID_REVERSE_SATURN_15, 2, 40, 136, "hell-garden-room2"},
+    {STAGE_ID_REVERSE_SATURN_15, 3, 40, 136, "hell-garden-room3"},
+    {STAGE_ID_REVERSE_SATURN_16, 0, 60, 648, "soul-prison-room0"},
+    {STAGE_ID_REVERSE_SATURN_16, 1, 1200, 136, "soul-prison-room1"},
 };
 
 enum SpawnPointStep {
