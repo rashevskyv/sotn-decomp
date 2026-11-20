@@ -1,6 +1,6 @@
 # sotn-native
 
-Нативний порт Castlevania: Symphony of the Night для ПК (Linux) і Nintendo Switch.
+Нативний порт Castlevania: Symphony of the Night для ПК (Linux, Windows) і Nintendo Switch.
 Його зібрано з декомпіляції [sotn-decomp](https://github.com/Xeeynamo/sotn-decomp).
 Він працює на [psyz](https://github.com/Xeeynamo/psyz) — PlayStation SDK для сучасних систем.
 Порт додає вміст із версій для Sega Saturn і PSP та український переклад.
@@ -214,7 +214,7 @@ cmake --build build/switch
 
 Результат — `build/switch/sotn.nro`. Ті самі необов'язкові опції, що й для ПК.
 
-### Збирання для Windows
+### 5a. Збирання для Windows
 
 Збірка для Windows — це крос-збирання з MinGW-w64 (`sudo apt install mingw-w64`) у Linux або WSL:
 

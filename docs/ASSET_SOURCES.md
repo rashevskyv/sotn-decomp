@@ -77,7 +77,10 @@ Five boxes have a different sound order in Japanese (step 105, plan item 4): ope
 | uk | jp | `script_jp.bin` | `ua.json` + `ua_jp.json` | PLANNED (today: `script.bin`) |
 | uk | psp | `script_psp.bin` | `ua_psp.json` | Works |
 
-A missing script file falls back one step: en -> stock text, uk -> `script.bin`.
+Today a missing script file leaves the stock text (`LangSwap` in `src/pc/cutscene_pc.c`).
+PLANNED: a missing script file falls back one step: en -> stock text, uk -> `script.bin`.
+Today `Lang_File` (`src/pc/lang.c`) reads only the pack inside the program, not a loose `lang/` folder.
+A loose `lang/en/script_psp.bin` needs that change first.
 
 ## Voices
 
