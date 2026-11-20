@@ -14,8 +14,14 @@ void func_us_801C4954(s32 resetAnims, s32 arg1) {
         g_Entities[E_ID_41].animCurFrame = g_Entities[E_ID_42].animCurFrame =
             g_Entities[E_ID_43].animCurFrame = 0;
         prim = &g_PrimBuf[g_Entities[E_AFTERIMAGE_1].primIndex];
+        // this walks Alucard's afterimage chain (not E_ID_41 as BO6 does),
+        // up to his two PRIM_ENV prims: x1 is the top half of their 8-byte
+        // DR_ENV pointer on the PC (the RBO5 crash, step 119)
         while (prim != NULL) {
-            prim->x1 = 0;
+#ifdef PLATFORM_PSYZ
+            if (prim->type != PRIM_ENV)
+#endif
+                prim->x1 = 0;
             prim = prim->next;
         }
     }

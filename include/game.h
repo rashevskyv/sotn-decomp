@@ -1125,8 +1125,24 @@ void Cheat_SkipPrologue(void); // game_handlers.c, before a stage load
 // Teleport to room `room` of `stage`, map cell (cx, cy). Returns NULL when
 // the warp starts, else the reason why it is refused.
 const char* Cheat_Warp(int stage, int room, int cx, int cy);
+// The same to the start of `stage` (its first room that does not crash).
+const char* Cheat_WarpStart(int stage);
 // NULL when a warp can start now, else the reason.
 const char* Cheat_WarpRefusal(void);
+// The bosses of the teleport list (src/pc/cheats.c): the g_EnemyDefs ids of
+// the name (0 ends), the warp target, the castle room on the map (host 0xFF:
+// none), the time attack event and castle flags it clears for a rematch
+// (0xFF, 0: none), and its record in BIN/MONSTER.BIN (the bestiary picture).
+struct CheatBoss {
+    u16 enemy[3];
+    u8 stage, room;
+    s16 px, py;
+    u8 host, host_room, event, flag[2], bestiary;
+};
+extern const struct CheatBoss g_CheatBosses[];
+extern const int g_CheatBossCount;
+// Teleport into the fight of boss i. NULL when the warp starts, else why not.
+const char* Cheat_WarpBoss(int i);
 // Read by the door path in 5087C.c at the next stage load.
 extern struct WarpTarget {
     int active, stage, room, cx, cy;
@@ -1240,6 +1256,8 @@ int Lang_MenuFont(int on);
 #define MENU_CELL_GT 0x1B
 int Lang_MenuFontOn(void);
 const char* Lang_Port(int index);
+// uk: the area name of a stage (tools/lang/uk/ua_zones.json), or NULL
+const char* Lang_Zone(int stage);
 // uk: the 11 rows (4 bytes, 4 bits a pixel) of a serif menu cell, or NULL
 const unsigned char* Lang_MenuCell(int code);
 // the same under en too, where only the shared cells (stat arrows) exist

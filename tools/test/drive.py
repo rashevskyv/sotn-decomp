@@ -4,6 +4,7 @@
 
 usage: drive.py <W>x<H> <ini> <outdir> step...
 steps: k:KEY[,KEY] tap | h:KEY:SEC hold | w:SEC wait | s:NAME screenshot | f: fit the window
+       m:X,Y mouse move | c:X,Y mouse move and left click (screen pixels)
        (KEY: xdotool names, for example Return, Right, z)
 env:   SOTN_ARGS     more game arguments, for example "--stage st0"
        SOTN_TEST_DIR the private copy (default ~/sotn/runs/test/t)
@@ -61,6 +62,12 @@ try:
                 x("windowmove", w_, "0", "0")
                 x("windowsize", w_, W, H)
             print("fit", wid, flush=True)
+        elif op in ("m", "c"):  # mouse move, or move and left click
+            mx, _, my = arg.partition(",")
+            x("mousemove", mx, my)
+            if op == "c":
+                x("click", "1")
+            time.sleep(0.25)
         elif op == "w":
             time.sleep(float(arg))
         elif op == "s":
