@@ -31,6 +31,12 @@ void EntityBoneArcherArrow(Entity*);
 void EntitySlinger(Entity*);
 void EntitySlingerRib(Entity*);
 void EntitySlingerPieces(Entity*);
+void EntityModSpecter(Entity*);
+void EntityModWispSpawner(Entity*);
+void EntityModWisp(Entity*);
+void EntityModWispFlame(Entity*);
+void EntityModWispTrail(Entity*);
+void EntityModWispBurst(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -68,6 +74,12 @@ PfnEntityUpdate EntityUpdates[] = {
     EntitySlinger,
     EntitySlingerRib,
     EntitySlingerPieces,
+    EntityModSpecter,
+    EntityModWispSpawner,
+    EntityModWisp,
+    EntityModWispFlame,
+    EntityModWispTrail,
+    EntityModWispBurst,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_PRISON_ENTITIES - 1, "EntityUpdates");
 

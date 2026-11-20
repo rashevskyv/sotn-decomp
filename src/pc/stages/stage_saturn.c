@@ -846,8 +846,7 @@ LayoutEntity* entityLayoutVertical[GDN_LAYOUTS];
 
 #ifdef SATURN_STAGE_PRISON
 // Saturn STAGE_16 entity id -> stage16.h EntityID. The ids without a port
-// (Specter 0x20, Will-o'-Wisp 0x28, the bank 19 objects 0x16/0x17, area name)
-// stay idle.
+// (the bank 19 objects 0x16/0x17, area name) stay idle.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
     switch (saturnId) {
     case 0x01:
@@ -866,8 +865,12 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_SPEAR_GUARD;
     case 0x1D:
         return E_SLINGER;
+    case 0x20:
+        return E_MOD_SPECTER;
     case 0x21:
         return E_MOD_GARGOYLE;
+    case 0x28:
+        return E_MOD_WISP_SPAWNER;
     default:
         return E_DUMMY_0F;
     }
@@ -999,6 +1002,40 @@ static void SaturnGdnStart(void) {
     }
 }
 
+// [ent] log: the live stage entities and the enemies (slot:id hp/step),
+// once a second and when an enemy's hp or step changes
+static void SaturnGdnUpdate(void) {
+    static u32 s_LastSum;
+    static s32 s_Frame;
+    char line[1024];
+    size_t len;
+    Entity* e;
+    s32 count = 0;
+    u32 sum = 0;
+
+    Update();
+    len = snprintf(line, sizeof(line), "[ent] room=%d", SaturnStageCurrentRoom());
+    for (e = &g_Entities[STAGE_ENTITY_START];
+         e < &g_Entities[TOTAL_ENTITY_COUNT]; e++) {
+        if (!e->entityId || !e->pfnUpdate) {
+            continue;
+        }
+        count++;
+        if (e->enemyId && len < sizeof(line) - 32) {
+            len += snprintf(line + len, sizeof(line) - len, " %d:%d/%d/%d",
+                            (s32)(e - g_Entities), e->entityId, e->hitPoints,
+                            e->step);
+            sum = sum * 31 + (e - g_Entities) * 7 + e->hitPoints * 131 +
+                  e->step;
+        }
+    }
+    if (++s_Frame >= 60 || sum != s_LastSum) {
+        fprintf(stderr, "%s n=%d\n", line, count);
+        s_Frame = 0;
+        s_LastSum = sum;
+    }
+}
+
 static void SaturnStageGdnInitRoomEntities(s32 layoutId) {
     SaturnStageSetCurrentLayout(layoutId);
     if (layoutId < 0 || layoutId >= GDN_LAYOUTS) {
@@ -1126,7 +1163,7 @@ static void SaturnStageInitRoomEntities(s32 layoutId) { (void)layoutId; }
 Overlay g_Overlay = {
 #ifdef SATURN_STAGE_GDN
     // the PS1 stage framework (src/st/stage15): layouts, hits, enemies
-    .Update = Update,
+    .Update = SaturnGdnUpdate,
     .HitDetection = HitDetection,
     .UpdateRoomPosition = UpdateRoomPosition,
     .InitRoomEntities = SaturnStageGdnInitRoomEntities,
