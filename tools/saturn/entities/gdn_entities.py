@@ -50,7 +50,14 @@ SPRITE_SETS = [
     # Saturn 0x20, the Slinger: the Prison's bank (0x060EC6AC) byte for byte,
     # so it runs the PS1 code (NO0) like the Prison's
     (15, [("slinger", 0x060F2AF4, 0x060F2E20, f) for f in range(1, 23)]),
+    # Saturn 0x36, Thornweed (params 0) and Corpseweed (1): the PS1's code
+    # (CHI). The Saturn keeps its anims, hitboxes and sensors; frames 17, 18
+    # and 28 are the leaves, stalk and splash its primitives draw
+    (16, [("thornweed", 0x060F8858, 0x060F8B10, f) for f in range(1, 29)]),
 ]
+# primitive textures: name -> (ANIMSET_OVL n, frame); each frame has one part
+PRIM_PARTS = {"CORPSEWEED_LEAVES": (16, 17), "CORPSEWEED_STALK": (16, 18),
+              "CORPSEWEED_PROJ": (16, 28)}
 DECORATIONS = (0x060F1F90, 6)
 DECORATION_GROUPS = ["candles", "candles", "scene", "scene", "scene", "scene"]
 PALETTE_BLOCKS = {"GARGOYLE": ("gargoyles", 0x060F2ED8),
@@ -62,6 +69,7 @@ GROUP_ROOMS = {
     "candles": (0, 1, 3), "scene": (2,), "drips": (1, 3), "gargoyles": (0,),
     "skbreeder": (0,), "leaper": (0,), "gardener": (1,), "tree": (0,),
     "maneater": (3,), "boss": (2,), "banner": (0,), "slinger": (0,),
+    "thornweed": (1, 3),
 }
 ROOMS = 4
 # the area name banner (Saturn 0x09, room 0): bank 18's three 64x48 thirds of
@@ -70,7 +78,8 @@ BANNER = (0x060F08D4, (0, 1, 2, 6), "banner")
 GARDEN = dict(SPRITE_SETS=SPRITE_SETS, DECORATIONS=DECORATIONS,
               DECORATION_GROUPS=DECORATION_GROUPS, PALETTE_BLOCKS=PALETTE_BLOCKS,
               BLEED_BANKS=BLEED_BANKS, STP_BANKS=STP_BANKS,
-              GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS, BANNER=BANNER)
+              GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS, BANNER=BANNER,
+              PRIM_PARTS=PRIM_PARTS)
 # Cursed Prison: bank and frame table addresses from config/saturn
 # stage_16_user_syms.txt and the gfx segments of stage_16.prg.yaml
 P_BANK16 = (0x060E8F60, 0x060E8F08)
@@ -105,6 +114,7 @@ PRISON = dict(
     # 128x48 halves of "呪われた牢獄 / Cursed Prison" (e_mod_banner.c)
     BANNER=(0x060E8FA8, (0, 1), "banner"),
     ROOMS=2,
+    PRIM_PARTS={},
 )
 STAGES = {"STAGE_15": GARDEN, "STAGE_16": PRISON}
 QUADRANTS = [(t, q) for t in range(18, 24) for q in range(4)]
@@ -325,6 +335,15 @@ def main(disc, out_path, stage="STAGE_15"):
                 (sheets[BANNER[2]].quadrants[q][1] & 1) * 128 + u,
                 (sheets[BANNER[2]].quadrants[q][1] >> 1) * 128 + v, w, h)
             for q, u, v, w, h, clut in parts))
+    # the primitives' textures: tpage, clut and u, v, width, height in it
+    for name, (n, f) in PRIM_PARTS.items():
+        p, = dict(banks)[n][f - 1]
+        quad = p["tileset"] & 3
+        for k, val in (("TPAGE", p["tileset"] >> 2), ("CLUT", p["clut"]),
+                       ("U", (quad & 1) * 128 + p["left"]),
+                       ("V", (quad >> 1) * 128 + p["top"]),
+                       ("W", p["width"]), ("H", p["height"])):
+            defs.append("#define MOD_%s_%s %d" % (name, k, val))
     with open(os.path.join(os.path.dirname(os.path.abspath(out_path)), "gdn_defs.h"), "w") as f:
         f.write("\n".join(defs) + "\n")
     for r in range(ROOMS):

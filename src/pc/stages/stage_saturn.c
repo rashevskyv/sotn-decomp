@@ -883,7 +883,7 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
 }
 #else
 // Saturn STAGE_15 entity id -> stage15.h EntityID. The ids without a port
-// (water, Thornweed, CD room foreground) stay idle.
+// (water, CD room foreground) stay idle.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
     switch (saturnId) {
     case 0x01:
@@ -908,6 +908,8 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_MOD_TREE;
     case 0x35:
         return E_MOD_LEAPER_SPAWNER;
+    case 0x36: // params 0 Thornweed, 1 Corpseweed
+        return E_THORNWEED;
     case 0x3B:
         return E_MOD_MANEATER;
     case 0x3D:

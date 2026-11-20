@@ -100,6 +100,7 @@ set(SATURN_GDN_SOURCES
     src/st/stage15/e_particles.c
     src/st/stage15/e_room_bg.c
     src/st/stage15/e_slinger.c
+    src/st/stage15/e_thornweed.c
     src/st/stage15/popup.c
     src/st/stage15/prim_helpers.c
     src/st/stage15/st_common.c
