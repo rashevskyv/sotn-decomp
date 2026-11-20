@@ -1962,6 +1962,24 @@ def cmd_vendor(_args):
 
 # ---------------------------------------------------------------- guard
 
+# A stock run that is only a name (or words of a name) with punctuation is not a Konami sentence:
+# "Alucard." "Lord Dracula!" "Richter?" and the castle area names of stage_names_hd.py.
+GUARD_NAMES = ("Alucard", "Adrian Farenheights Tepes", "Richter Belmont", "Maria Renard", "Lord Dracula",
+               "Count Dracula", "Master Dracula", "Vlad Tepes", "Trevor Belmont", "Simon Belmont", "Shaft",
+               "Death", "Lisa", "Annette", "Master Librarian", "Succubus", "Olrox", "Galamoth",
+               "Colosseum", "Catacombs", "Abandoned Mine", "Royal Chapel", "Nightmare", "Long Library",
+               "Marble Gallery", "Outer Wall", "Olrox's Quarters", "Underground Caverns",
+               "Alchemy Laboratory", "Clock Tower", "Castle Keep")
+# Short common phrases of en/en_jp.json that a PSP English box also has (exact runs only).
+GUARD_PHRASES = {"Mother...", "Never mind that.", "forgotten what they", "yourself.", "this castle.",
+                 "are you?!"}
+
+
+def guard_allowed(run):
+    words = " ".join(re.sub(r"[^\w\s']|(?<!\w)'|'(?!\w)", " ", run).split())
+    return run in GUARD_PHRASES or bool(words) and any(f" {words} " in f" {n} " for n in GUARD_NAMES)
+
+
 def cmd_guard(_args):
     """The stock strings: the Xbox text (SOTN_LANG_XBLA) when it is there, and the US, PSP English and
     Japanese boxes of disc_text.py when that file is there."""
@@ -1970,7 +1988,8 @@ def cmd_guard(_args):
     def add(s):
         for run in re.split(r"\{[^}]*\}|\n|@", s or ""):
             run = run.strip()
-            if len(run) >= 8 and sum(c.isalpha() for c in run) >= 4 and not has_cyrillic(run):
+            if (len(run) >= 8 and sum(c.isalpha() for c in run) >= 4 and not has_cyrillic(run)
+                    and not guard_allowed(run)):
                 needles.add(run)
     if XBLA and os.path.isdir(XBLA):
         for x in xbla_units():
@@ -2023,6 +2042,9 @@ def cmd_selftest(_args):
     assert packed_text({"stock": " X", "font": "sjis"}, "Б")[0] == " Б"
     assert proof_level(["F_GAME.BIN @y256"]) == "placement" and proof_level(["F_GAME.BIN @y0"]) == "content"
     assert not proof_level([])
+    assert guard_allowed("Alucard...") and guard_allowed("Lord Dracula!") and guard_allowed("Underground")
+    assert guard_allowed("Olrox's Quarters") and guard_allowed("Mother...")
+    assert not guard_allowed("Alucard, my son!") and not guard_allowed("Mother... no.") and not guard_allowed("...")
     assert len(struct.pack("<HBBIIHH", 0, 0, 0, 0, 0, 0, NO_INDEX)) == 16
     assert enc_cells("З", menu=True)[0] == bytes((Z_CELL, 0xFF)) != enc_cells("З")[0]
     # a plate: the stock ink (5) of the name plate's row 1 goes and nothing comes (the word is drawn
