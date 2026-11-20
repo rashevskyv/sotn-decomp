@@ -231,6 +231,8 @@ int Main(int argc, char* argv[]) {
             // the two dialogue portrait slots (48x72, 8 bpp): HD in play too
             Psyz_HdTexAllow(0, 256, 24, 72, 8);
             Psyz_HdTexAllow(32, 256, 24, 72, 8);
+            // the stage-name banners and the ST0 title card (128x128, 4 bpp)
+            Psyz_HdTexAllow(64, 256, 32, 128, 4);
         }
         if (g_HdDump) {
             Psyz_HdTexDump("data/textures/dump");
