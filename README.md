@@ -1,6 +1,6 @@
 # sotn-native
 
-A native port of Castlevania: Symphony of the Night for PC (Linux) and Nintendo Switch.
+A native port of Castlevania: Symphony of the Night for PC (Linux, Windows) and Nintendo Switch.
 It is built from the [sotn-decomp](https://github.com/Xeeynamo/sotn-decomp) decompilation
 and runs on [psyz](https://github.com/Xeeynamo/psyz), a PlayStation SDK for modern systems.
 The port adds content from the Sega Saturn and PSP versions and a Ukrainian translation.
@@ -53,7 +53,8 @@ More about the build:
 
 ### Windows
 
-There is no native Windows build. The PC build is a Linux program. It runs in WSL 2, and WSLg shows its window.
+`build.py` and `build.bat` make the Linux build. It runs in WSL 2, and WSLg shows its window.
+A native Windows build (`sotn.exe`) also exists. It is a manual MinGW build, see "Build for Windows" below.
 `build.bat` needs WSL 2 with Ubuntu. If it is missing, `build.bat` prints the install command (`wsl --install -d Ubuntu-24.04`).
 
 Clone the repository inside WSL, for example in `\\wsl.localhost\Ubuntu-24.04\home\<user>\`.
@@ -65,6 +66,7 @@ If you clone with Git for Windows, switch off the line end change: `git clone -c
 | Part | State |
 |---|---|
 | PC (Linux, x86-64) build of the PS1 US game | Works. Main test platform for the code. |
+| PC (Windows, x86-64) build, MinGW, one `sotn.exe` | Works. Manual build (see "Build for Windows"). |
 | Nintendo Switch NRO (homebrew) | Works. Tested on one console. |
 | 16:9 view at an integer scale, port menu, button icons, rumble on damage (Switch) | Works. |
 | Saturn stages: Underground Garden, Cursed Prison and their inverted versions; stitched rooms | Experimental. Enemies and bosses are ported by hand and can differ from the Saturn game. |
@@ -75,7 +77,14 @@ If you clone with Git for Windows, switch off the line end change: `git clone -c
 | Ukrainian language | Works. Without `ps1vram_uk.bin` ten labels stay in English (see "Ukrainian language" below). |
 | Cheats, teleport map, tile editor page (port 8080, no password) | Test tools. |
 
-All tests are manual. Expect bugs.
+Offline tests: `python3 tools/test/run.py offline` (no game data needed).
+Tests with the game and the release checks: see [docs/TESTING.md](docs/TESTING.md). Most game tests are still manual. Expect bugs.
+
+More documents:
+
+- [docs/ASSET_SOURCES.md](docs/ASSET_SOURCES.md): where each piece of game data comes from. Nothing proprietary is in git.
+- [docs/FONTS.md](docs/FONTS.md): each font, where it is used, its licence.
+- [docs/TESTING.md](docs/TESTING.md): the tests and the release checklist.
 
 ## What you need
 
@@ -205,6 +214,21 @@ cmake --build build/switch
 
 The result is `build/switch/sotn.nro`. The same optional settings as for PC apply.
 
+### 5a. Build for Windows
+
+The Windows build is a cross build with MinGW-w64 (`sudo apt install mingw-w64`), in Linux or WSL:
+
+```sh
+cmake -S . -B build/win -G Ninja \
+      -DCMAKE_TOOLCHAIN_FILE=tools/psyz/psyz/cmake/windows-x86_64.cmake -DCMAKE_BUILD_TYPE=Release \
+      -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl -DPSYZ_STATIC_MODULES=ON -DSOTN_PC_DATA_DIR=data \
+      -DENABLE_SATURN_STAGES=ON
+cmake --build build/win
+```
+
+The result is `build/win/sotn.exe`: one file, no DLLs, no console window.
+Put it in a folder with the game files in `data/` (as `out/pc/`). The log is `sotn.log` next to it.
+
 ### 6. Install on the Switch
 
 The port uses its own folder, `/switch/sotn-native/`, on the SD card:
@@ -258,6 +282,7 @@ Saturn stages and Maria are build options, not settings. Rumble is always on (Sw
 It needs two manifest files that map each sound to a clip in the image.
 The manifests are not in this repository yet, so the voice sets cannot be made from it alone.
 Without them the game uses the PS1 voices.
+The plan for manifests in git (no audio, no text): [docs/ASSET_SOURCES.md](docs/ASSET_SOURCES.md).
 
 ## Music files
 
