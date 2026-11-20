@@ -1990,7 +1990,8 @@ def cmd_guard(_args):
         hits = [n for n in needles if n in text]
         if hits:
             bad.append((rel, hits[:3]))
-    bad += [("relic name cut", o) for o in relic_name_cuts()]
+    if XBLA and os.path.isdir(XBLA):  # the relic widths need the Xbox text (join_sources)
+        bad += [("relic name cut", o) for o in relic_name_cuts()]
     for b in bad:
         print("GUARD:", b)
     print(f"guard: {len(set(files))} files, {len(needles)} stock strings, {len(bad)} problems")

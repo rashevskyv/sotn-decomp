@@ -161,7 +161,7 @@ MOVABLE = {11}  # SCRIPT_UNKNOWN_11 (wait for the sound, no args) stands elsewhe
 
 
 def fit(q, ops):
-    """The text of disc box q on the US ops of a box: markup, or None when the ops (without
+    """The text of disc box q on the US ops of a box: markup, or None if the ops (without
     MOVABLE) differ. The text before the k-th other op stays before it."""
     if q["ops"] == ops:
         return "{}".join(q["parts"])
