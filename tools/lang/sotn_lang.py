@@ -1322,13 +1322,20 @@ def plate_records(srcs):
                             "le": b"".join(bytes(r[i] | r[i + 1] << 4 for i in range((a - x) * 4, (b - x) * 4, 2))
                                            for r in t)})
             continue
-        (c0, c1), (r0, r1), (ax, ay) = p["cols"], p["rows"], p["at"]
-        if ax < c0 or ax + max(map(len, p["word"])) - 1 > c1:
+        (c0, c1), (r0, r1) = p["cols"], p["rows"]
+        word = p.get("word", [])
+        ax, ay = p.get("at", (c0, r0))
+        if word and (ax < c0 or ax + max(map(len, word)) - 1 > c1):
             sys.exit(f"plate {name}: the word is wider than the stock word's cols {c0}..{c1}")
-        ink = {(r, c) for r in range(r0, r1 + 1) for c in range(c0, c1 + 1) if t[r][c] in p["stock_ink"]}
+        span = {r: range(c0, c1 + 1) for r in range(r0, r1 + 1)}
+        if "gold" in p:  # each row only between its first and its last plate texel
+            for r in span:
+                g = [c for c in span[r] if t[r][c] in p["gold"]]
+                span[r] = range(g[0], g[-1] + 1) if g else range(0)
+        ink = {(r, c) for r in span for c in span[r] if t[r][c] in p["stock_ink"]}
         for r, c in sorted(ink):
-            t[r][c] = t[r][min((abs(k - c), k) for k in range(c0, c1 + 1) if (r, k) not in ink)[1]]
-        for dy, line in enumerate(p["word"]):
+            t[r][c] = t[r][min((abs(k - c), k) for k in span[r] if (r, k) not in ink)[1]]
+        for dy, line in enumerate(word):
             for dx, ch in enumerate(line):
                 if ch == "#":
                     t[ay + dy][ax + dx] = p["ink"][dy]
@@ -1913,13 +1920,17 @@ def cmd_selftest(_args):
     assert not proof_level([])
     assert len(struct.pack("<HBBIIHH", 0, 0, 0, 0, 0, 0, NO_INDEX)) == 16
     assert enc_cells("З", menu=True)[0] == bytes((Z_CELL, 0xFF)) != enc_cells("З")[0]
-    # a plate: the stock ink (5) of the name plate's row 1 goes, the word's ink comes
+    # a plate: the stock ink (5) of the name plate's row 1 goes and nothing comes (the word is drawn
+    # at run time); a card plate's row keeps the texels outside its first and last plate (7) texel
     fake = {(bx, y): b"\x77" * 64 for bx in (768, 800, 864) for y in range(128)}
     fake[(768, 90)] = b"\x75" * 64
+    fake[(800, 6)] = b"\x11" * 41 + b"\x77" + b"\x95" * 2 + b"\x77" + b"\x11" * 19
     plates = {r["name"]: r for r in plate_records({"F_SEL.BIN @y0": fake})}
     assert len(plates) == 3 and plates["name_plate"]["first"] == fnv(b"\x77" * 12)
     row1 = le_texels([plates["name_plate"]["le"][12:24]])[0]
-    assert [c for c in range(3, 21) if row1[c] == 5] == [5 + i for i, ch in enumerate("#.#...#.#..###") if ch == "#"]
+    assert 5 not in row1[3:21] and row1[0] == 5
+    row2 = le_texels([plates["card1_plate"]["le"][24:36]])[0]
+    assert row2 == [1] * 6 + [7] * 8 + [1] * 10, row2
     print("selftest ok")
 
 

@@ -773,6 +773,54 @@ void func_801AD490(void) {
     DrawString16x16("your", 0x100, 0x30, 1);
     DrawString16x16("destiny", 0xE8, 0x40, 1);
 
+#ifdef PLATFORM_PSYZ
+    // An HD label is found by its clut (0x200) only, so the 0x203 of the
+    // chosen label showed the 1x picture: with an HD file the label keeps
+    // 0x200 and takes the colour of 0x203 / 0x200 (sum of colours 1..12, per
+    // channel, read each frame: 0x203 may change) as its vertex colour.
+    {
+        u16 pal[2][16];
+        RECT rc = {0, 0, 16, 1};
+        s32 sum[2][3], tint[3], c, j, k, tw, th;
+
+        for (k = 0; k < 2; k++) {
+            c = g_ClutIds[k ? 0x203 : 0x200];
+            rc.x = (c & 0x3F) << 4;
+            rc.y = c >> 6;
+            StoreImage(&rc, (u_long*)pal[k]);
+        }
+        DrawSync(0);
+        for (k = 0; k < 2; k++) {
+            sum[k][0] = sum[k][1] = sum[k][2] = 0;
+            for (j = 1; j <= 12; j++) {
+                sum[k][0] += pal[k][j] & 0x1F;
+                sum[k][1] += (pal[k][j] >> 5) & 0x1F;
+                sum[k][2] += (pal[k][j] >> 10) & 0x1F;
+            }
+        }
+        for (k = 0; k < 3; k++) {
+            tint[k] = sum[0][k] ? MIN(0xFF, 0x80 * sum[1][k] / sum[0][k]) : 0x80;
+        }
+        for (i = 0; i < NUM_MENU_OPTIONS; i++) {
+            prim = &g_PrimBuf[D_801BAF18[i + 1][0]];
+            if (!Psyz_HdTexSize(768 + g_MenuHeadGfxU[i] / 4, g_MenuHeadGfxV[i],
+                                32, 32, 4, &tw, &th)) {
+                prim->clut = i == g_MainMenuCursor ? 0x203 : 0x200;
+                c = 0x80;
+                prim->r0 = prim->r1 = prim->r2 = prim->r3 = c;
+                prim->g0 = prim->g1 = prim->g2 = prim->g3 = c;
+                prim->b0 = prim->b1 = prim->b2 = prim->b3 = c;
+                continue;
+            }
+            prim->clut = 0x200;
+            k = i == g_MainMenuCursor;
+            prim->r0 = prim->r1 = prim->r2 = prim->r3 = k ? tint[0] : 0x80;
+            prim->g0 = prim->g1 = prim->g2 = prim->g3 = k ? tint[1] : 0x80;
+            prim->b0 = prim->b1 = prim->b2 = prim->b3 = k ? tint[2] : 0x80;
+        }
+        return;
+    }
+#endif
     for (i = 0; i < NUM_MENU_OPTIONS; i++) {
         prim = &g_PrimBuf[D_801BAF18[i + 1][0]];
         if (i == g_MainMenuCursor) {
@@ -1314,7 +1362,42 @@ static void func_801AEE74(void) {
 }
 
 #ifdef PLATFORM_PSYZ
+s32 DrawGothicCaption(
+    const char* key, s32 cx, s32 cy, s32 maxW, s32 h, u32 rgb, s32 otIdx);
 #include "charsel.h"
+
+// The words of the plaques that the uk pack clears (tools/lang/uk/plates.py):
+// НОСІЙ (en CARD) over an engraved 1 or 2 on each card window, ІМ'Я (en NAME)
+// on the name window, in the gothic letters, between the windows (0x10) and
+// the text (0x20).
+static void SelPlateCaptions(void) {
+    static const u8 gfx[] = {GFX_WND_CARD_1, GFX_WND_CARD_2};
+    static const char* digit[] = {"#1", "#2"};
+    Primitive* prim;
+    s32 i, tw, th;
+    // en: the 1x plates keep the stock words, so only the HD window sheets
+    // (empty plaques) get them drawn; asked only while a window shows
+#define PLATE_WORDS()                                                          \
+    (g_Lang || Psyz_HdTexSize(768, 0, 64, 128, 4, &tw, &th))
+
+    for (i = 0; i < 2; i++) {
+        prim = &g_PrimBuf[D_801BAF18[gfx[i]][0]];
+        if ((prim->drawMode & DRAW_HIDE) || !PLATE_WORDS()) {
+            continue;
+        }
+        // the word first: the later prim of an OT entry is drawn first
+        DrawGothicCaption(
+            "#card", prim->x0 + 40, prim->y0 + 10, 24, 6, 0x808080, 0x18);
+        DrawGothicCaption(
+            digit[i], prim->x0 + 40, prim->y0 + 11, 20, 14, 0x402C10, 0x18);
+    }
+    prim = &g_PrimBuf[D_801BAF18[GFX_UNK_7][0]];
+    if (!(prim->drawMode & DRAW_HIDE) && PLATE_WORDS()) {
+        DrawGothicCaption(
+            "#name", prim->x0 + 80, prim->y0 + 11, 19, 7, 0x808080, 0x18);
+    }
+#undef PLATE_WORDS
+}
 #endif
 
 void Update(void) {
@@ -2508,6 +2591,10 @@ void Update(void) {
         g_GameEngineStep = g_SelEng220NextStep;
         break;
     }
+#ifdef PLATFORM_PSYZ
+    SelPlateCaptions();
+    Buttons_SelPrims(&g_PrimBuf[D_801BAF18[GFX_UNK_6][0]]);
+#endif
     g_GameTimer++;
     if (g_GameTimer == 10) {
         g_GameTimer = 0;

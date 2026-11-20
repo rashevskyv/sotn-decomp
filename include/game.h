@@ -1057,6 +1057,8 @@ int Buttons_Width(int b);
 // px: a colour index per pixel, 0 off, else g_ButtonRgb
 int Buttons_Rows(int set, int b, u8 px[11][16]);
 void Buttons_Paint(u16* dst, int stride);
+// the 4 tips marks of the file select (the prims from p) by the set
+void Buttons_SelPrims(Primitive* p);
 #define BUTTON_INKS 11
 extern const u8 g_ButtonRgb[BUTTON_INKS][3];
 // The 16 colours of the marks: a CLUT in the atlas at texel u BUTTON_CLUT_U of

@@ -1,37 +1,29 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""The Ukrainian words of three small file-select plates and the card before the opening video,
-drawn for the native port (2026-11-15):
-«Ім'я» on the name-entry plate (stock "Name") and «НОСІЙ» on the two card plates (stock "CARD";
-the engraved 1 or 2 behind the word stays). Read as data by sotn_lang.py (ast), never imported.
+"""The three small file-select plates and the card before the opening video, for the native port.
+The plates (2026-11-20) are cleared only: the game draws «Ім'я» (stock "Name") and «НОСІЙ» with
+the 1 or 2 (stock "CARD" over an engraved 1 or 2) at run time in the gothic letters of the file
+select (src/st/sel/select.c SelPlateCaptions), so the 1x plates and the HD window frames (empty
+plaques) show the same words. Read as data by sotn_lang.py (ast), never imported.
 
-The pack takes each stock rect from F_SEL.BIN on the disc, clears the stock word (each of its
-texels takes the nearest other texel of the same row) and draws the word, so no stock pixel is in git.
+The pack takes each stock rect from F_SEL.BIN on the disc and clears the stock word (each of its
+texels takes the nearest other texel of the same row), so no stock pixel is in git.
 rect: VRAM halfwords x, y, w, h, inside one 32x128 F_SEL block (one LoadImage holds it all).
-cols, rows: the texels of the stock word in the rect (inclusive). stock_ink: its nibbles there.
-at: texel column, row of the top-left of `word`. word: '#' ink. ink: the nibble of each word row
-(the stock name plate has a darker fourth row). like: take the other keys from that plate.
+cols, rows: the texels to clear in the rect (inclusive). stock_ink: the nibbles that go there.
+gold: clear a row only between its first and its last texel of these nibbles (the plaque), so
+the dark rim of the plaque stays. like: take the other keys from that plate.
+Optional word (the plates up to 2026-11-19): at: texel column, row of its top-left; word: '#'
+ink; ink: the nibble of each word row.
 """
 PLATES = {
     "name_plate": {
         "rect": [785, 89, 6, 5], "cols": [3, 20], "rows": [0, 4], "stock_ink": [4, 5],
-        "at": [5, 0], "ink": [5, 5, 5, 4, 5],
-        "word": ["#.......#.....",
-                 "#.#...#.#..###",
-                 "#.##.##...#..#",
-                 "#.#.#.#....###",
-                 "#.#...#...#..#"],
     },
+    # the word (5) and the engraved digit (1, 9..12) on the gold (6..8) of the plaque, rows 4..15
     "card1_plate": {
-        "rect": [819, 8, 6, 6], "cols": [3, 20], "rows": [1, 5], "stock_ink": [5],
-        "at": [3, 0], "ink": [5, 5, 5, 5, 5, 5],
-        "word": ["...............##.",
-                 "#.#..#...##.#.#..#",
-                 "#.#.#.#.#...#.#..#",
-                 "###.#.#.#...#.#.##",
-                 "#.#.#.#.#...#.##.#",
-                 "#.#..#...##.#.#..#"],
+        "rect": [819, 4, 6, 12], "cols": [0, 23], "rows": [0, 11], "stock_ink": [1, 5, 9, 10, 11, 12],
+        "gold": [6, 7, 8],
     },
-    "card2_plate": {"like": "card1_plate", "rect": [875, 8, 6, 6]},
+    "card2_plate": {"like": "card1_plate", "rect": [875, 4, 6, 12]},
     # The card before the opening video (2026-11-17, the owner's option A): the stock English card
     # of two lines, F_TITLE1.BIN at VRAM 768,256 (232x32 texels, tpage 0x1C, HandleVideoPlayback).
     # src: the art source. font: in tools/lang/fonts (OFL fonts, each with its licence file there).

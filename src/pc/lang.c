@@ -380,12 +380,73 @@ static const char* const gothic_words[][2] = {
     {"no data", "IopoDhJo"},  // ПОРОЖНЬО
     {"no", "AeE"},            // БЕЗ
     {"card", "hociL"},        // НОСІЯ
+    // port words ('#': no stock string or typed name starts so): the plate
+    // captions of the file select and the names of the player select
+    {"#card", "hociG"},     // НОСІЙ
+    {"#1", "M"},            // 1
+    {"#2", "N"},            // 2
+    {"#name", "im'L"},      // ІМ'Я
+    {"#alucard", "aHykapC"}, // АЛУКАРД
+    {"#richter", "pixtep"},  // РІХТЕР
+    {"#maria", "mapiL"},     // МАРІЯ
 };
-// the cells of the drawn page, 8 a row: Б Г Д Ж З И Й Л П Ь Ю Я
+// the cells of the drawn page, 8 a row: Б Г Д Ж З И Й Л П Ь Ю Я 1 2
+
+// en: only the port words, in the stock cells; the digits 1 and 2 (cells 12
+// and 13 of the drawn page, from tools/lang/uk/labels/gothic.png) on an
+// otherwise empty page, so its HD file has one fixed content
+static const char* const gothic_words_en[][2] = {
+    {"#card", "card"},       {"#1", "M"},
+    {"#2", "N"},             {"#name", "name"},
+    {"#alucard", "alucard"}, {"#richter", "richter"},
+    {"#maria", "maria"},     {"#player", "player select"},
+};
+static const u16 gothic_digits[16][8] = {
+    {0x0000, 0x0000, 0x0032, 0x0000, 0x0000, 0x2000, 0x0000, 0x0000},
+    {0x0000, 0x4300, 0x0245, 0x0000, 0x0000, 0x5430, 0x0045, 0x0000},
+    {0x0000, 0x5543, 0x0035, 0x0000, 0x0000, 0x5553, 0x2455, 0x0000},
+    {0x0000, 0x5423, 0x0034, 0x0000, 0x0000, 0x4344, 0x3555, 0x0000},
+    {0x0000, 0x5400, 0x0034, 0x0000, 0x3000, 0x2024, 0x3554, 0x0000},
+    {0x0000, 0x5400, 0x0034, 0x0000, 0x0000, 0x0003, 0x3453, 0x0000},
+    {0x0000, 0x5400, 0x0034, 0x0000, 0x0000, 0x0000, 0x2453, 0x0000},
+    {0x0000, 0x5400, 0x0034, 0x0000, 0x0000, 0x0000, 0x0344, 0x0000},
+    {0x0000, 0x5400, 0x0034, 0x0000, 0x0000, 0x3000, 0x0034, 0x0000},
+    {0x0000, 0x5400, 0x0034, 0x0000, 0x0000, 0x4300, 0x0002, 0x0003},
+    {0x0000, 0x5400, 0x0034, 0x0000, 0x0000, 0x2430, 0x3222, 0x0024},
+    {0x0000, 0x5520, 0x0245, 0x0000, 0x0000, 0x5553, 0x5555, 0x0003},
+    {0x0000, 0x5542, 0x2455, 0x0000, 0x3000, 0x5555, 0x4555, 0x0003},
+    {0x0000, 0x3442, 0x2343, 0x0000, 0x4200, 0x3334, 0x4333, 0x0002},
+    {0x0000, 0x2220, 0x0222, 0x0000, 0x0000, 0x0022, 0x2000, 0x0000},
+    {0},
+};
+
+static const char* Lang_GothicEn(const char* word) {
+    static u16 page[32 * 32];
+    RECT r = {832, 256, 32, 32};
+    int i, y;
+    if (word[0] != '#') {
+        return NULL;
+    }
+    for (i = 0; i < LEN(gothic_words_en); i++) {
+        if (!strcmp(word, gothic_words_en[i][0])) {
+            if (!page[16 * 32 + 18]) {
+                for (y = 0; y < 16; y++) {
+                    memcpy(page + (16 + y) * 32 + 16, gothic_digits[y], 16);
+                }
+            }
+            LoadImage(&r, (u_long*)page);
+            return gothic_words_en[i][1];
+        }
+    }
+    return NULL;
+}
 
 const char* Lang_Gothic(const char* word) {
     int i;
-    if (!g_Lang || !gothic.texels) {
+    if (!g_Lang) {
+        return Lang_GothicEn(word);
+    }
+    if (!gothic.texels) {
         return NULL;
     }
     for (i = 0; i < LEN(gothic_words); i++) {

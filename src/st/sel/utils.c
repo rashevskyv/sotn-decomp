@@ -527,6 +527,85 @@ void DrawString16x16(char* str, s32 x, s32 y, s32 tge) {
     }
 }
 
+#ifdef PLATFORM_PSYZ
+// The ink columns (left << 4 | right) of the gothic cells, as the HD sheets
+// draw them (step 103): the stock cells in D_8018046C order, the drawn page.
+static const u8 s_GothicInk[] = {
+    0x0E, 0x0F, 0x0E, 0x0F, 0x0F, 0x0E, 0x0E, 0x0F, 0x1E, 0x0E, 0x0E,
+    0x0E, 0x0F, 0x0F, 0x0F, 0x0E, 0x0E, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
+    0x0F, 0x0F, 0x0E, 0x0E, 0x0E, 0x59, 0x0E, 0x26, 0x27, 0x2C};
+static const u8 s_GothicInkUk[] = {0x1E, 0x0E, 0x0F, 0x0F, 0x1E, 0x1E, 0x2C,
+                                   0x0E, 0x0E, 0x2D, 0x0F, 0x1F, 0x3C, 0x2D};
+
+// uk: the gothic word `key` (lang.c, a '#' key) as one quad a letter, h px
+// high (16: the cell size) and never wider than maxW, centred on cx, cy;
+// the letters touch (ink width - 1 apart). The HD letter sheets keep it
+// sharp at any size. rgb: the texture times rgb / 0x80. 0: no such word.
+s32 DrawGothicCaption(
+    const char* key, s32 cx, s32 cy, s32 maxW, s32 h, u32 rgb, s32 otIdx) {
+    const char* s = Lang_Gothic(key);
+    const char* p;
+    s32 w16, x16, k, u, v, l, r, tpage, x0, x1, y0;
+    POLY_GT4* poly;
+
+    if (!s) {
+        return 0;
+    }
+    // all in 1/16 px: w16 the width at h 16, then h and x
+    for (w16 = 0, p = s; *p; p++) {
+        k = *p >= 'A' && *p <= 'Z' ? s_GothicInkUk[*p - 'A']
+                                   : s_GothicInk[func_801B2984(*p) & 0x1F];
+        w16 += *p == ' ' ? 6 * 16 : ((k & 0xF) - (k >> 4)) * 16;
+    }
+    h *= 16;
+    if (w16 * h / 256 > maxW * 16) {
+        h = maxW * 16 * 256 / w16;
+    }
+    x16 = cx * 16 - w16 * h / 256 / 2;
+    y0 = cy - (h * 15 / 32 + 8) / 16; // the ink is rows 0..14
+    for (p = s; *p; p++) {
+        if (*p == ' ') {
+            x16 += 6 * h / 16;
+            continue;
+        }
+        if (*p >= 'A' && *p <= 'Z') {
+            k = *p - 'A';
+            u = (k & 7) * 16;
+            v = (k >> 3) * 16;
+            tpage = 0x1D;
+            k = s_GothicInkUk[k];
+        } else {
+            k = func_801B2984(*p) & 0x1F;
+            u = D_8018046C[k * 3 + 1];
+            v = D_8018046C[k * 3 + 2];
+            tpage = 12;
+            k = s_GothicInk[k];
+        }
+        l = k >> 4;
+        r = MIN(k & 0xF, 0xFF - u - 1) + 1;
+        x0 = (x16 + 8) / 16;
+        x1 = (x16 + (r - l) * h / 16 + 8) / 16;
+        poly = &g_CurrentBuffer->polyGT4[g_GpuUsage.gt4];
+        setPolyGT4(poly);
+        setSemiTrans(poly, 0);
+        setShadeTex(poly, 0);
+        setXY4(poly, x0, y0, x1, y0, x0, y0 + (h + 8) / 16, x1,
+               y0 + (h + 8) / 16);
+        setUV4(poly, u + l, v, u + r, v, u + l, v + 16, u + r, v + 16);
+        setRGB0(poly, rgb >> 16, (rgb >> 8) & 0xFF, rgb & 0xFF);
+        setRGB1(poly, rgb >> 16, (rgb >> 8) & 0xFF, rgb & 0xFF);
+        setRGB2(poly, rgb >> 16, (rgb >> 8) & 0xFF, rgb & 0xFF);
+        setRGB3(poly, rgb >> 16, (rgb >> 8) & 0xFF, rgb & 0xFF);
+        poly->tpage = tpage;
+        poly->clut = g_ClutIds[0x200];
+        AddPrim(&g_CurrentBuffer->ot[otIdx], poly);
+        g_GpuUsage.gt4++;
+        x16 += (r - l - 1) * h / 16;
+    }
+    return 1;
+}
+#endif
+
 #if VERSION >= VER_USPROTO
 void DrawGlyph8x8(s32 ch, s32 x, s32 y, s32 tge) {
     DrawGlyph(

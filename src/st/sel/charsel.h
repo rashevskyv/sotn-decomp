@@ -230,6 +230,13 @@ static void CharselArrows(s32 x, s32 sel) {
 }
 #endif
 
+// the gothic names: always on uk; on en only with the HD letter sheet (else
+// the Saturn's English art stays)
+static s32 CharselGothic(void) {
+    s32 tw, th;
+    return g_Lang || Psyz_HdTexSize(800, 176, 32, 64, 4, &tw, &th);
+}
+
 // One card: the blue fill, the portrait on it, the frame and the name on
 // top. The chosen card has the bright frame and the portrait at full light.
 static void CharselDrawCard(s32 id, s32 x, s32 sel) {
@@ -264,8 +271,20 @@ static void CharselDrawCard(s32 id, s32 x, s32 sel) {
         CharselArrows(x, sel);
     }
 #endif
+    // the name in the gothic letters of the file select (uk; en with the HD
+    // letter sheet), as wide as the Saturn name at most; else the Saturn art
+    // (en), else the 8x8 font (the pack's name on uk)
+    if (CharselGothic() &&
+        DrawGothicCaption(g_Charsel[id].player == PLAYER_RICHTER ? "#richter"
+                          : g_Charsel[id].player == PLAYER_ALUCARD
+                              ? "#alucard"
+                              : "#maria",
+                          x + CHARSEL_FRAME_W / 2, CS_NAME_Y + CS_NAME_H / 2,
+                          CHARSEL_NAME_RICHTER_W * 8, 16,
+                          sel ? 0x808080 : 0x505050, 0x20)) {
+        return;
+    }
 #if CHARSEL_SATURN
-    // the gothic name is English art: uk shows the pack's name instead
     if (!g_Lang || LANG_CELL(g_Charsel[id].name) == g_Charsel[id].name) {
         CharselQuad(x + (CHARSEL_FRAME_W - CHARSEL_NAME_RICHTER_W * 8) / 2,
                     CS_NAME_Y, CHARSEL_NAME_RICHTER_W * 8, CS_NAME_H,
@@ -296,14 +315,19 @@ static s32 CharselCardX(s32 id) {
 static void CharselDraw(void) {
     s32 i;
 
+    // en: PLAYER SELECT in the gothic letters of the file select with the HD
+    // letter sheet, else the Saturn's English art (uk: no such word, no header)
+    if (!g_Lang && !(CharselGothic() &&
+                     DrawGothicCaption("#player", CS_HEADER_X + CHARSEL_HEADER_W * 4,
+                           CS_HEADER_Y + CHARSEL_HEADER_H * 4,
+                           CHARSEL_HEADER_W * 8, 16, 0x808080, 0x20))) {
 #if CHARSEL_SATURN
-    if (!g_Lang) { // the header is English art
         CharselQuad(CS_HEADER_X, CS_HEADER_Y, CHARSEL_HEADER_W * 8,
                     CHARSEL_HEADER_H * 8, CS_SIDE_U, CS_ART_Y,
                     CHARSEL_HEADER_W * 8, CHARSEL_HEADER_H * 8, CS_ART_TPAGE,
                     getClut(CS_VRAM_X, CS_CLUT4_Y), 0x80, 0x20);
-    }
 #endif
+    }
     for (i = 0; i < CS_N; i++) {
         CharselDrawCard(i, CharselCardX(i), i == s_CharselCursor);
     }
