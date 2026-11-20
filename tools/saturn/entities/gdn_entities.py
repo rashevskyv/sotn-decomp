@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Underground Garden (Saturn STAGE_15) enemy data for the PC stage module.
+"""Underground Garden (Saturn STAGE_15) and Cursed Prison (STAGE_16) enemy
+data for the PC stage modules.
 
 Reads the Saturn disc files and writes one C header into the build folder:
 the converted sprite frames (ANIMSET_OVL banks), their 4bpp pages as one
@@ -13,7 +14,11 @@ saturn_sprites.py. The PC has the whole PS1 sprite area free (tpages 18-23:
 the stage tiles are drawn by the native 8x8 renderer), so each room gets one
 bank and no zone streaming is needed.
 
-usage: gdn_entities.py <saturn disc dir> <output header>
+The Prison's Spear Guard, Bone Archer and Slinger run the PS1 code (NO4,
+NO0): the Saturn frames keep the PS1 frame numbers, so frame n of a Saturn
+bank becomes frame n of its ANIMSET_OVL bank.
+
+usage: gdn_entities.py <saturn disc dir> <output header> [STAGE_15|STAGE_16]
 """
 import os
 import struct
@@ -48,6 +53,9 @@ DECORATION_GROUPS = ["candles", "candles", "scene", "scene", "scene", "scene"]
 PALETTE_BLOCKS = {"GARGOYLE": ("gargoyles", 0x060F2ED8),
                   "TREE": ("tree", 0x060F6DC4)}
 BLEED_BANKS = (0x060F82C8, 0x060F6DC4)
+STP_BANKS = ()
+# Saturn drop item numbers the PC knows (others: no drop)
+DROPS = {}
 # the ordinary rooms (s_SaturnStageRooms 0-3) each group is used in
 GROUP_ROOMS = {
     "candles": (0, 1, 3), "scene": (2,), "drips": (1, 3), "gargoyles": (0,),
@@ -55,6 +63,47 @@ GROUP_ROOMS = {
     "maneater": (3,), "boss": (2,),
 }
 ROOMS = 4
+GARDEN = dict(SPRITE_SETS=SPRITE_SETS, DECORATIONS=DECORATIONS,
+              DECORATION_GROUPS=DECORATION_GROUPS, PALETTE_BLOCKS=PALETTE_BLOCKS,
+              BLEED_BANKS=BLEED_BANKS, STP_BANKS=STP_BANKS, DROPS=DROPS,
+              GROUP_ROOMS=GROUP_ROOMS, ROOMS=ROOMS)
+# Cursed Prison: bank and frame table addresses from config/saturn
+# stage_16_user_syms.txt and the gfx segments of stage_16.prg.yaml
+P_BANK16 = (0x060E8F60, 0x060E8F08)
+PRISON = dict(
+    SPRITE_SETS=[
+        # the breakables' frames keep their Saturn numbers (stdata.c)
+        (2, [("candles",) + P_BANK16 + (f,) for f in range(1, 13)]),
+        (3, "decorations"),
+        (7, [("gargoyles", 0x060ECEF0, 0x060EE030, f) for f in range(1, 60)]),
+        (8, [("spearguard", 0x060EB498, 0x060EC46C, f) for f in range(1, 65)]),
+        (9, [("archer", 0x060EABC4, 0x060EB218, f) for f in range(1, 41)]),
+        (10, [("slinger", 0x060EC6AC, 0x060EC9D8, f) for f in range(1, 23)]),
+        # Specter (Saturn 0x20) and Will-o'-Wisp (0x28-0x2C): e_mod_ghosts.c
+        (11, [("specter", 0x060ECB58, 0x060ECE10, f) for f in range(1, 25)]),
+        (12, [("wisp", 0x060EEC7C, 0x060EEFBC, f) for f in range(1, 42)]),
+        # bank 19: the room 0 stone pillar (1) and its switch (2), Saturn
+        # 0x17 / 0x16 (e_mod_pillar.c)
+        (13, [("pillar", 0x060E900C, 0x060E9000, f) for f in (1, 2)]),
+    ],
+    DECORATIONS=(0x060EA1CC, 6),
+    DECORATION_GROUPS=["candles"] * 6,
+    PALETTE_BLOCKS={"GARGOYLE": ("gargoyles", 0x060ECEF0),
+                    "SPECTER": ("specter", 0x060ECB58),
+                    "WISP": ("wisp", 0x060EEC7C)},
+    BLEED_BANKS=(),
+    # drawn translucent (the Saturn's colour calculation on sprite type 5)
+    STP_BANKS=(0x060ECB58, 0x060EEC7C),
+    GROUP_ROOMS={"candles": (0, 1), "gargoyles": (1,), "spearguard": (0,),
+                 "archer": (0,), "slinger": (0,), "specter": (1,),
+                 "wisp": (1,), "pillar": (0,)},
+    # Saturn item numbers -> PS1 drop ids (both lists: Saturn hand item n + 2
+    # is PS1 item n here; the names and icons match): Mana Prism 292 -> 0x122,
+    # Antivenom 274 -> 0x110, Potion 289 -> 0x11F
+    DROPS={292: 0x122, 274: 0x110, 289: 0x11F},
+    ROOMS=2,
+)
+STAGES = {"STAGE_15": GARDEN, "STAGE_16": PRISON}
 QUADRANTS = [(t, q) for t in range(18, 24) for q in range(4)]
 CLUT_BASE = 0x210
 GAME_BASE, ENEMY_DEFS, FIRST, COUNT = 0x06066000, 0x06080288, 400, 26
@@ -79,9 +128,11 @@ def allocate(sizes):
     return slots
 
 
-def main(disc, out_path):
-    st = SaturnStage(os.path.join(disc, "STAGE_15.PRG"),
-                     os.path.join(disc, "STAGE_15.CHR"),
+def main(disc, out_path, stage="STAGE_15"):
+    # the stage's tables replace the module's (allocate() reads GROUP_ROOMS)
+    globals().update(STAGES[stage])
+    st = SaturnStage(os.path.join(disc, stage + ".PRG"),
+                     os.path.join(disc, stage + ".CHR"),
                      os.path.join(disc, "0.BIN"))
     decos = []
     for v in range(DECORATIONS[1]):
@@ -93,6 +144,7 @@ def main(disc, out_path):
     sets = [(n, [d[0] for d in decos] if f == "decorations" else f)
             for n, f in SPRITE_SETS]
     saturn_sprites.BLEED_BANKS.update(BLEED_BANKS)
+    saturn_sprites.STP_BANKS.update(STP_BANKS)
 
     def fill(sheets):
         for g, bank in PALETTE_BLOCKS.values():
@@ -201,12 +253,16 @@ def main(disc, out_path):
         r = struct.unpack_from(">IhhHhHHHHHHHHHHHBBI", game,
                                ENEMY_DEFS - GAME_BASE + i * 0x28)
         (_name, hp, atk, elem, dfn, hbs, weak, strong, imm, absorb, level, exp,
-         _rare, _unc, _rr, _ur, bw, bh, flags) = r
-        # the Saturn's drops use its own item numbers: none on the PC yet
+         rare, unc, rr, ur, bw, bh, flags) = r
+        # the Saturn's drops use its own item numbers: DROPS maps the known
+        # ones, the rest drop nothing
+        rare, unc = DROPS.get(rare, 0), DROPS.get(unc, 0)
+        rr, ur = rr if rare else 0, ur if unc else 0
         # _S(): sotn_str ends the name with the 0xFF 0x00 the popup reads
         w("    {_S(\"\"), %d, %d, 0x%X, %d, %d, 0x%X, 0x%X, 0x%X, 0x%X, %d, %d, "
-          "0, 0, 0, 0, %d, %d, 0x%X}," % (hp, atk, elem, dfn, hbs, weak, strong,
-                                          imm, absorb, level, exp, bw, bh, flags))
+          "0x%X, 0x%X, %d, %d, %d, %d, 0x%X}," % (
+              hp, atk, elem, dfn, hbs, weak, strong, imm, absorb, level, exp,
+              rare, unc, rr, ur, bw, bh, flags))
     w("};")
     w("// clang-format on")
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
@@ -214,7 +270,11 @@ def main(disc, out_path):
         f.write("\n".join(L) + "\n")
     defs = ["// Generated by tools/saturn/entities/gdn_entities.py, do not commit"]
     for name, (g, bank) in PALETTE_BLOCKS.items():
-        defs.append("#define MOD_%s_PAL 0x%03X" % (name, sheets[g].blocks[bank]))
+        base = sheets[g].blocks[bank]
+        defs.append("#define MOD_%s_PAL 0x%03X" % (name, base))
+        # the block's first palette, for primitives drawn in its colours
+        defs.append("#define MOD_%s_COLORS %s" % (name, ", ".join(
+            "0x%04X" % c for c in cluts[base - CLUT_BASE])))
     with open(os.path.join(os.path.dirname(os.path.abspath(out_path)), "gdn_defs.h"), "w") as f:
         f.write("\n".join(defs) + "\n")
     for r in range(ROOMS):
@@ -224,6 +284,6 @@ def main(disc, out_path):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4) or sys.argv[3:] and sys.argv[3] not in STAGES:
         raise SystemExit(__doc__)
-    main(sys.argv[1], sys.argv[2])
+    main(*sys.argv[1:])

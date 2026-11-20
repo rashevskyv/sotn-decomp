@@ -41,6 +41,11 @@ void EntityBreakable(Entity* entity) {
         entity->blendMode = blend_modes[breakableType];
         entity->hitboxHeight = g_eBreakableHitboxes[breakableType];
         entity->animSet = g_eBreakableanimSets[breakableType];
+#ifdef BREAKABLE_HITBOX_OFFY
+        // the Saturn stages' breakables: 8 wide, raised to the sprite
+        entity->hitboxWidth = 8;
+        entity->hitboxOffY = BREAKABLE_HITBOX_OFFY[breakableType];
+#endif
 #ifdef STAGE_IS_BO5
         entity->hitboxOffX = 8;
         entity->hitboxOffY = 8;
