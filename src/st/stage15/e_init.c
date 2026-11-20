@@ -55,6 +55,9 @@ void EntityModBossWave(Entity*);
 void EntityExplosionPuffOpaque(Entity*);
 void EntityLifeUpSpawn(Entity*);
 void EntityModBanner(Entity*);
+void EntitySlinger(Entity*);
+void EntitySlingerRib(Entity*);
+void EntitySlingerPieces(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -115,10 +118,16 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityModBossWave,
     EntityExplosionPuffOpaque,
     EntityLifeUpSpawn,
+    EntitySlinger,
+    EntitySlingerRib,
+    EntitySlingerPieces,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_GDN_ENTITIES - 1, "EntityUpdates");
 
 // clang-format off
 EInit g_EInitBreakable = {ANIMSET_OVL(1), 0x00, 0x00, PAL_NONE, ENEMY_BREAKABLE};
+EInit g_EInitSlinger = {MOD_SLINGER_ANIMSET, 0x01, 0x00, PAL_NONE, ENEMY_SLINGER};
+EInit g_EInitSlingerPieces = {MOD_SLINGER_ANIMSET, 0x00, 0x00, PAL_NONE, ENEMY_PARTICLE};
+EInit g_EInitSlingerRib = {MOD_SLINGER_ANIMSET, 0x16, 0x00, PAL_NONE, ENEMY_SLINGER_RIB};
 #include "../e_init_common.h"
 // clang-format on

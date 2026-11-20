@@ -47,6 +47,9 @@ SPRITE_SETS = [
     (12, [("maneater", 0x060F8BFC, 0x060F9470, f) for f in range(1, 56)]),
     (13, [("boss", 0x060F43C4, 0x060F6A90, f) for f in range(1, 87)]),
     (14, [("boss",) + SAT_BANK16 + (46,)]),
+    # Saturn 0x20, the Slinger: the Prison's bank (0x060EC6AC) byte for byte,
+    # so it runs the PS1 code (NO0) like the Prison's
+    (15, [("slinger", 0x060F2AF4, 0x060F2E20, f) for f in range(1, 23)]),
 ]
 DECORATIONS = (0x060F1F90, 6)
 DECORATION_GROUPS = ["candles", "candles", "scene", "scene", "scene", "scene"]
@@ -60,7 +63,7 @@ DROPS = {}
 GROUP_ROOMS = {
     "candles": (0, 1, 3), "scene": (2,), "drips": (1, 3), "gargoyles": (0,),
     "skbreeder": (0,), "leaper": (0,), "gardener": (1,), "tree": (0,),
-    "maneater": (3,), "boss": (2,), "banner": (0,),
+    "maneater": (3,), "boss": (2,), "banner": (0,), "slinger": (0,),
 }
 ROOMS = 4
 # the area name banner (Saturn 0x09, room 0): bank 18's three 64x48 thirds of

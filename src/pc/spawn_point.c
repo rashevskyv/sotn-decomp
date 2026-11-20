@@ -25,6 +25,7 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_ID_SATURN_16, 1, 200, 150, "prison-specter"},
     {STAGE_ID_SATURN_16, 1, 640, 150, "prison-wisp"},
     {STAGE_ID_SATURN_15, 0, 40, 140, "garden-room0"},
+    {STAGE_ID_SATURN_15, 0, 600, 360, "garden-slinger"},
     {STAGE_ID_SATURN_15, 1, 40, 140, "garden-room1"},
     {STAGE_ID_SATURN_15, 2, 40, 140, "garden-room2"},
     {STAGE_ID_SATURN_15, 3, 40, 140, "garden-room3"},

@@ -79,6 +79,10 @@ typedef enum EntityID {
     E_MOD_BOSS_WAVE,
     E_EXPLODE_PUFF_OPAQUE,
     E_LIFE_UP_SPAWN,
+    // Saturn 0x20 (the PS1's NO0 code, e_slinger.c)
+    E_SLINGER,
+    E_SLINGER_THROWN_BONE,
+    E_SLINGER_PIECES,
     NUM_GDN_ENTITIES,
 } EntityID;
 // the name e_mod_boss.h uses
@@ -133,6 +137,7 @@ extern u16 g_GdnSolidTile;
 #define MOD_BOSS_ANIMSET ANIMSET_OVL(13)
 #define MOD_BOSS_DOOR_ANIMSET ANIMSET_OVL(14)
 #define MOD_BOSS_DOOR_FRAME 1
+#define MOD_SLINGER_ANIMSET ANIMSET_OVL(15)
 // the palette blocks (generated in the build folder by gdn_entities.py)
 #include "gdn_defs.h"
 #define MOD_TREE_PAL_ABS MOD_TREE_PAL
@@ -145,3 +150,6 @@ extern EInit g_EInitObtainable;
 extern EInit g_EInitParticle;
 extern EInit g_EInitInteractable;
 extern EInit g_EInitCommon;
+extern EInit g_EInitSlinger;
+extern EInit g_EInitSlingerPieces;
+extern EInit g_EInitSlingerRib;
