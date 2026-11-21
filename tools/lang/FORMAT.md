@@ -13,6 +13,7 @@ Git holds only the Ukrainian side, in `tools/lang/uk/`:
 |------|---------|
 | `ua.json` | `{xbox id: ua}` for every translated line. Dialogue uses the markup below. |
 | `ua_psp.json` | Dialogue boxes that differ for the PSP voice set. |
+| `ua_ps1.json` | `{xbox id: ua}` for every dialogue box of the PS1 EN voice set: a translation of the US PS1 English lines, not of the JP script. Its `{s}{w}{}` tokens follow the native US box. `ua_ps1.py check` tests the pairing, the timing and the widths. |
 | `ua_code.json` | File-select lines (`code:<addr>`) and gothic words (`gothic:<addr>`). Not packed yet. |
 | `ua_menu.json` | `{g_MenuStr index: ua}`: MENU rows that replace the Xbox line (ДОСВІД, the two Saturn familiars). |
 | `ua_port.json` | `{index: ua}`: words of the port's own screens (PORT table): 0..5 the stat names of the status page, ATT DEF STR CON INT LCK in full, in sentence case; 6 the map word of its records; 7..11 the line of each item of the pause main list, in its order, 33 cells at most; 20..57 the words of the port menu (src/pc/port_menu.c P_*), drawn in the serif menu cells; 200..213 the words of its Controls page; 214 FULLSCREEN and 215 MAX of the main page. The pack adds 100 + row: the status page words of g_MenuStr (`STATUS_ROWS` in sotn_lang.py) in sentence case. |
@@ -210,6 +211,8 @@ Loose PNG files replace VRAM pictures at draw time (psyz `hdtex.h`, sdl3_gl only
 
 The native cutscene scripts rebuilt with the Ukrainian boxes, one record per yaml that has one.
 The port picks `script_psp.bin` for the PSP voice set.
+`script.bin` (PS1 EN voice set) takes its boxes from `ua_ps1.json` over `ua.json`; `script_jp.bin` and
+`script_psp.bin` do not read `ua_ps1.json`.
 
 ```
 char magic[8] = "SOTNSCR1"; u32 count;
