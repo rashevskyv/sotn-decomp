@@ -201,12 +201,21 @@ static const struct {
     {"fps", &g_FpsOn},
     {"fullscreen", &g_Fullscreen},
     {"room_stitch", &g_RoomStitch},
+    {"skip_cd_rooms", &g_SkipCdRooms},
+    {"show_loading_text", &g_ShowLoadingText},
 };
 
 static const char ini_stitch[] =
     "\n"
     "; room_stitch: 1 = some rooms side by side play as one wide room, with\n"
     "; no fade between them (a test: src/pc/room_stitch.c lists them).\n";
+
+static const char ini_loading[] =
+    "\n"
+    "; skip_cd_rooms: 1 = a door into a CD loading room (the corridor between\n"
+    "; two areas) goes on to the next area at once. 0 = walk through it.\n"
+    "; show_loading_text: 1 = the NOW LOADING word and logo show while a stage\n"
+    "; loads. 0 = the screen stays black.\n";
 
 static const char ini_overlay[] =
     "\n"
@@ -270,6 +279,9 @@ void Wide_SaveIni(void) {
             g_HdTextures, g_HdDump, g_MusicFiles);
     fputs(ini_stitch, f);
     fprintf(f, "room_stitch = %d\n", g_RoomStitch);
+    fputs(ini_loading, f);
+    fprintf(f, "skip_cd_rooms = %d\nshow_loading_text = %d\n", g_SkipCdRooms,
+            g_ShowLoadingText);
     fclose(f);
 }
 
@@ -280,7 +292,7 @@ void Wide_SaveIni(void) {
 // jp_cards = extra|jp|off, relic_toggle = modern|stock,
 // spawn = <spawn point name>, cheat_* = 0|1 (cheat_character 0..2, 4), editor, overlay, fps = 0|1,
 // hd_textures = 0|1 (missing: 1), hd_dump = 0|1, music_files = 0|1 (1),
-// room_stitch = 0|1 (0).
+// room_stitch = 0|1 (0), skip_cd_rooms = 0|1 (1), show_loading_text = 0|1 (1).
 // A missing key keeps its default (cheats, editor, overlay and fps off).
 // The aspect key of an old file does nothing.
 void Wide_LoadIni(const char* path) {

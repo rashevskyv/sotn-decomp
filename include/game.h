@@ -1123,6 +1123,10 @@ extern int g_EditorOn;         // editor = 1 in sotn.ini, or --editor (PC)
 // Debug overlay (src/pc/port_menu.c): overlay = 1 shows the stage, room,
 // map cell and cheats in a corner; fps = 1 shows the frame rate.
 extern int g_OverlayOn, g_FpsOn;
+// sotn.ini skip_cd_rooms = 1 (default): a door into a CD loading room takes
+// the teleport on its far side at once (5087C.c). show_loading_text = 0: the
+// NOW LOADING word and logo stay hidden, the screen is black (game_handlers.c)
+extern int g_SkipCdRooms, g_ShowLoadingText;
 // The door path (5087C.c) calls it before a room loads: a flushed log line
 // [room] <stage> (<zone>) id <hex> room <n> cell <x>,<y> pos <x>,<y>, and
 // the room for the overlay.

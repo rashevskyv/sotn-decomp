@@ -164,6 +164,8 @@ static void State(void) {
     // tests: the hands, their attack, the defence and the Saturn items owned
     Putf(",\"hpMax\":%d,\"lv\":%d,\"exp\":%u", g_Status.hpMax, g_Status.level,
          g_Status.exp);
+    // tests: the room's fg flags (0x40: a CD loading room) and the map rooms
+    Putf(",\"roomFlags\":%d,\"roomCount\":%u", D_8003C708.flags, g_RoomCount);
     Putf(",\"equip\":[%u,%u],\"atk\":[%d,%d],\"def\":%d,\"saturn\":[%d,%d,%d,%d]}",
          g_Status.equipment[0], g_Status.equipment[1],
          g_Status.attackHands[0], g_Status.attackHands[1],

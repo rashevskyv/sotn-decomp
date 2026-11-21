@@ -1310,6 +1310,89 @@ void func_800F2860(void) {
     }
 }
 
+#ifdef PLATFORM_PSYZ
+// A CD loading room has fg params 0x40. func_800E414C walks the player
+// through it: to the left for 0x40 exactly, else to the right. The cell on
+// that far side is the teleport row the walk ends on.
+static RoomHeader* CdRoomExit(RoomHeader* room) {
+    LayerDef* fg;
+    RoomHeader* r;
+    s32 x;
+
+    if (room->load.tilesetId == 0xFF) {
+        return NULL;
+    }
+    fg = g_api.o.tileLayers[room->load.tileLayoutId].fg;
+    if (!fg || !fg->tileDef || !(fg->rect.params & FLAG_UNK_40)) {
+        return NULL;
+    }
+    x = fg->rect.params == FLAG_UNK_40 ? room->left - 1 : room->right + 1;
+    for (r = g_api.o.rooms; r->left != 0x40; r++) {
+        if (x >= r->left && x <= r->right && room->top >= r->top &&
+            room->top <= r->bottom) {
+            return r->load.tilesetId == 0xFF ? r : NULL;
+        }
+    }
+    return NULL;
+}
+
+// tests (editor on): each CD room of the stage and its exit teleport
+static void LogCdRooms(void) {
+    RoomHeader* r;
+    RoomHeader* exit;
+    LayerDef* fg;
+
+    for (r = g_api.o.rooms; g_EditorOn && r->left != 0x40; r++) {
+        if ((exit = CdRoomExit(r))) {
+            fg = g_api.o.tileLayers[r->load.tileLayoutId].fg;
+            fprintf(stderr,
+                    "[cdroom] stage %02X room %d cell %d,%d params %02X "
+                    "teleport %d exit %d\n",
+                    g_StageId, (s32)(r - g_api.o.rooms), r->left, r->top,
+                    fg->rect.params, fg->zPriority, exit->load.tileLayoutId);
+        }
+    }
+}
+
+// sotn.ini skip_cd_rooms = 1: the door into a CD room takes its exit teleport
+// at once. The room's cells go on the map, as the walk through it would do.
+static s32 SkipCdRoom(void) {
+    RoomHeader* room = (RoomHeader*)(D_801375BC.def - 1);
+    RoomHeader* exit = g_SkipCdRooms ? CdRoomExit(room) : NULL;
+    LayerDef* fg;
+    s32 x, y, idx, bit;
+
+    if (!exit) {
+        return 0;
+    }
+    fg = g_api.o.tileLayers[room->load.tileLayoutId].fg;
+    if (!(fg->rect.params & LAYOUT_RECT_PARAMS_HIDEONMAP) &&
+        g_StageId != STAGE_ST0) { // func_800F2014 for each cell
+        for (y = room->top; y <= room->bottom; y++) {
+            for (x = room->left; x <= room->right; x++) {
+                bit = 1 << ((3 - (x & 3)) * 2);
+                idx = (x >> 2) + y * 16;
+                if (g_StageId & STAGE_INVERTEDCASTLE_FLAG) {
+                    idx += 2 * 4 * WIDTH_OF_MAP_ROW_IN_BYTES;
+                }
+                if (!(g_CastleMap[idx] & bit)) {
+                    g_CastleMap[idx] |= bit;
+                    g_RoomCount++;
+                    func_800F1B08(x, y, 0);
+                    RevealSecretPassageOnMap(x, y, 0xFFFF);
+                }
+            }
+        }
+    }
+    fprintf(stderr,
+            "[cdroom] skip stage %02X cell %d,%d teleport %d rooms %u\n",
+            g_StageId, room->left, room->top, exit->load.tileLayoutId,
+            g_RoomCount);
+    D_801375BC.def = &exit->load;
+    return 1;
+}
+#endif
+
 void RunMainEngine(void) {
     Entity* ent;
     Primitive* prim;
@@ -1368,6 +1451,7 @@ void RunMainEngine(void) {
         PortMenu_OnRoom(D_801375BC.def,
                         g_Tilemap.left + (PLAYER.posX.i.hi >> 8),
                         g_Tilemap.top + (PLAYER.posY.i.hi >> 8));
+        LogCdRooms();
 #endif
         if (D_8003C708.flags & FLAG_UNK_20) {
             LoadGfxAsync(ANIMSET_DRA(3));
@@ -1624,7 +1708,11 @@ void RunMainEngine(void) {
                 g_GameStep = Play_PrepareNextStage;
                 return;
             }
-            if (D_801375BC.def->tilesetId == 0xFF) {
+            if (D_801375BC.def->tilesetId == 0xFF
+#ifdef PLATFORM_PSYZ
+                || SkipCdRoom()
+#endif
+            ) {
                 D_8006C374 = D_801375BC.def->tileLayoutId;
                 g_GameStep = Play_PrepareNextStage;
                 return;

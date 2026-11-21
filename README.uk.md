@@ -259,6 +259,8 @@ cmake --build build/win
 | `buttons` | `switch`, `xbox`, `psx` | `switch` на Switch, `xbox` на ПК | Значки кнопок у меню. |
 | `jp_cards` | `extra`, `jp`, `off` | `extra` | Дві японські картки фамільярів: поруч із предметами США, на місцях JP/PSP або без них. Читається під час запуску. |
 | `relic_toggle` | `modern`, `stock` | `modern` | Вигляд перемикача реліквій. |
+| `skip_cd_rooms` | 0, 1 | 1 | 1: двері в CD-кімнату завантаження (коридор між двома зонами) ведуть одразу в наступну зону. 0: гравець проходить кімнату, як на диску. |
+| `show_loading_text` | 0, 1 | 1 | 1: під час завантаження етапу видно напис NOW LOADING («Загрузка») і логотип. 0: екран лишається чорним. |
 | `spawn` | назва або порожньо | порожньо | Тестова точка старту: `np3-stage15-door`, `marble-soul`, `caverns-soul`, `reverse-trapdoor-underground`, `reverse-marble-soul`, `reverse-caverns-soul`. |
 | `cheat_refill` | 0, 1 | 0 | HP, MP і серця завжди повні. |
 | `cheat_invincible` | 0, 1 | 0 | Удари не шкодять. |

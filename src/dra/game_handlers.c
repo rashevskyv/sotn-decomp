@@ -1294,6 +1294,14 @@ void AnimateNowLoading(NowLoadingModel* self, s16 x, s16 y, bool isDone) {
         prim->clut = 0x1D0;
         prim->priority = 0x1FE;
         prim->drawMode = DRAW_DEFAULT;
+#ifdef PLATFORM_PSYZ
+        if (!g_ShowLoadingText) { // sotn.ini show_loading_text = 0: black
+            prim = &g_PrimBuf[self->primIndex];
+            for (i = 0; i <= NOW_LOADING_PRIM_COUNT; i++, prim = prim->next) {
+                prim->drawMode |= DRAW_HIDE;
+            }
+        }
+#endif
         self->x = x;
         self->y = y;
         self->unkC = 0;
