@@ -1511,9 +1511,9 @@ typedef enum {
 typedef struct {
     /* 80097964 */ u8 relics[NUM_RELICS];
     /* 80097982 */ u8 spells[NUM_SPELLS];
-    /* 8009798A */ u8 equipHandCount[NUM_HAND_ITEMS];
+    /* 8009798A */ u8 equipHandCount[NUM_HAND_IDS];
     /* 80097A33 */ u8 equipBodyCount[NUM_BODY_ITEMS];
-    /* 80097A8D */ u8 equipHandOrder[NUM_HAND_ITEMS];
+    /* 80097A8D */ u8 equipHandOrder[NUM_HAND_ORDER];
     /* 80097B36 */ u8 equipBodyOrder[NUM_BODY_ITEMS];
     /* 80097B90 */ char saveName[12];
     /* 80097B9C */ u32 spellsLearnt;
@@ -1554,6 +1554,27 @@ typedef struct {
 
     /* 80097C44 */ FamiliarStats statsFamiliars[NUM_FAMILIARS];
 } PlayerStatus; /* size=0x334 */
+
+#ifdef PLATFORM_PSYZ
+// PC: PlayerStatus as the PS1 saves it (SaveData.status): PS1 hand items
+// only. The memory copy has the Saturn items too (items.h); the save keeps
+// them after SaveData (src/pc/saturn_items.c). From saveName on both
+// layouts are the same.
+typedef struct {
+    u8 relics[NUM_RELICS];
+    u8 spells[NUM_SPELLS];
+    u8 equipHandCount[NUM_HAND_ITEMS];
+    u8 equipBodyCount[NUM_BODY_ITEMS];
+    u8 equipHandOrder[NUM_HAND_ITEMS];
+    u8 equipBodyOrder[NUM_BODY_ITEMS];
+    char saveName[12];
+    u8 rest[sizeof(PlayerStatus) - offsetof(PlayerStatus, saveName) - 12];
+} PlayerStatusPs1; /* size=0x334 */
+// ext: the Saturn block after SaveData, or NULL
+void Status_ToPs1(PlayerStatusPs1* dst, const PlayerStatus* src, void* ext);
+void Status_FromPs1(
+    PlayerStatus* dst, const PlayerStatusPs1* src, const void* ext);
+#endif
 
 typedef enum {
     FADE_NONE,
@@ -1629,7 +1650,11 @@ typedef struct {
 typedef struct {
     /* 0x000 */ MemcardHeader header;
     /* 0x200 */ SaveInfo info;
+#ifdef PLATFORM_PSYZ
+    /* 0x238 */ PlayerStatusPs1 status;
+#else
     /* 0x238 */ PlayerStatus status;
+#endif
     /* 0x56C */ MenuNavigation menuNavigation;
     /* 0x5B8 */ GameSettings settings;
     /* 0x6C8 */ u8 castleFlags[0x300];

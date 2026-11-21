@@ -3875,7 +3875,7 @@ void func_800FAF44(bool isAccessory) {
     ptr = g_Pix[3];
 
     if (!isAccessory) {
-        for (i = 0; i < 169; i++) {
+        for (i = 0; i < NUM_HAND_ORDER; i++) {
             *ptr++ = i;
         }
         g_Menus[MENU_DG_EQUIP_SELECTOR].h =
@@ -4279,7 +4279,7 @@ void func_800FBAC4(void) {
     *ptr++ = 0;
     for (i = 0; i < ITEM_END; i++) {
         s32 importantcategory = g_Settings.equipOrderTypes[i];
-        for (j = 0; j < NUM_HAND_ITEMS; j++) {
+        for (j = 0; j < NUM_HAND_ORDER; j++) {
             s32 order = g_Status.equipHandOrder[j];
             if (g_Status.equipHandCount[order] != 0 && order != 0 &&
                 g_EquipDefs[order].itemCategory == importantcategory) {
@@ -4287,7 +4287,7 @@ void func_800FBAC4(void) {
             }
         }
     }
-    for (j = 0; j < NUM_HAND_ITEMS; j++) {
+    for (j = 0; j < NUM_HAND_ORDER; j++) {
         s32 order = g_Status.equipHandOrder[j];
         if (g_Status.equipHandCount[order] == 0) {
             *ptr++ = order;
@@ -4295,7 +4295,7 @@ void func_800FBAC4(void) {
     }
 
     ptr = D_801375D8;
-    for (i = 0; i < NUM_HAND_ITEMS; i++) {
+    for (i = 0; i < NUM_HAND_ORDER; i++) {
         g_Status.equipHandOrder[i] = *ptr++;
     }
 }

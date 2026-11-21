@@ -284,11 +284,18 @@ static void ApplyInitChunk(FILE* f, unsigned length) {
     g_DebugPlayer = scalars.debugPlayer;
     g_UseDisk = scalars.useDisk;
 
-    if (fread(&blobSize, sizeof(blobSize), 1, f) != 1 ||
-        blobSize != sizeof(PlayerStatus)) {
+    if (fread(&blobSize, sizeof(blobSize), 1, f) != 1) {
         goto fail;
     }
-    if (fread(&g_Status, blobSize, 1, f) != 1) {
+    if (blobSize == sizeof(PlayerStatusPs1)) {
+        // a replay of 0.8.60 or older: no Saturn items (saturn_items.c)
+        PlayerStatusPs1 old;
+        if (fread(&old, blobSize, 1, f) != 1) {
+            goto fail;
+        }
+        Status_FromPs1(&g_Status, &old, NULL);
+    } else if (blobSize != sizeof(PlayerStatus) ||
+               fread(&g_Status, blobSize, 1, f) != 1) {
         goto fail;
     }
 
