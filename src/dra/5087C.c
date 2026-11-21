@@ -1336,21 +1336,28 @@ static RoomHeader* CdRoomExit(RoomHeader* room) {
     return NULL;
 }
 
-// tests (editor on): each CD room of the stage and its exit teleport
+// tests (editor on): each CD room of the stage and its exit teleport, -1
+// when none is found (the skip then leaves that room to the walk)
 static void LogCdRooms(void) {
     RoomHeader* r;
     RoomHeader* exit;
     LayerDef* fg;
 
     for (r = g_api.o.rooms; g_EditorOn && r->left != 0x40; r++) {
-        if ((exit = CdRoomExit(r))) {
-            fg = g_api.o.tileLayers[r->load.tileLayoutId].fg;
-            fprintf(stderr,
-                    "[cdroom] stage %02X room %d cell %d,%d params %02X "
-                    "teleport %d exit %d\n",
-                    g_StageId, (s32)(r - g_api.o.rooms), r->left, r->top,
-                    fg->rect.params, fg->zPriority, exit->load.tileLayoutId);
+        if (r->load.tilesetId == 0xFF) {
+            continue;
         }
+        fg = g_api.o.tileLayers[r->load.tileLayoutId].fg;
+        if (!fg || !fg->tileDef || !(fg->rect.params & FLAG_UNK_40)) {
+            continue;
+        }
+        exit = CdRoomExit(r);
+        fprintf(stderr,
+                "[cdroom] stage %02X room %d cell %d,%d params %02X "
+                "teleport %d exit %d\n",
+                g_StageId, (s32)(r - g_api.o.rooms), r->left, r->top,
+                fg->rect.params, fg->zPriority,
+                exit ? exit->load.tileLayoutId : -1);
     }
 }
 
