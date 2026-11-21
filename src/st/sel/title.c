@@ -179,10 +179,13 @@ const char D_801A7B80[] = "SELECT ！！";
 // at its bottom needs a new value
 #define TITLE_LOGO_BLANK 15 // empty rows under the logo art
 
-// The sprite rectangle of each text piece, read while it is still a sprite.
+#define TITLE_LOGO 11 // the logo: prims 11..14, four 128-texel pieces
+
+// The sprite rectangle of each text piece and logo piece, read while it is
+// still a sprite.
 static struct {
     s16 x, y, w, h;
-} title_text[TITLE_TEXT];
+} title_text[TITLE_TEXT], title_logo[4];
 
 static void TitleQuad(Primitive* p, s32 x0, s32 y0, s32 x1, s32 y1, s32 u0,
                       s32 v0, s32 u1, s32 v1) {
@@ -248,13 +251,13 @@ static void TitleTextLine(Primitive** p, s32 first, s32 n, s32 cx2, s32 cw,
 }
 
 // The wide view gives the title a canvas larger than 512x240 (src/pc/wide.c).
-// The background stretches to the whole canvas, the logo stays in place, the
-// KONAMI line keeps its gap to the bottom and PRESS START sits midway between
+// The background stretches to the whole canvas, the logo keeps its place in
+// the PS1 shape (5:8 texels, like the text), the KONAMI line keeps its gap to the bottom and PRESS START sits midway between
 // the logo and the KONAMI line. Runs every frame after the step code, so it
 // follows dock changes and the colours the step code just set.
 static void TitleFillCanvas(void) {
     PsyzRect a = Psyz_VideoGetDrawArea();
-    s32 w = a.ex - a.sx, i, n, sy, sx8, ky, py;
+    s32 w = a.ex - a.sx, i, n, sy, sx8, ky, py, lx0, lx1, lsx8, lsy8;
     Primitive* prim;
     Primitive* p[TITLE_PRIMS + TITLE_TEXT];
 
@@ -287,11 +290,44 @@ static void TitleFillCanvas(void) {
     ky = a.ey - (DISP_TITLE_H - title_text[3].y - title_text[3].h) -
          title_text[3].h * sy;
     TitleTextLine(p, 3, 4, a.sx + a.ex, w, ky, sx8, sy);
-    // PRESS START (prims 0..2): midway between the logo art (prim 11) and
-    // KONAMI
-    py = (p[11]->y0 + p[11]->v1 - TITLE_LOGO_BLANK + ky -
+    // The logo has the same 5:8 texels as the text (it looked 1.6 times too
+    // wide): sx8/8 columns and sy rows per texel, centred on the canvas, its
+    // rows scaled about the frame's middle row
+    for (i = 0; i < 4; i++) {
+        prim = p[TITLE_LOGO + i];
+        if (prim->type == PRIM_SPRT) {
+            title_logo[i].x = prim->x0;
+            title_logo[i].y = prim->y0;
+            title_logo[i].w = prim->u1;
+            title_logo[i].h = prim->v1;
+        }
+    }
+    lx0 = title_logo[0].x;
+    lx1 = title_logo[3].x + title_logo[3].w;
+    lsx8 = sx8;
+    lsy8 = sy * 8;
+    if ((lx1 - lx0) * sx8 > w * 8) {
+        // a canvas narrower than the logo (narrower than 4:3; not tested):
+        // shrink both ways, so the logo keeps its 5:8 texels (the old code
+        // shrank only the width and squashed the logo)
+        lsx8 = w * 8 / (lx1 - lx0);
+        lsy8 = lsx8 * 8 / 5;
+    }
+#define LX(x) ((a.sx + a.ex + (2 * (x) - lx0 - lx1) * lsx8 / 8) / 2)
+#define LY(y) ((a.sy + a.ey + (2 * (y) - DISP_TITLE_H) * lsy8 / 8) / 2)
+    for (i = 0; i < 4; i++) {
+        prim = p[TITLE_LOGO + i];
+        TitleQuad(prim, LX(title_logo[i].x), LY(title_logo[i].y),
+                  LX(title_logo[i].x + title_logo[i].w),
+                  LY(title_logo[i].y + title_logo[i].h), prim->u0, prim->v0,
+                  prim->u0 + title_logo[i].w, prim->v0 + title_logo[i].h);
+    }
+    // PRESS START (prims 0..2): midway between the logo art and KONAMI
+    py = (LY(title_logo[0].y + title_logo[0].h - TITLE_LOGO_BLANK) + ky -
           title_text[0].h * sy) /
          2;
+#undef LX
+#undef LY
     TitleTextLine(p, 0, 3, a.sx + a.ex, w, py, sx8, sy);
 
     for (i = 7; i < TITLE_PRIMS; i++) {
