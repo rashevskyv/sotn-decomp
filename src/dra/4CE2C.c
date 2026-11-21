@@ -147,16 +147,14 @@ static bool BossRoom(void) {
 // covers them in pure black and darkens the edge tile column linearly over
 // its outer EDGE_FADE px (0 in the middle of the tile, black at the room
 // edge). On every frame at once, so no frame shows what lies outside.
-// side -1: the switch; 0, 1: that side is a room edge, not a camera lock
-// inside the room (a lock keeps the vignette).
+// side 0 (left), 1 (right): that side is a room edge, not a camera lock
+// inside the room (a lock side keeps the old fill and vignette).
 #define EDGE_FADE 8
 static s32 RoomEdgeFade(s32 side) {
     if (!g_RoomEdgeFade || !g_WideX || !(g_Tilemap.flags & LAYER_SHOW)) {
         return 0;
     }
-    return side < 0 ? 1
-           : side   ? g_Tilemap.width >= g_Tilemap.hSize * 256
-                    : g_Tilemap.x <= 0;
+    return side ? g_Tilemap.width >= g_Tilemap.hSize * 256 : g_Tilemap.x <= 0;
 }
 
 // The cells of the wide view outside the room (or layer). The loops below
@@ -186,10 +184,11 @@ static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
     static s32 logged = -1;
     u32 slots;
     u16 tile, clut, *row;
-    // room_edge_fade: no cell past the left or right room edge (screen x)
-    s32 walls = RoomEdgeFade(-1);
-    s32 wall0 = r->x - g_Tilemap.scrollX.i.hi;
-    s32 wall1 = wall0 + g_Tilemap.hSize * 256;
+    // room_edge_fade: no cell past a left or right room edge (screen x)
+    s32 wall0 = RoomEdgeFade(0) ? r->x - g_Tilemap.scrollX.i.hi : -0x7FFF;
+    s32 wall1 = RoomEdgeFade(1) ? r->x - g_Tilemap.scrollX.i.hi +
+                                      g_Tilemap.hSize * 256
+                                : 0x7FFF;
 
     if (!WIDE_COLS && !WIDE_ROWS && !patched) {
         return;
@@ -207,7 +206,7 @@ static void ApronPass(TilemapRenderer* r, SPRT_16* sp16, s32 bg, u16* layout,
             for (j = -WIDE_COLS; j < N_HORIZ_TILES + WIDE_COLS;
                  j++, x0 += TILE_SIZE) {
                 tx = startTx + j;
-                if (walls && (x0 + TILE_SIZE <= wall0 || x0 >= wall1)) {
+                if (x0 + TILE_SIZE <= wall0 || x0 >= wall1) {
                     continue;
                 }
                 in = tx >= 0 && tx < r->roomTileWidth && ty >= 0 &&
