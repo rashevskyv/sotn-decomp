@@ -908,7 +908,8 @@ void EntityModEfreet27(Entity* self) {
         // Saturn flags |= 0x2000 (not ported)
         self->pose = 0;
         self->poseTimer = 0;
-        self->drawFlags = ENTITY_OPACITY; // Saturn 8
+        // Saturn 8, and the sprite's scale flag 0x40
+        self->drawFlags = ENTITY_OPACITY | ENTITY_SCALEX | ENTITY_SCALEY;
         self->opacity = 0x80;
         ext->counter = Random() & 3;
         self->velocityY =
@@ -918,6 +919,7 @@ void EntityModEfreet27(Entity* self) {
         // Saturn sprite clut += 0x10: palette 1 of the bank, set in the
         // conversion (rstage15_entities.py)
         ext->scale = 0x10;
+        self->scaleX = self->scaleY = ext->scale * 4; // Saturn 0x40 = 1
         self->hitboxWidth = 0;
         self->hitboxHeight = 0;
         v = (s8)rsin((s16)(g_Timer << 7));
@@ -928,6 +930,7 @@ void EntityModEfreet27(Entity* self) {
     self->posX.val -= SAT_X(0x1800);
     MoveEntity();
     ext->scale += 3;
+    self->scaleX = self->scaleY = ext->scale * 4;
     if (ext->counter < 0x20) {
         self->hitboxWidth = SAT_X(ext->scale / 5);
         self->hitboxHeight = ext->scale / 5;
