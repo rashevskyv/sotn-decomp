@@ -1231,7 +1231,14 @@ void EntityVenusWeedTendril(Entity* self) {
 
     // Update the hitbox based on the current animation frame
     hitboxData = HitboxData_Tendril;
+#if defined(FIX_UB)
+    // the init frame has animCurFrame 0: the PSX reads before the table
+    hitboxIndex = self->animCurFrame < 0x22
+                      ? 0
+                      : HitboxIndices_Tendril[self->animCurFrame - 0x22];
+#else
     hitboxIndex = HitboxIndices_Tendril[self->animCurFrame - 0x22];
+#endif
     hitboxData += hitboxIndex * 4; // 4 entries per index
     self->hitboxOffX = *hitboxData++;
     self->hitboxOffY = *hitboxData++;
