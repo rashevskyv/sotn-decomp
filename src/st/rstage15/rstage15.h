@@ -80,6 +80,7 @@ typedef enum EntityID {
     E_SIDE_WATER_SPLASH,
     E_SMALL_WATER_DROP,
     E_WATER_DROP,
+    E_WATER_LINE, // Saturn 0x16
     NUM_RGDN_ENTITIES,
 } EntityID;
 // the names RNO4's Cave Troll code uses

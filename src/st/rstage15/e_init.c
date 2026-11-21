@@ -56,6 +56,7 @@ void EntitySurfacingWater(Entity*);
 void EntitySideWaterSplash(Entity*);
 void EntitySmallWaterDrop(Entity*);
 void EntityWaterDrop(Entity*);
+void EntityWaterLine(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -117,6 +118,7 @@ PfnEntityUpdate EntityUpdates[] = {
     EntitySideWaterSplash,
     EntitySmallWaterDrop,
     EntityWaterDrop,
+    EntityWaterLine,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_RGDN_ENTITIES - 1, "EntityUpdates");
 

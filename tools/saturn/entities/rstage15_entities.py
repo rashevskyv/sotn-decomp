@@ -51,9 +51,12 @@ RGARDEN = dict(
     TRIM_BANKS={},
     GROUP_ROOMS={"candles": (0, 1, 3), "scene": (2,), "troll": (0,),
                  "copper": (0,), "efreet": (0,), "bitterfly": (0, 3),
-                 "venus": (1, 3), "knight": (1,), "guardian": (3,)},
+                 "venus": (1, 3), "knight": (1,), "guardian": (3,),
+                 "water": (0,)},
     ROOMS=4,
-    BANNER=None,
+    # Saturn 0x16, room 0's water line (e_water.c): bank 0x060ECEF0's 12
+    # images, 3 phases of 4 strips, by number as the banner's
+    BANNER=(0x060ECEF0, range(12), "water", "WATER_LINE"),
     # the Blue Venus Weed's primitives: the leaves (frame 59, the right
     # half) and the stem (frame 2)
     PRIM_PARTS={"VENUS_LEAVES": (7, 59), "VENUS_STEM": (7, 2)},
