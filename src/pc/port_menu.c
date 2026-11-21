@@ -1610,7 +1610,11 @@ static void AddBoss(char* line, const struct CheatBoss* b) {
 
 // The bestiary picture of a boss (the librarian's, BIN/MONSTER.BIN: 96x112
 // 15-bit pixels a record) at half size: one tile per run of one colour in a
-// row, the low bit of each colour dropped. Read when the boss changes.
+// row. Read when the boss changes. Only a raw 0 pixel is clear (0x8000 is
+// opaque black, the librarian draws it so); a half size pixel is the mean of
+// the opaque ones of its 2x2, clear when 3 or 4 of them are clear. It lies on
+// a dark box, so black art stays black (on the old grey box Doppleganger,
+// mostly black, came out as grey holes).
 #define PIC_W 48
 #define PIC_H 56
 static struct {
@@ -1620,7 +1624,8 @@ static int pic_n, pic_of = -1;
 
 static void LoadPicture(int bestiary) {
     static u16 px[0x5800 / 2];
-    int x, y, run;
+    static int half[PIC_W]; // a row at half size, -1 clear, else 0x7FFF rgb
+    int x, y, i, n, r, g, b, run;
     u16 c;
     pic_of = bestiary;
     pic_n = 0;
@@ -1629,23 +1634,33 @@ static void LoadPicture(int bestiary) {
         fprintf(stderr, "[menu] no bestiary picture %d\n", bestiary);
         return;
     }
-#define PX(x, y) (px[(y) * 2 * 96 + (x) * 2] & 0x7BDE)
     for (y = 0; y < PIC_H; y++) {
-        for (x = 0; x < PIC_W; x += run) {
-            c = PX(x, y);
-            for (run = 1; x + run < PIC_W && PX(x + run, y) == c; run++) {
+        for (x = 0; x < PIC_W; x++) {
+            n = r = g = b = 0;
+            for (i = 0; i < 4; i++) {
+                c = px[(y * 2 + (i >> 1)) * 96 + x * 2 + (i & 1)];
+                if (c) {
+                    n++;
+                    r += c & 31;
+                    g += c >> 5 & 31;
+                    b += c >> 10 & 31;
+                }
             }
-            if (c && pic_n < LEN(pic)) {
+            half[x] = n < 2 ? -1 : r / n | g / n << 5 | b / n << 10;
+        }
+        for (x = 0; x < PIC_W; x += run) {
+            for (run = 1; x + run < PIC_W && half[x + run] == half[x]; run++) {
+            }
+            if (half[x] >= 0 && pic_n < LEN(pic)) {
                 pic[pic_n].x = x;
                 pic[pic_n].y = y;
                 pic[pic_n].w = run;
-                pic[pic_n].r = (c & 31) << 3;
-                pic[pic_n].g = (c >> 5 & 31) << 3;
-                pic[pic_n++].b = (c >> 10 & 31) << 3;
+                pic[pic_n].r = (half[x] & 31) << 3;
+                pic[pic_n].g = (half[x] >> 5 & 31) << 3;
+                pic[pic_n++].b = (half[x] >> 10 & 31) << 3;
             }
         }
     }
-#undef PX
 }
 
 static void DrawPicture(int x, int y, int bestiary) {
@@ -1657,7 +1672,8 @@ static void DrawPicture(int x, int y, int bestiary) {
         Rect(x + pic[i].x, y + pic[i].y, pic[i].w, 1, pic[i].r, pic[i].g,
              pic[i].b);
     }
-    if (pic_n) {
+    if (pic_n) { // a dark box in a grey frame, under the picture
+        Rect(x, y, PIC_W, PIC_H, 8, 8, 16);
         Rect(x - 2, y - 2, PIC_W + 4, PIC_H + 4, 200, 200, 200);
     }
 }
@@ -1724,6 +1740,13 @@ static void DrawMini(int it) {
             if (mini_s >= 48) { // a gap between rooms from 3 px a cell
                 w--;
                 h--;
+            }
+            // a red ring round a small boss room (a cell or two at 720p)
+            if (hi && it >= ITEM_BOSS && w < 8 && h < 8) {
+                Rect(x - 4, y - 4, w + 8, 1, 255, 40, 40);
+                Rect(x - 4, y + h + 3, w + 8, 1, 255, 40, 40);
+                Rect(x - 4, y - 3, 1, h + 6, 255, 40, 40);
+                Rect(x + w + 3, y - 3, 1, h + 6, 255, 40, 40);
             }
             if (hi) {
                 cr = 255;

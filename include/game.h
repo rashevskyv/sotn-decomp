@@ -1143,6 +1143,8 @@ extern const struct CheatBoss g_CheatBosses[];
 extern const int g_CheatBossCount;
 // Teleport into the fight of boss i. NULL when the warp starts, else why not.
 const char* Cheat_WarpBoss(int i);
+// StoreSaveData: in a rematch the save copy keeps the boss beaten.
+void Cheat_RematchSave(s32* records, u8* flags);
 // Read by the door path in 5087C.c at the next stage load.
 extern struct WarpTarget {
     int active, stage, room, cx, cy;
