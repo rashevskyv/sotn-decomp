@@ -54,6 +54,13 @@ void EntityModBossBeam(Entity*);
 void EntityModBossWave(Entity*);
 void EntityExplosionPuffOpaque(Entity*);
 void EntityLifeUpSpawn(Entity*);
+void EntityModBanner(Entity*);
+void EntitySlinger(Entity*);
+void EntitySlingerRib(Entity*);
+void EntitySlingerPieces(Entity*);
+void EntityThornweed(Entity*);
+void EntityCorpseweed(Entity*);
+void EntityCorpseweedProjectile(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -65,7 +72,7 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityIntenseExplosion,
     EntitySoulStealOrb,
     EntityDummy, // E_ROOM_FOREGROUND: the native renderer draws it
-    EntityDummy, // E_STAGE_NAME_POPUP: no area name art
+    EntityModBanner, // E_STAGE_NAME_POPUP: Saturn 0x09 (e_mod_banner.c)
     EntityEquipItemDrop,
     EntityRelicOrb,
     EntityPersistentItemDrop,
@@ -114,10 +121,22 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityModBossWave,
     EntityExplosionPuffOpaque,
     EntityLifeUpSpawn,
+    EntitySlinger,
+    EntitySlingerRib,
+    EntitySlingerPieces,
+    EntityThornweed,
+    EntityCorpseweed,
+    EntityCorpseweedProjectile,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_GDN_ENTITIES - 1, "EntityUpdates");
 
 // clang-format off
 EInit g_EInitBreakable = {ANIMSET_OVL(1), 0x00, 0x00, PAL_NONE, ENEMY_BREAKABLE};
+EInit g_EInitSlinger = {MOD_SLINGER_ANIMSET, 0x01, 0x00, PAL_NONE, ENEMY_SLINGER};
+EInit g_EInitSlingerPieces = {MOD_SLINGER_ANIMSET, 0x00, 0x00, PAL_NONE, ENEMY_PARTICLE};
+EInit g_EInitSlingerRib = {MOD_SLINGER_ANIMSET, 0x16, 0x00, PAL_NONE, ENEMY_SLINGER_RIB};
+EInit g_EInitThornweed = {MOD_THORNWEED_ANIMSET, 0x00, 0x00, PAL_NONE, ENEMY_THORNWEED};
+EInit g_EInitCorpseweed = {MOD_THORNWEED_ANIMSET, 0x00, 0x00, PAL_NONE, ENEMY_CORPSEWEED};
+EInit g_EInitCorpseweedProjectile = {MOD_THORNWEED_ANIMSET, 0x00, 0x00, PAL_NONE, ENEMY_CORPSEWEED_PROJECTILE};
 #include "../e_init_common.h"
 // clang-format on

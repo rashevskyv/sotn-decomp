@@ -5,6 +5,26 @@ extern EInit g_EInitThornweed;
 extern EInit g_EInitCorpseweed;
 extern EInit g_EInitCorpseweedProjectile;
 
+// The primitives' texture places (u0, u1, v0, v1) and tpages; a stage with
+// its own sprite sheet (the Saturn Garden) gives its own
+#ifndef CORPSEWEED_LEAVES_U0
+#define CORPSEWEED_LEAVES_U0 0
+#define CORPSEWEED_LEAVES_U1 0x18
+#define CORPSEWEED_LEAVES_V0 0x28
+#define CORPSEWEED_LEAVES_V1 0x50
+#define CORPSEWEED_STALK_U0 0x40
+#define CORPSEWEED_STALK_U1 0x18
+#define CORPSEWEED_STALK_V0 0
+#define CORPSEWEED_STALK_V1 0x70
+#define CORPSEWEED_PROJ_U0 0x40
+#define CORPSEWEED_PROJ_U1 0x80
+#define CORPSEWEED_PROJ_V0 0x40
+#define CORPSEWEED_PROJ_V1 0x80
+#define CORPSEWEED_LEAVES_TPAGE CORPSEWEED_TPAGE
+#define CORPSEWEED_STALK_TPAGE CORPSEWEED_TPAGE
+#define CORPSEWEED_PROJ_TPAGE CORPSEWEED_TPAGE
+#endif
+
 static s16 PhysicsSensors[] = {
     0, 1, 0, 4, 2, -4, -4, 0,
 };
@@ -175,14 +195,14 @@ void EntityThornweed(Entity* self) {
 
 void EntityCorpseweed(Entity* self) {
     // Sprites
-    const int SpriteLeavesLeft = 0;
-    const int SpriteLeavesRight = 0x18;
-    const int SpriteLeavesTop = 0x28;
-    const int SpriteLeavesBottom = 0x50;
-    const int SpriteStalkLeft = 0x40;
-    const int SpriteStalkRight = 0x18;
-    const int SpriteStalkTop = 0;
-    const int SpriteStalkBottom = 0x70;
+    const int SpriteLeavesLeft = CORPSEWEED_LEAVES_U0;
+    const int SpriteLeavesRight = CORPSEWEED_LEAVES_U1;
+    const int SpriteLeavesTop = CORPSEWEED_LEAVES_V0;
+    const int SpriteLeavesBottom = CORPSEWEED_LEAVES_V1;
+    const int SpriteStalkLeft = CORPSEWEED_STALK_U0;
+    const int SpriteStalkRight = CORPSEWEED_STALK_U1;
+    const int SpriteStalkTop = CORPSEWEED_STALK_V0;
+    const int SpriteStalkBottom = CORPSEWEED_STALK_V1;
     // Anim Frames
     const int AnimFrameInit = 0;
     const int AnimFrameIdle = 0x13;
@@ -289,7 +309,7 @@ void EntityCorpseweed(Entity* self) {
         self->ext.corpseweed.prim = prim;
 
         // Leaves primitive
-        prim->tpage = CORPSEWEED_TPAGE;
+        prim->tpage = CORPSEWEED_LEAVES_TPAGE;
         // Palettes are different in CHI
         prim->clut = CORPSEWEED_PAL;
         prim->u0 = prim->u2 = SpriteLeavesLeft;
@@ -307,7 +327,7 @@ void EntityCorpseweed(Entity* self) {
 
         // Stalk primitive
         prim = prim->next;
-        prim->tpage = CORPSEWEED_TPAGE;
+        prim->tpage = CORPSEWEED_STALK_TPAGE;
         prim->clut = CORPSEWEED_PAL;
         prim->u0 = prim->u2 = SpriteStalkLeft;
         prim->u1 = prim->u3 = SpriteStalkRight;
@@ -721,10 +741,10 @@ void EntityCorpseweed(Entity* self) {
 
 void EntityCorpseweedProjectile(Entity* self) {
     // Sprites
-    const int SpriteLeft = 0x40;
-    const int SpriteRight = 0x80;
-    const int SpriteTop = 0x40;
-    const int SpriteBottom = 0x80;
+    const int SpriteLeft = CORPSEWEED_PROJ_U0;
+    const int SpriteRight = CORPSEWEED_PROJ_U1;
+    const int SpriteTop = CORPSEWEED_PROJ_V0;
+    const int SpriteBottom = CORPSEWEED_PROJ_V1;
     // Misc
     const int Brightness = 0x40;
     const int RangeMaxX = 0x60;
@@ -789,7 +809,7 @@ void EntityCorpseweedProjectile(Entity* self) {
         prim = &g_PrimBuf[primIdx];
         self->ext.corpseweed.prim = prim;
 
-        prim->tpage = CORPSEWEED_TPAGE;
+        prim->tpage = CORPSEWEED_PROJ_TPAGE;
         prim->clut = CORPSEWEED_PROJ_PAL;
         prim->u0 = prim->u2 = SpriteLeft;
         prim->u1 = prim->u3 = SpriteRight;

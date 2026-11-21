@@ -846,13 +846,15 @@ LayoutEntity* entityLayoutVertical[GDN_LAYOUTS];
 
 #ifdef SATURN_STAGE_PRISON
 // Saturn STAGE_16 entity id -> stage16.h EntityID. The ids without a port
-// (the area name banner) stay idle.
+// stay idle.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
     switch (saturnId) {
     case 0x01:
         return E_BREAKABLE;
     case 0x05:
         return E_RED_DOOR;
+    case 0x09:
+        return E_STAGE_NAME_POPUP;
     case 0x0F:
         return saveRoom ? E_SATURN_MASONRY : E_DUMMY_0F;
     case 0x10:
@@ -881,13 +883,15 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
 }
 #else
 // Saturn STAGE_15 entity id -> stage15.h EntityID. The ids without a port
-// (water, Slinger, Thornweed, area name, CD room foreground) stay idle.
+// (water, CD room foreground) stay idle.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
     switch (saturnId) {
     case 0x01:
         return E_BREAKABLE;
     case 0x05:
         return E_RED_DOOR;
+    case 0x09:
+        return E_STAGE_NAME_POPUP;
     case 0x0F:
         return saveRoom ? E_SATURN_MASONRY : E_DUMMY_0F;
     case 0x10:
@@ -896,12 +900,16 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_ID_11;
     case 0x1E:
         return E_MOD_DRIP_SPAWNER;
+    case 0x20:
+        return E_SLINGER;
     case 0x23:
         return E_MOD_GARGOYLE;
     case 0x2E:
         return E_MOD_TREE;
     case 0x35:
         return E_MOD_LEAPER_SPAWNER;
+    case 0x36: // params 0 Thornweed, 1 Corpseweed
+        return E_THORNWEED;
     case 0x3B:
         return E_MOD_MANEATER;
     case 0x3D:
@@ -1012,11 +1020,15 @@ static void SaturnGdnStart(void) {
 // comes or goes or an hp or a step changes
 #ifdef SATURN_STAGE_PRISON
 #define SATURN_LOGGED(e)                                                       \
-    ((e)->enemyId || (e)->entityId == E_BREAKABLE ||                           \
-     (e)->entityId == E_MOD_PILLAR || (e)->entityId == E_MOD_PILLAR_SWITCH)
+    (SATURN_LOGGED_COMMON(e) || (e)->entityId == E_MOD_PILLAR ||               \
+     (e)->entityId == E_MOD_PILLAR_SWITCH)
 #else
-#define SATURN_LOGGED(e) ((e)->enemyId || (e)->entityId == E_BREAKABLE)
+#define SATURN_LOGGED(e) SATURN_LOGGED_COMMON(e)
 #endif
+// the enemies, the breakables and the drops (their params: the item)
+#define SATURN_LOGGED_COMMON(e)                                                \
+    ((e)->enemyId || (e)->entityId == E_BREAKABLE ||                           \
+     (e)->entityId == E_PRIZE_DROP || (e)->entityId == E_EQUIP_ITEM_DROP)
 static void SaturnGdnUpdate(void) {
     static u32 s_LastSum;
     static s32 s_Frame;
@@ -1027,9 +1039,9 @@ static void SaturnGdnUpdate(void) {
     u32 sum = 0;
 
     Update();
-    len = snprintf(line, sizeof(line), "[ent] room=%d php=%d pl=%d,%d",
-                   SaturnStageCurrentRoom(), g_Status.hp, PLAYER.posX.i.hi,
-                   PLAYER.posY.i.hi);
+    len = snprintf(line, sizeof(line), "[ent] room=%d php=%d exp=%d pl=%d,%d",
+                   SaturnStageCurrentRoom(), g_Status.hp, g_Status.exp,
+                   PLAYER.posX.i.hi, PLAYER.posY.i.hi);
     for (e = &g_Entities[STAGE_ENTITY_START];
          e < &g_Entities[TOTAL_ENTITY_COUNT]; e++) {
         if (!e->entityId || !e->pfnUpdate) {
@@ -1040,11 +1052,16 @@ static void SaturnGdnUpdate(void) {
             len += snprintf(line + len, sizeof(line) - len, " %d:%d/%d/%d@%d,%d",
                             (s32)(e - g_Entities), e->entityId, e->hitPoints,
                             e->step, e->posX.i.hi, e->posY.i.hi);
+            if (e->entityId == E_PRIZE_DROP ||
+                e->entityId == E_EQUIP_ITEM_DROP) {
+                len += snprintf(line + len, sizeof(line) - len, "#%X",
+                                e->params);
+            }
             sum = sum * 31 + (e - g_Entities) * 7 + e->hitPoints * 131 +
-                  e->step;
+                  e->step + e->params;
         }
     }
-    sum += g_Status.hp * 17;
+    sum += g_Status.hp * 17 + g_Status.exp * 3;
     if (++s_Frame >= 60 || sum != s_LastSum) {
         fprintf(stderr, "%s n=%d\n", line, count);
         s_Frame = 0;

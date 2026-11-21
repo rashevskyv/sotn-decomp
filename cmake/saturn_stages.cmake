@@ -96,8 +96,11 @@ set(SATURN_GDN_SOURCES
     src/st/stage15/e_collect.c
     src/st/stage15/e_init.c
     src/st/stage15/e_misc.c
+    src/st/stage15/e_mod_banner.c
     src/st/stage15/e_particles.c
     src/st/stage15/e_room_bg.c
+    src/st/stage15/e_slinger.c
+    src/st/stage15/e_thornweed.c
     src/st/stage15/popup.c
     src/st/stage15/prim_helpers.c
     src/st/stage15/st_common.c
@@ -149,6 +152,7 @@ set(SATURN_PRISON_SOURCES
     src/st/stage16/e_spear_guard.c
     src/st/stage16/e_bone_archer.c
     src/st/stage16/e_slinger.c
+    src/st/stage16/e_mod_banner.c
     src/st/stage16/e_mod_ghosts.c
     src/st/stage16/e_mod_pillar.c
     src/st/stage16/popup.c
