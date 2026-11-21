@@ -4,7 +4,30 @@ extern EInit g_EInitVenusWeedTendril;
 extern EInit g_EInitVenusWeedDart;
 extern EInit g_EInitVenusWeedRoot;
 
+#ifndef SPIKE_SPRITE
 extern signed short* SPIKE_SPRITES[];
+#define SPIKE_SPRITE(n) SPIKE_SPRITES[n]
+#endif
+// a port with its own sprite sheet sets where the leaves and the stem are,
+// and VENUS_PART_FIXUP moves a sprite part's primitive to its own tpage
+#ifndef VENUS_LEAVES_U
+#define VENUS_LEAVES_TPAGE 0x14
+#define VENUS_LEAVES_U 0x48
+#define VENUS_LEAVES_V 0x00
+#define VENUS_LEAVES_W 0x38
+#define VENUS_LEAVES_H 0x22
+#define VENUS_STEM_TPAGE 0x14
+#define VENUS_STEM_U 0x00
+#define VENUS_STEM_V 0x30
+#define VENUS_STEM_W 0x18
+#define VENUS_STEM_H 0x22
+#endif
+#ifndef VENUS_PART_FIXUP
+#define VENUS_PART_FIXUP(prim, spriteData)
+#endif
+#ifndef DART_CLUT_MAX
+#define DART_CLUT_MAX (PLANT_CLUT - 1)
+#endif
 
 static Primitive* SetupPrimsForEntitySpriteParts(
     Entity* entity, Primitive* prim) {
@@ -24,7 +47,7 @@ static Primitive* SetupPrimsForEntitySpriteParts(
     u8 spriteV1;
     s32 xFlip;
 
-    spriteData = SPIKE_SPRITES[entity->animCurFrame];
+    spriteData = SPIKE_SPRITE(entity->animCurFrame);
     spritePartCount = *spriteData;
     spriteData++;
 
@@ -159,6 +182,7 @@ static Primitive* SetupPrimsForEntitySpriteParts(
         }
 
         prim->tpage = 0x14;
+        VENUS_PART_FIXUP(prim, spriteData);
         // Entity-relative z priority
         prim->priority = entity->zPriority + 1;
 
@@ -289,14 +313,14 @@ static s32 unused = 0;
 // clang-format on
 void EntityVenusWeed(Entity* self) {
     // Sprites
-    const int SpriteLeavesX = 0x48;
-    const int SpriteLeavesY = 0x00;
-    const int SpriteLeavesW = 0x38;
-    const int SpriteLeavesH = 0x22;
-    const int SpriteStemX = 0x00;
-    const int SpriteStemY = 0x30;
-    const int SpriteStemW = 0x18;
-    const int SpriteStemH = 0x22;
+    const int SpriteLeavesX = VENUS_LEAVES_U;
+    const int SpriteLeavesY = VENUS_LEAVES_V;
+    const int SpriteLeavesW = VENUS_LEAVES_W;
+    const int SpriteLeavesH = VENUS_LEAVES_H;
+    const int SpriteStemX = VENUS_STEM_U;
+    const int SpriteStemY = VENUS_STEM_V;
+    const int SpriteStemW = VENUS_STEM_W;
+    const int SpriteStemH = VENUS_STEM_H;
     // Behaviour
 #if defined(BLUE)
     const int ActivateDistanceX = 0xA0;
@@ -362,7 +386,7 @@ void EntityVenusWeed(Entity* self) {
 
         // Leaves
         for (i = 0; i < 2; i++) {
-            prim->tpage = 0x14;
+            prim->tpage = VENUS_LEAVES_TPAGE;
             prim->clut = PLANT_CLUT;
             prim->u0 = prim->u2 = SpriteLeavesX;
             prim->u1 = prim->u3 = SpriteLeavesX + SpriteLeavesW;
@@ -376,7 +400,7 @@ void EntityVenusWeed(Entity* self) {
 
         // Stem
         self->ext.venusWeed.stemPrim = prim;
-        prim->tpage = 0x14;
+        prim->tpage = VENUS_STEM_TPAGE;
         prim->clut = PLANT_CLUT;
         prim->u0 = prim->u2 = SpriteStemX;
         prim->u1 = prim->u3 = SpriteStemX + SpriteStemW;
@@ -1304,8 +1328,8 @@ void EntityVenusWeedDart(Entity* self) {
             self->ext.venusWeedDart.clutIndex++;
             self->palette = self->ext.venusWeedDart.clutIndex + DART_CLUT_START;
 
-            if (self->palette > PLANT_CLUT - 1) {
-                self->palette = PLANT_CLUT - 1;
+            if (self->palette > DART_CLUT_MAX) {
+                self->palette = DART_CLUT_MAX;
             }
         }
         if (self->ext.venusWeedDart.clutIndex > ClutIdxMax) {
