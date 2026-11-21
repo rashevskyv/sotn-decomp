@@ -135,9 +135,11 @@ static const char ini_buttons[] =
     "; psx = PlayStation, xbox = Xbox, switch = Nintendo.\n"
     "; menu_confirm: the gamepad face button that confirms in the menus\n"
     "; (title, file select, pause menu, shops, save, port menu); the other one\n"
-    "; goes back. auto = right on a Nintendo pad (A) and on the Switch, else\n"
-    "; bottom; right = the right face button; bottom = the bottom one. The\n"
-    "; keyboard and the gameplay buttons stay as they are.\n";
+    "; goes back. auto = the button labelled A confirms and B goes back: east\n"
+    "; on a Nintendo pad and on the Switch, south on an Xbox or other pad; a\n"
+    "; PlayStation pad keeps Cross and Triangle. east = the right face button,\n"
+    "; south = the bottom one. The keyboard and the gameplay buttons stay as\n"
+    "; they are.\n";
 
 static const char ini_aspect[] =
     "\n"
@@ -357,7 +359,7 @@ void Wide_SaveIni(void) {
 // room_stitch = 0|1 (0), room_edge_fade = 0|1 (1), skip_cd_rooms = 0|1 (1),
 // show_loading_text = 0|1 (1).
 // aspect = auto|4:3|16:10|16:9|21:9|2.39:1|32:9 (auto),
-// menu_confirm = auto|right|bottom (auto).
+// menu_confirm = auto|east|south (auto; right, bottom: the 0.8.68 names).
 // A missing key keeps its default (cheats, editor, overlay and fps off).
 void Wide_LoadIni(const char* path) {
     int scale = 5, v, i; // docked 5, handheld 3 (ScaleRange)
@@ -379,6 +381,9 @@ void Wide_LoadIni(const char* path) {
                 g_Aspect = IniWord("aspect", word, g_AspectNames,
                                    WIDE_ASPECTS, 0);
             } else if (sscanf(line, " menu_confirm = %15s", word) == 1) {
+                if (!strcmp(word, "right") || !strcmp(word, "bottom")) {
+                    strcpy(word, word[0] == 'r' ? "east" : "south"); // 0.8.68
+                }
                 g_MenuConfirm = IniWord("menu_confirm", word,
                                         g_MenuConfirmNames, MENU_CONFIRMS,
                                         MENU_CONFIRM_AUTO);

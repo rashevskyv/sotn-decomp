@@ -1203,11 +1203,14 @@ void PortMenu_Touch(int n, const int* x, const int* y);
 void PortMenu_Wheel(int dir, int x, int y);
 int PortMenu_IsOpen(void);
 // menu_confirm (sotn.ini): the gamepad face button that confirms in the
-// menus, auto (right on a Nintendo pad and the Switch, else bottom), right
-// or bottom; the other one goes back. Gameplay keeps its buttons.
+// menus: auto (by the pad type: A confirms, B goes back), east (the right
+// one) or south (the bottom one); the other one goes back. Gameplay keeps
+// its buttons. PortMenu_ConfirmMode: EAST, SOUTH, or AUTO for the stock
+// buttons (a PlayStation pad under auto: Cross and Triangle).
 enum { MENU_CONFIRM_AUTO, MENU_CONFIRM_EAST, MENU_CONFIRM_SOUTH, MENU_CONFIRMS };
 extern int g_MenuConfirm;
 extern const char* const g_MenuConfirmNames[MENU_CONFIRMS];
+int PortMenu_ConfirmMode(void);
 int PortMenu_ConfirmEast(void);
 // A game menu (shop, save) reads its buttons through this: for a few frames
 // the gamepad gives the menu buttons. Returns bits.

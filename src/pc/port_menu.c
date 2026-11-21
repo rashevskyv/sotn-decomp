@@ -4,9 +4,10 @@
 // left and right change it, Cross activates it, Circle or Triangle goes
 // back; on MAIN back closes the menu. SDL-switch maps the face buttons by
 // position (SWITCH_JoystickGetGamepadMapping: south = B), as psyz reads them.
-// menu_confirm (MenuButtons) makes the right gamepad button (Switch A) Cross
-// and the bottom one (Switch B) Triangle in every menu of the game and here,
-// so A confirms and B goes back; the hints show those marks. The
+// menu_confirm (MenuButtons) makes the button labelled A Cross and the one
+// labelled B Triangle in every menu of the game and here (Switch: A right,
+// Xbox: A bottom), so A confirms and B goes back; the hints show those
+// marks. A PlayStation pad keeps Cross and Circle. The
 // game gets no pad input while the menu is open. Long pages scroll, with a
 // scroll bar; the mouse wheel over a box scrolls it. Changes
 // apply at once (a voice set at the next spoken line) and are saved in
@@ -37,12 +38,12 @@
 #include <time.h>
 #include <psyz/audio.h>
 #include <psyz/input.h>
+#include <psyz/video.h>
 #ifdef __SWITCH__
 #include <unistd.h>
 #include <SDL3/SDL.h>
 #else
 #include <psyz/overlay_sdl3.h>
-#include <psyz/video.h>
 #endif
 
 extern EnemyDef g_EnemyDefs[]; // src/dra/dra.h
@@ -189,15 +190,18 @@ static char hint_ok[2] = "\x03", hint_back[2] = "\x02"; // Cross, Circle
 
 // ---- menu_confirm -------------------------------------------------------------
 // The US menus confirm with Cross and go back with Triangle, the gamepad
-// gives Cross on the bottom button. With the right button to confirm, in a
-// menu the right button gives Cross and the bottom one Triangle; on the
-// title also Start (PRESS START takes Start only, its stage select Start or
-// Circle). A press keeps the meaning it had when it began until it is up, so
-// the press that closes a menu is no jump.
+// gives Cross on the bottom button and Circle on the right one. The button
+// labelled A confirms and B goes back: on a Nintendo pad (A right) in a menu
+// the right button gives Cross and the bottom one Triangle; on an Xbox or an
+// unknown pad (A bottom) the bottom one gives Cross and the right one
+// Triangle. The confirm button also gives Start on the title (PRESS START
+// takes Start only, its stage select Start or Circle). A PlayStation pad
+// keeps the stock buttons. A press keeps the meaning it had when it began
+// until it is up, so the press that closes a menu is no jump.
 // Gameplay, the keyboard and the other buttons stay as they are.
 int g_MenuConfirm;
-const char* const g_MenuConfirmNames[MENU_CONFIRMS] = {"auto", "right",
-                                                       "bottom"};
+const char* const g_MenuConfirmNames[MENU_CONFIRMS] = {"auto", "east",
+                                                       "south"};
 static int menu_pad; // frames a game menu still counts (PortMenu_MenuPad)
 
 u32 PortMenu_MenuPad(u32 bits) {
@@ -205,15 +209,26 @@ u32 PortMenu_MenuPad(u32 bits) {
     return bits;
 }
 
-int PortMenu_ConfirmEast(void) {
+int PortMenu_ConfirmMode(void) {
     if (g_MenuConfirm != MENU_CONFIRM_AUTO) {
-        return g_MenuConfirm == MENU_CONFIRM_EAST;
+        return g_MenuConfirm;
     }
 #ifdef __SWITCH__
-    return 1;
+    return MENU_CONFIRM_EAST;
 #else
-    return Psyz_PadsFamily() == PSYZ_PAD_FAMILY_NINTENDO;
+    switch (Psyz_PadsFamily()) {
+    case PSYZ_PAD_FAMILY_NINTENDO:
+        return MENU_CONFIRM_EAST;
+    case PSYZ_PAD_FAMILY_PLAYSTATION:
+        return MENU_CONFIRM_AUTO; // stock
+    default: // Xbox, unknown, none yet
+        return MENU_CONFIRM_SOUTH;
+    }
 #endif
+}
+
+int PortMenu_ConfirmEast(void) {
+    return PortMenu_ConfirmMode() == MENU_CONFIRM_EAST;
 }
 
 static int GamepadDown(SDL_GamepadButton b) {
@@ -227,36 +242,63 @@ static int GamepadDown(SDL_GamepadButton b) {
     return r;
 }
 
+// The left stick as the D-pad of the port menu (the map cursor, the lines):
+// psyz maps the stick to no PS button.
+static u16 StickDirs(void) {
+    int n = 0, i, x, y;
+    u16 r = 0;
+    SDL_JoystickID* ids = SDL_GetGamepads(&n);
+    for (i = 0; ids && i < n; i++) {
+        SDL_Gamepad* g = SDL_GetGamepadFromID(ids[i]);
+        x = g ? SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTX) : 0;
+        y = g ? SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTY) : 0;
+        r |= x < -16000 ? PAD_LEFT : x > 16000 ? PAD_RIGHT : 0;
+        r |= y < -16000 ? PAD_UP : y > 16000 ? PAD_DOWN : 0;
+    }
+    SDL_free(ids);
+    return r;
+}
+
 static u16 MenuButtons(u16 pressed, int open) {
     static const SDL_GamepadButton btn[2] = {SDL_GAMEPAD_BUTTON_EAST,
                                              SDL_GAMEPAD_BUTTON_SOUTH};
-    static int latch[2]; // 0 up, 1 held as it was, 2 held as a menu button
+    static int down[2];
+    static u16 as[2]; // the PS button a held one gives, 0: as mapped
     int menu = open || g_GameState == Game_Title ||
                g_GameState == Game_MainMenu ||
                (g_GameState == Game_Play && g_GameEngineStep == Engine_Menu) ||
                menu_pad > 0;
-    int east = PortMenu_ConfirmEast(), i, b;
-    u16 clear = 0, add = 0;
+    int mode = PortMenu_ConfirmMode(), i, b;
+    u16 clear = 0, add = 0, give[2] = {0, 0}; // right, bottom
+    if (mode == MENU_CONFIRM_EAST) {
+        give[0] = PAD_CROSS;
+        give[1] = PAD_TRIANGLE;
+    } else if (mode == MENU_CONFIRM_SOUTH) {
+        give[0] = PAD_TRIANGLE;
+        give[1] = PAD_CROSS;
+    }
     if (menu_pad > 0) {
         menu_pad--;
     }
     for (i = 0; i < 2; i++) {
         if (!GamepadDown(btn[i])) {
-            latch[i] = 0;
+            down[i] = 0;
             continue;
         }
-        if (!latch[i]) {
-            latch[i] = menu && east ? 2 : 1;
+        if (!down[i]) {
+            down[i] = 1;
+            as[i] = menu ? give[i] : 0;
             fprintf(stderr, "[pad] %s button: %s\n", i ? "bottom" : "right",
-                    latch[i] == 2 ? (i ? "back (triangle)" : "ok (cross)")
-                                  : "as mapped");
+                    as[i] == PAD_CROSS      ? "ok (cross)"
+                    : as[i] == PAD_TRIANGLE ? "back (triangle)"
+                                            : "as mapped");
         }
-        for (b = 0; latch[i] == 2 && b < PSYZ_PAD_BUTTONS; b++) {
+        for (b = 0; as[i] && b < PSYZ_PAD_BUTTONS; b++) {
             if (Psyz_PadsMap(PSYZ_INPUT_GAMEPAD, b, PSYZ_INPUT_QUERY) ==
                 (int)btn[i]) {
                 clear |= 1 << b;
-                add |= i ? PAD_TRIANGLE : PAD_CROSS;
-                if (!i && g_GameState == Game_Title && !open) {
+                add |= as[i];
+                if (as[i] == PAD_CROSS && g_GameState == Game_Title && !open) {
                     add |= PAD_START;
                 }
             }
@@ -343,9 +385,12 @@ static int FbH(void) { return g_CurrentBuffer->disp.disp.h; }
 
 // ---- map maths --------------------------------------------------------------
 
+// The visible frame columns: the stage with its wide margins, or the whole
+// canvas of a full-screen menu (pause menu), as Wide_ScreenToFrame maps them.
 static void ViewRect(int* x0, int* y0, int* x1, int* y1) {
-    *x0 = -g_WideX;
-    *x1 = DISP_STAGE_W + g_WideX;
+    PsyzRect g = Psyz_VideoGetDrawArea();
+    *x0 = g.ex > g.sx ? g.sx : -g_WideX;
+    *x1 = g.ex > g.sx ? g.ex : DISP_STAGE_W + g_WideX;
     *y0 = 20; // the stage clip rows (func_800E34DC), also in the wide view
     *y1 = 226;
 }
@@ -353,11 +398,22 @@ static void ViewRect(int* x0, int* y0, int* x1, int* y1) {
 static int CellX(int cx) { return (ox16 + cx * zoom16) >> 4; }
 static int CellY(int cy) { return (oy16 + cy * zoom16) >> 4; }
 
+// The cell under frame pixel p, of cells s/16 px from origin o16 (1/16 px):
+// the exact inverse of the drawing, cell c covers pixels (o16 + c s) >> 4 up
+// to the next cell's first one, also left of or above the origin.
+static int CellAt(int p, int o16, int s) {
+    int a = ((p + 1) << 4) - 1 - o16;
+    return a >= 0 ? a / s : -((s - 1 - a) / s);
+}
+
+// the top of the hint lines under the map (DrawMap sets it each frame)
+static int map_bottom = 226 - LINE_H;
+
 static void KeepCursorVisible(void) {
     int x0, y0, x1, y1, z = zoom16 >> 4;
     ViewRect(&x0, &y0, &x1, &y1);
     y0 += 2 * LINE_H; // the text lines on top
-    y1 -= LINE_H;     // the hint line at the bottom
+    y1 = map_bottom;  // the hint lines at the bottom
     if (CellX(cur_x) < x0) {
         ox16 += (x0 - CellX(cur_x)) << 4;
     }
@@ -380,9 +436,30 @@ static void Zoom(int nz, int fx, int fy) {
     zoom16 = nz;
 }
 
-static void CenterOnCursor(void) {
-    ox16 = (DISP_STAGE_W / 2 << 4) - cur_x * zoom16 - zoom16 / 2;
-    oy16 = (DISP_STAGE_H / 2 << 4) - cur_y * zoom16 - zoom16 / 2;
+// map_fit: the next DrawMap fits the castle's rooms into the map area (it
+// knows the hint lines) and keeps the cursor in it
+static int map_fit;
+static void FitCastle(int x0, int y0, int x1, int y1) {
+    int i, l = 63, t = 63, r = 0, b = 0;
+    for (i = 0; i < g_CastleRoomCount; i++) {
+        const struct CastleRoom* rm = &g_CastleRooms[i];
+        if ((rm->stage & 0x20) == castle) {
+            l = MIN(l, rm->left);
+            t = MIN(t, rm->top);
+            r = MAX(r, rm->right);
+            b = MAX(b, rm->bottom);
+        }
+    }
+    if (r < l) {
+        l = t = 0;
+        r = b = 63;
+    }
+    zoom16 = MIN(((x1 - x0 - 8) << 4) / (r - l + 1),
+                 ((y1 - y0 - 4) << 4) / (b - t + 1));
+    zoom16 = MAX(ZOOM_MIN, MIN(ZOOM_MAX, zoom16));
+    ox16 = ((x0 + x1) << 3) - (l + r + 1) * zoom16 / 2;
+    oy16 = ((y0 + y1) << 3) - (t + b + 1) * zoom16 / 2;
+    KeepCursorVisible();
 }
 
 static void FindOwners(int cx, int cy) {
@@ -425,7 +502,7 @@ static void SwitchCastle(void) {
     castle ^= 0x20;
     cur_x = 63 - cur_x;
     cur_y = 63 - cur_y;
-    CenterOnCursor();
+    map_fit = 1;
     fprintf(stderr, "[cheat] map: castle %s\n", castle ? "inverted" : "normal");
 }
 
@@ -435,7 +512,7 @@ static void OpenMap(void) {
         castle = g_StageId & 0x20;
         cur_x = D_8009791C.x & 63;
         cur_y = D_8009791C.y & 63;
-        CenterOnCursor();
+        map_fit = 1;
         map_ready = 1;
     }
     if (g_CastleRoomCount == 0) {
@@ -555,11 +632,12 @@ static void MiniZoom(int dir, int x, int y) {
 static int MiniPick(int x, int y) {
     int k;
     mark_cx = mark_cy = -1;
-    if (!InMini(x, y) || (x << 4) < mini_ox || (y << 4) < mini_oy) {
+    if (!InMini(x, y) || CellAt(x, mini_ox, mini_s) < 0 ||
+        CellAt(y, mini_oy, mini_s) < 0) {
         return 0;
     }
-    mark_cx = ((x << 4) - mini_ox) / mini_s;
-    mark_cy = ((y << 4) - mini_oy) / mini_s;
+    mark_cx = CellAt(x, mini_ox, mini_s);
+    mark_cy = CellAt(y, mini_oy, mini_s);
     mark_c = mini_castle;
     k = ItemAt(mark_cx, mark_cy, mark_c);
     if (k >= 0) {
@@ -692,22 +770,29 @@ static void Scroll(int dir) {
             dir > 0 ? "up" : "down", page, *top, n, sel);
 }
 
+// The map cell under frame point (x, y): 1 on the rooms area (between the
+// text lines on top and the hints at the bottom), 0 elsewhere
+static int MapCellAt(int x, int y, int* cx, int* cy) {
+    int x0, y0, x1, y1;
+    ViewRect(&x0, &y0, &x1, &y1);
+    *cx = CellAt(x, ox16, zoom16);
+    *cy = CellAt(y, oy16, zoom16);
+    return x >= x0 && x < x1 && y >= y0 + 2 * LINE_H && y < map_bottom &&
+           *cx >= 0 && *cx < 64 && *cy >= 0 && *cy < 64;
+}
+
 static void Tap(int x, int y) {
-    int x0, y0, x1, y1, i;
+    int x0, y0, x1, y1, i, cx, cy;
     if (page == PAGE_MAP) {
         ViewRect(&x0, &y0, &x1, &y1);
-        if (y < y0 + 2 * LINE_H || y >= y1 - LINE_H) {
-            SwitchCastle(); // a tap on the title line or the hint line
-            return;
-        }
-        x = ((x << 4) - ox16) / zoom16;
-        y = ((y << 4) - oy16) / zoom16;
-        if (x >= 0 && x < 64 && y >= 0 && y < 64) {
-            cur_x = x;
-            cur_y = y;
-            FindOwners(x, y);
-            fprintf(stderr, "[menu] map click: cell %d,%d, %d rooms\n", x, y,
-                    n_owners);
+        if (x >= x0 && x < x1 && y >= y0 && y < y0 + LINE_H) {
+            SwitchCastle(); // a tap on the title line: "< NORMAL >"
+        } else if (MapCellAt(x, y, &cx, &cy)) {
+            cur_x = cx;
+            cur_y = cy;
+            FindOwners(cx, cy);
+            fprintf(stderr, "[menu] map click %d,%d: cell %d,%d, %d rooms\n",
+                    x, y, cx, cy, n_owners);
             Teleport();
         }
         return;
@@ -827,23 +912,41 @@ static PsyzOverlayEventCB_SDL3 prev_cb;
 static int mouse_down, mouse_x, mouse_y;
 static int mouse_seen = 1; // 0: a press not seen by a frame yet (fast click)
 
-// SOTN_TEST_PAD=1 (tests): an SDL virtual Switch Pro pad; keypad 6, 2, 8, 4
-// hold its right, bottom, top, left face button, keypad 5 its Start.
+// SOTN_TEST_PAD=switch|xbox|ps|other (tests; any other value: switch): an
+// SDL virtual pad of that type (vendor and product ids). Keypad 6, 2, 8, 4
+// hold its right, bottom, top, left face button, keypad 5 its Start; keypad
+// 1, 3, 7, 9 push its left stick left, right, up, down.
 static SDL_Joystick* test_pad;
 static void TestPadInit(void) {
+    static const struct {
+        const char* name;
+        u16 vendor, product;
+    } types[] = {{"switch", 0x057E, 0x2009}, // Switch Pro Controller
+                 {"xbox", 0x045E, 0x028E},   // Xbox 360 Controller
+                 {"ps", 0x054C, 0x09CC},     // DualShock 4
+                 {"other", 0x1209, 0x0001}}; // a vendor SDL does not know
     SDL_VirtualJoystickDesc d;
-    if (!getenv("SOTN_TEST_PAD")) {
+    const char* want = getenv("SOTN_TEST_PAD");
+    int t = 0;
+    if (!want) {
         return;
     }
+    while (t < LEN(types) - 1 && strcmp(want, types[t].name)) {
+        t++;
+    }
+    t = strcmp(want, types[t].name) ? 0 : t;
     SDL_INIT_INTERFACE(&d);
     d.type = SDL_JOYSTICK_TYPE_GAMEPAD;
-    d.vendor_id = 0x057E; // Nintendo, Switch Pro Controller
-    d.product_id = 0x2009;
+    d.vendor_id = types[t].vendor;
+    d.product_id = types[t].product;
     d.naxes = SDL_GAMEPAD_AXIS_COUNT;
     d.nbuttons = SDL_GAMEPAD_BUTTON_COUNT;
+    d.button_mask = (1u << SDL_GAMEPAD_BUTTON_COUNT) - 1;
+    d.axis_mask = (1u << SDL_GAMEPAD_AXIS_COUNT) - 1;
     d.name = "sotn test pad";
     test_pad = SDL_OpenJoystick(SDL_AttachVirtualJoystick(&d));
-    fprintf(stderr, "[pad] test pad %s\n", test_pad ? "on" : SDL_GetError());
+    fprintf(stderr, "[pad] test pad %s: %s\n", types[t].name,
+            test_pad ? "on" : SDL_GetError());
 }
 static void TestPadKey(const SDL_Event* e) {
     static const struct {
@@ -854,15 +957,32 @@ static void TestPadKey(const SDL_Event* e) {
                 {SDL_SCANCODE_KP_8, SDL_GAMEPAD_BUTTON_NORTH},
                 {SDL_SCANCODE_KP_4, SDL_GAMEPAD_BUTTON_WEST},
                 {SDL_SCANCODE_KP_5, SDL_GAMEPAD_BUTTON_START}};
-    int i;
+    static const struct {
+        SDL_Scancode key;
+        u8 axis;
+        s16 value;
+    } sticks[] = {{SDL_SCANCODE_KP_1, SDL_GAMEPAD_AXIS_LEFTX, -32767},
+                  {SDL_SCANCODE_KP_3, SDL_GAMEPAD_AXIS_LEFTX, 32767},
+                  {SDL_SCANCODE_KP_7, SDL_GAMEPAD_AXIS_LEFTY, -32767},
+                  {SDL_SCANCODE_KP_9, SDL_GAMEPAD_AXIS_LEFTY, 32767}};
+    int i, down = e->type == SDL_EVENT_KEY_DOWN;
     if (!test_pad ||
         (e->type != SDL_EVENT_KEY_DOWN && e->type != SDL_EVENT_KEY_UP)) {
         return;
     }
     for (i = 0; i < LEN(keys); i++) {
         if (e->key.scancode == keys[i].key) {
-            SDL_SetJoystickVirtualButton(test_pad, keys[i].button,
-                                         e->type == SDL_EVENT_KEY_DOWN);
+            SDL_SetJoystickVirtualButton(test_pad, keys[i].button, down);
+            if (down && !e->key.repeat) {
+                fprintf(stderr, "[pad] test pad button %d: down\n",
+                        keys[i].button);
+            }
+        }
+    }
+    for (i = 0; i < LEN(sticks); i++) {
+        if (e->key.scancode == sticks[i].key) {
+            SDL_SetJoystickVirtualAxis(
+                test_pad, sticks[i].axis, down ? sticks[i].value : 0);
         }
     }
 }
@@ -978,8 +1098,11 @@ static void Change(int dir) {
         Wide_SetAspect(g_Aspect + dir); // at the next vsync
     } else if (sel == ITEM_CONFIRM) {
         g_MenuConfirm = (g_MenuConfirm + dir + MENU_CONFIRMS) % MENU_CONFIRMS;
-        fprintf(stderr, "[pad] menu: menu_confirm %s (right confirms %d)\n",
-                g_MenuConfirmNames[g_MenuConfirm], PortMenu_ConfirmEast());
+        fprintf(stderr, "[pad] menu: menu_confirm %s (now %s)\n",
+                g_MenuConfirmNames[g_MenuConfirm],
+                PortMenu_ConfirmMode() == MENU_CONFIRM_AUTO
+                    ? "stock"
+                    : g_MenuConfirmNames[PortMenu_ConfirmMode()]);
         Wide_SaveIni();
     } else if (sel == ITEM_CDROOMS || sel == ITEM_LOADING) {
         flag = sel == ITEM_CDROOMS ? &g_SkipCdRooms : &g_ShowLoadingText;
@@ -1027,7 +1150,8 @@ static void Activate(void) {
         }
     } else if (page == PAGE_CHEATS) {
         if (sel == CH_TELEPORT) {
-            OpenList(0);
+            map_ready = 0; // the map, on the player's room
+            OpenMap();
         } else if (sel == CH_APPLY) {
             const char* why = Cheat_ApplyCharacter();
             if (why) {
@@ -1129,6 +1253,7 @@ static void MapPad(u16 pressed, u16 tap) {
         cur_x = (cur_x + dx) & 63;
         cur_y = (cur_y + dy) & 63;
         KeepCursorVisible();
+        fprintf(stderr, "[menu] map cursor %d,%d\n", cur_x, cur_y);
     }
     if (tap & (PAD_L1 | PAD_L2)) {
         Zoom(zoom16 * 2 / 3, CellX(cur_x), CellY(cur_y));
@@ -1152,6 +1277,9 @@ u16 PortMenu_Pad(u16 pressed) {
     u16 tap;
     int count;
     pressed = MenuButtons(pressed, is_open);
+    if (is_open) {
+        pressed |= StickDirs();
+    }
     tap = pressed & ~prev;
 #ifndef __SWITCH__
     static int hooked;
@@ -1168,9 +1296,23 @@ u16 PortMenu_Pad(u16 pressed) {
         // the mouse over a line or the mini map selects; only when it
         // moves, so a resting pointer does not fight the D-pad
         static int hover_x, hover_y;
+        int cx, cy;
         if (is_open && page == PAGE_LIST &&
             (mouse_x != hover_x || mouse_y != hover_y)) {
             Hover(mouse_x, mouse_y);
+        }
+        // on the map the cursor follows the pointer (not in a drag)
+        if (is_open && page == PAGE_MAP && !mouse_down &&
+            (mouse_x != hover_x || mouse_y != hover_y) &&
+            MapCellAt(mouse_x, mouse_y, &cx, &cy) &&
+            (cx != cur_x || cy != cur_y)) {
+            cur_x = cx;
+            cur_y = cy;
+            FindOwners(cx, cy);
+            fprintf(stderr, "[menu] map pointer %d,%d: cell %d,%d %s room %d\n",
+                    mouse_x, mouse_y, cx, cy,
+                    n_owners ? Castle_StageName(owners[0]->stage) : "-",
+                    n_owners ? owners[0]->room : -1);
         }
         hover_x = mouse_x;
         hover_y = mouse_y;
@@ -1469,6 +1611,12 @@ enum {
     P_EDGEFADE, // ROOM EDGE FADE
     P_CONFIRM,  // MENU OK (menu_confirm)
     P_ASPECT,   // ASPECT
+    P_LIST,     // the map hints: LIST, the mouse ones, MOVE (the D-pad)
+    P_CLICK,
+    P_WHEEL,
+    P_DRAG,
+    P_PAN,
+    P_MOVE,
 };
 #define LINE_MAX 64
 #define MARK_ESC 0xFE
@@ -2360,10 +2508,60 @@ static void ClipRect(int x, int y, int w, int h, int vx0, int vy0, int vx1,
 static const char* mark_names[] = {"BOSS", "SAVE", "WARP"};
 static const u8 mark_rgb[][3] = {{255, 64, 255}, {230, 40, 40}, {255, 220, 0}};
 
+// The hints under the map, over a band that hides the rooms: the pad
+// buttons, then (PC) the mouse, packed into lines as wide as the view.
+// Sets map_bottom, the top of the band.
+static void DrawMapHints(int x0, int x1, int y1) {
+    char seg[8][LINE_MAX], lines[6][LINE_MAX];
+    int n = 0, n_pad, i, k = 0, wmax = x1 - x0 - 8, mouse = LEN(lines);
+    const char* gap = uk ? " " : ": ";
+    for (i = 0; i < LEN(seg); i++) {
+        Clear(seg[i]);
+    }
+    Add(seg[n], HINT_OK), Add(seg[n], " "), AddW(seg[n++], P_GO, "GO");
+    Add(seg[n], HINT_BACK), Add(seg[n], " "), AddW(seg[n++], P_LIST, "LIST");
+    Add(seg[n], "\x0B "), AddW(seg[n++], P_MOVE, "MOVE"); // the D-pad
+    Add(seg[n], "\x06/\x07 "), AddW(seg[n++], P_SCALE, "ZOOM"); // L1/R1
+    Add(seg[n], HINT_CASTLE), Add(seg[n], gap);
+    AddW(seg[n++], castle ? P_NORMAL : P_INVERTED,
+         castle ? "NORMAL" : "INVERTED");
+    n_pad = n;
+#ifndef __SWITCH__
+    AddW(seg[n], P_CLICK, "CLICK"), Add(seg[n], ": "), AddW(seg[n++], P_GO, "GO");
+    AddW(seg[n], P_WHEEL, "WHEEL"), Add(seg[n], ": ");
+    AddW(seg[n++], P_SCALE, "ZOOM");
+    AddW(seg[n], P_DRAG, "DRAG"), Add(seg[n], ": "), AddW(seg[n++], P_PAN, "PAN");
+#endif
+    // a line takes segments while they fit; the mouse starts a new line,
+    // light blue
+    Clear(lines[0]);
+    for (i = 0; i < n; i++) {
+        if (Len(lines[k]) && k + 1 < LEN(lines) &&
+            (i == n_pad ||
+             Width(lines[k]) + 2 * SERIF_W + Width(seg[i]) > wmax)) {
+            Clear(lines[++k]);
+        }
+        if (i == n_pad) {
+            mouse = k;
+        }
+        if (Len(lines[k])) {
+            Add(lines[k], "  ");
+        }
+        AddCells(lines[k], uk ? seg[i] : NULL, seg[i]);
+    }
+    map_bottom = y1 - (k + 1) * LINE_H;
+    for (i = 0; i <= k; i++) {
+        Line(x0 + 4, map_bottom + i * LINE_H + 3, lines[i],
+             i >= mouse ? 128 : 255, i >= mouse ? 200 : 255,
+             i >= mouse ? 255 : 64);
+    }
+    Rect(x0, map_bottom, x1 - x0, y1 - map_bottom, 8, 8, 24);
+}
+
 static void DrawMap(void) {
     const struct CastleRoom* rm;
     char line[LINE_MAX], legend[3][LINE_MAX], tmp[24];
-    int i, x0, y0, x1, y1, x, y, w, h, gap, my0;
+    int i, j, x0, y0, x1, y1, x, y, w, h, gap, my0;
     u8 r, g, b;
 
     ViewRect(&x0, &y0, &x1, &y1);
@@ -2393,32 +2591,37 @@ static void DrawMap(void) {
         Add(line, "-");
     }
     Line(x0 + 4, y0 + 3, line, 255, 255, 255);
-    // the hint line at the bottom, over a band that hides the rooms
+    DrawMapHints(x0, x1, y1);
+    if (map_fit) {
+        map_fit = 0;
+        FitCastle(x0, my0, x1, map_bottom);
+    }
+    // line 2: a message, else the place or the boss of the room under the
+    // cursor, and the legend right aligned where it fits
     Clear(line);
-    Add(line, HINT_OK);
-    Add(line, " ");
-    AddW(line, P_GO, "GO");
-    Add(line, "  ");
-    Add(line, HINT_BACK);
-    Add(line, " ");
-    AddW(line, P_BACK, "BACK");
-    Add(line, uk ? "  " HINT_CASTLE " " : "  " HINT_CASTLE ": ");
-    AddW(line, castle ? P_NORMAL : P_INVERTED, castle ? "NORMAL" : "INVERTED");
-    Line(x0 + 4, y1 - LINE_H + 3, line, 255, 255, 64);
-    Rect(x0, y1 - LINE_H, x1 - x0, LINE_H, 8, 8, 24);
     if (msg_timer > 0) {
         msg_timer--;
-        Clear(line);
         Add(line, msg);
         Line(x0 + 4, y0 + 3 + LINE_H, line, 255, 120, 80);
-    } else { // the legend: each word in its marker colour, right aligned
+    } else if (n_owners) {
+        i = BossAt(cur_x, cur_y, castle);
+        if (i >= 0) {
+            AddNames(line, &g_CheatBosses[i]);
+        } else if (*Castle_ZoneName(owners[0]->stage)) {
+            AddZone(line, owners[0]->stage);
+        } else {
+            Add(line, Castle_StageName(owners[0]->stage));
+        }
+        Line(x0 + 4, y0 + 3 + LINE_H, line, 255, 240, 150);
+    }
+    if (msg_timer <= 0) { // the legend: each word in its marker colour
         for (w = 0, i = 0; i < 3; i++) {
             Clear(legend[i]);
             AddW(legend[i], P_BOSS + i, mark_names[i]);
             w += Width(legend[i]) + (i ? (uk ? SERIF_W : CELL_W) : 0);
         }
         x = x1 - 4 - w;
-        for (i = 0; i < 3; i++) {
+        for (i = 0; i < 3 && x >= x0 + 4 + Width(line) + 2 * SERIF_W; i++) {
             Line(x, y0 + 3 + LINE_H, legend[i], mark_rgb[i][0], mark_rgb[i][1],
                  mark_rgb[i][2]);
             x += Width(legend[i]) + (uk ? SERIF_W : CELL_W);
@@ -2429,10 +2632,10 @@ static void DrawMap(void) {
     y = CellY(cur_y) - 1;
     w = CellX(cur_x + 1) - CellX(cur_x) + 2;
     if (frame & 16) {
-        ClipRect(x, y, w, 1, x0, my0, x1, y1, 255, 255, 0);
-        ClipRect(x, y + w - 1, w, 1, x0, my0, x1, y1, 255, 255, 0);
-        ClipRect(x, y, 1, w, x0, my0, x1, y1, 255, 255, 0);
-        ClipRect(x + w - 1, y, 1, w, x0, my0, x1, y1, 255, 255, 0);
+        ClipRect(x, y, w, 1, x0, my0, x1, map_bottom, 255, 255, 0);
+        ClipRect(x, y + w - 1, w, 1, x0, my0, x1, map_bottom, 255, 255, 0);
+        ClipRect(x, y, 1, w, x0, my0, x1, map_bottom, 255, 255, 0);
+        ClipRect(x + w - 1, y, 1, w, x0, my0, x1, map_bottom, 255, 255, 0);
     }
     // markers over the rooms: a square in the middle of each marked area
     for (i = 0; i < g_CastleMarkCount; i++) {
@@ -2444,7 +2647,7 @@ static void DrawMap(void) {
         w = w < 3 ? 3 : w;
         x = (CellX(mk->left) + CellX(mk->right + 1) - w) / 2;
         y = (CellY(mk->top) + CellY(mk->bottom + 1) - w) / 2;
-        ClipRect(x, y, w, w, x0, my0, x1, y1, mark_rgb[mk->kind][0],
+        ClipRect(x, y, w, w, x0, my0, x1, map_bottom, mark_rgb[mk->kind][0],
                  mark_rgb[mk->kind][1], mark_rgb[mk->kind][2]);
     }
     // rooms; the room of the player is white
@@ -2460,14 +2663,20 @@ static void DrawMap(void) {
         if (x >= x1 || y >= y1 || x + w <= x0 || y + h <= my0) {
             continue;
         }
+        for (j = 0; j < n_owners && owners[j] != rm; j++) {
+        }
         if (rm->stage == g_StageId && D_8009791C.x >= rm->left &&
             D_8009791C.x <= rm->right && D_8009791C.y >= rm->top &&
             D_8009791C.y <= rm->bottom) {
             r = g = b = 255;
+        } else if (j < n_owners) { // a room under the cursor: light yellow
+            r = 255;
+            g = 240;
+            b = 150;
         } else {
             StageColor(rm->stage, &r, &g, &b);
         }
-        ClipRect(x, y, w, h, x0, my0, x1, y1, r, g, b);
+        ClipRect(x, y, w, h, x0, my0, x1, map_bottom, r, g, b);
     }
     // the background last
     Rect(x0, y0, x1 - x0, y1 - y0, 8, 8, 24);

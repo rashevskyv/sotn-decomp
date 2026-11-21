@@ -296,18 +296,78 @@ static const u16 sel_marks[2][256] = {
     },
 };
 
-// menu_confirm right (PortMenu_ConfirmEast): the Decide tip (Cross, the
-// cell at v 0xE0) shows the right button and the Cancel tip (Triangle, v
-// 0xD0) the bottom one. The right button of one set is the bottom one of the
-// other (Switch A = Xbox A, Xbox B = Switch B): the cells come from there.
-// The PSX set keeps its marks.
-static u16 east_marks[2][256];
+// The Decide tip (Cross, the cell at v 0xE0) and the Cancel tip (Triangle, v
+// 0xD0) show the buttons that confirm and go back (PortMenu_ConfirmMode):
+// A and B of the set (Switch A right, Xbox A bottom), or under the stock
+// buttons the bottom one and Triangle's. The Switch marks are plain, Xbox A
+// green, B red, Y yellow (the SEL CLUT 0x200: ink B yellow, F red; 0x202:
+// ink B green). The PSX set keeps its marks.
+enum { ART_SW_X, ART_SW_B, ART_SW_A, ART_XB_Y, ART_XB_A, ART_XB_B, ARTS };
+static u16 tip[ARTS][64];
+static const u16 tip_clut[ARTS] = {0x200, 0x200, 0x200, 0x200, 0x202, 0x200};
+// the arts of the right, bottom and top button of a set
+static const u8 set_tip[2][3] = {{ART_SW_A, ART_SW_B, ART_SW_X},
+                                 {ART_XB_B, ART_XB_A, ART_XB_Y}};
+static u16 variant[2][MENU_CONFIRMS][256]; // set, mode: the 4 cells
+
+static int Ink(const u16* c, int x, int y) {
+    return c[y * 4 + x / 4] >> (x & 3) * 4 & 15;
+}
+static void SetInk(u16* c, int x, int y, int ink) {
+    c[y * 4 + x / 4] &= ~(15 << (x & 3) * 4);
+    c[y * 4 + x / 4] |= ink << (x & 3) * 4;
+}
+
+static void BuildArts(void) {
+    const char* g = Find(big, LEN(big), 'B');
+    int a, s, m, x, y, k;
+    memcpy(tip[ART_SW_X], sel_marks[0] + 64, 128);
+    memcpy(tip[ART_SW_B], sel_marks[0] + 128, 128);
+    memcpy(tip[ART_XB_Y], sel_marks[1] + 64, 128);
+    memcpy(tip[ART_XB_A], sel_marks[1] + 128, 128);
+    // Switch A: the Xbox A in the Switch letter ink (5); Xbox B: the Xbox
+    // disc without the A, a 5x7 B in red (F)
+    memcpy(tip[ART_SW_A], tip[ART_XB_A], 128);
+    memcpy(tip[ART_XB_B], tip[ART_XB_A], 128);
+    for (y = 5; y < 13; y++) {
+        for (x = 5; x < 11; x++) {
+            if (Ink(tip[ART_XB_A], x, y) == 11) {
+                SetInk(tip[ART_SW_A], x, y, 5);
+            }
+            if (Ink(tip[ART_XB_A], x, y) == 11 ||
+                (Ink(tip[ART_XB_A], x, y) == 2 && y < 12)) {
+                SetInk(tip[ART_XB_B], x, y, 3);
+            }
+        }
+    }
+    for (y = 0; y < 7; y++) {
+        for (x = 0; x < 5; x++) {
+            if (g[y * 5 + x] == '#') {
+                SetInk(tip[ART_XB_B], 6 + x, 5 + y, 15);
+            }
+        }
+    }
+    for (s = 0; s < 2; s++) {
+        for (m = 0; m < MENU_CONFIRMS; m++) {
+            k = m == MENU_CONFIRM_EAST ? 1 : m == MENU_CONFIRM_SOUTH ? 0 : 2;
+            a = set_tip[s][k]; // the Cancel tip
+            memcpy(variant[s][m], sel_marks[s], 512);
+            memcpy(variant[s][m] + 64, tip[a], 128);
+            a = set_tip[s][m == MENU_CONFIRM_EAST ? 0 : 1]; // the Decide tip
+            memcpy(variant[s][m] + 128, tip[a], 128);
+        }
+    }
+}
 
 static int OurMarks(const u16* now) {
-    int s;
+    int s, m;
     for (s = 0; s < 2; s++) {
-        if (!memcmp(now, sel_marks[s], sizeof(sel_marks[s])) ||
-            !memcmp(now, east_marks[s], sizeof(east_marks[s]))) {
+        for (m = 0; m < MENU_CONFIRMS; m++) {
+            if (!memcmp(now, variant[s][m], sizeof(variant[s][m]))) {
+                return 1;
+            }
+        }
+        if (!memcmp(now, sel_marks[s], sizeof(sel_marks[s]))) {
             return 1;
         }
     }
@@ -318,23 +378,25 @@ void Buttons_SelPrims(Primitive* p) {
     static const u8 v_psx[] = {0x50, 0x70, 0x60, 0x80};
     static const u8 v_pad[] = {0xC0, 0xE0, 0xD0, 0xF0};
     static const u16 clut_psx[] = {0x200, 0x200, 0x202, 0x200};
-    static const u16 clut_xbox[2][4] = {{0x200, 0x202, 0x200, 0x200},
-                                        {0x200, 0x200, 0x202, 0x200}};
     static u16 saved[256], now[256];
     static int have_saved, built;
     RECT r = {960, 448, 4, 64};
-    int set = g_ButtonSet, east = PortMenu_ConfirmEast(), i, u, v, s;
-    const u16* want;
+    int set = g_ButtonSet, mode = PortMenu_ConfirmMode(), i, u, v;
+    u16 clut[4] = {0x200, 0x200, 0x200, 0x200};
+    const u16* want = NULL;
     _Static_assert(BUTTONS_SWITCH == 0 && BUTTONS_XBOX == 1, "sel_marks");
 
-    // a cell is 16 rows of 4 halfwords: cell k at 64 k
-    for (s = 0; !built && s < 2; s++) {
-        memcpy(east_marks[s], sel_marks[s], sizeof(east_marks[s]));
-        memcpy(east_marks[s] + 64, sel_marks[s] + 128, 128);
-        memcpy(east_marks[s] + 128, sel_marks[!s] + 128, 128);
+    if (!built) {
+        BuildArts();
+        built = 1;
     }
-    built = 1;
-    want = set == BUTTONS_PSX ? NULL : east ? east_marks[set] : sel_marks[set];
+    if (set != BUTTONS_PSX) {
+        want = variant[set][mode];
+        clut[1] = tip_clut[set_tip[set][mode == MENU_CONFIRM_EAST ? 0 : 1]];
+        clut[2] = tip_clut[set_tip[set][mode == MENU_CONFIRM_EAST   ? 1
+                                        : mode == MENU_CONFIRM_SOUTH ? 0
+                                                                     : 2]];
+    }
     // the VRAM is read each frame: a stage that came between may have
     // written there, so a flag alone could keep a stale picture
     StoreImage(&r, (u_long*)now);
@@ -356,9 +418,7 @@ void Buttons_SelPrims(Primitive* p) {
         u = set == BUTTONS_PSX ? 0xA0 : 0;
         v = set == BUTTONS_PSX ? v_psx[i] : v_pad[i];
         p->tpage = set == BUTTONS_PSX ? 0xC : 0x1F;
-        p->clut = set == BUTTONS_PSX  ? clut_psx[i]
-                  : set == BUTTONS_XBOX ? clut_xbox[east][i]
-                                        : 0x200;
+        p->clut = set == BUTTONS_PSX ? clut_psx[i] : clut[i];
         p->u0 = p->u2 = u;
         p->u1 = p->u3 = u + 16;
         p->v0 = p->v1 = v;
