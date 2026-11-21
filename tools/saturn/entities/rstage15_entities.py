@@ -34,6 +34,9 @@ RGARDEN = dict(
         # Saturn draws the body (frames 1-18) at the entity + (0, 32)
         (10, [("guardian", 0x060F2E08, 0x060F33B4, f, 32 if f <= 18 else 0)
               for f in range(1, 27)]),
+        # Saturn 0x27, the Efreet's puffs: the common bank 0x06046BF8 with the
+        # frame table 0x060467E0; the Saturn adds 0x10 to the clut (palette 1)
+        (11, [("efreet", 0x06046BF8, 0x060467E0, f, 0, 1) for f in range(1, 14)]),
     ],
     # Saturn 0x11 (func_060DC434): 6 records of 28 bytes
     DECORATIONS=(0x060EE478, 6),

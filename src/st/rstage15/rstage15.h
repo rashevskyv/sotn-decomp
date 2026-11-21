@@ -96,6 +96,7 @@ typedef enum EntityID {
 #define MOD_BITTERFLY_ANIMSET ANIMSET_OVL(8)
 #define MOD_KNIGHT_ANIMSET ANIMSET_OVL(9)
 #define MOD_GUARDIAN_ANIMSET ANIMSET_OVL(10)
+#define MOD_EFREET_PUFF_ANIMSET ANIMSET_OVL(11)
 // the palette blocks (generated in the build folder by gdn_entities.py)
 #include "gdn_defs.h"
 

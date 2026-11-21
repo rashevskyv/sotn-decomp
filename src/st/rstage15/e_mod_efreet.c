@@ -895,14 +895,15 @@ void EntityModEfreet26(Entity* self) {
 }
 
 // Projectile (Saturn 0x27, funcs 060E7C3C and 060E7D60). Sprite bank
-// 0x06046BF8 (a common bank, not the Efreet bank); the frames 0x01..0x0D
-// with a 3-frame duration. The Efreet bank copy is used as a stand-in.
+// 0x06046BF8 (a common bank, not the Efreet bank; MOD_EFREET_PUFF_ANIMSET);
+// the frames 0x01..0x0D with a 3-frame duration.
 void EntityModEfreet27(Entity* self) {
     EfreetExt* ext = EFREET_EXT(self);
     s8 v;
 
     if (self->step == 0) {
         InitializeEntity(g_EInitModEfreetPart); // TekiInit 0x2C
+        self->animSet = MOD_EFREET_PUFF_ANIMSET;
         self->step = 1;
         // Saturn flags |= 0x2000 (not ported)
         self->pose = 0;
@@ -914,7 +915,8 @@ void EntityModEfreet27(Entity* self) {
             *(s32*)&self->ext * -0x1000 + 0x30000 + (Random() & 0x3FFF);
         self->velocityX =
             self->facingLeft == 0 ? -SAT_X(0x40000) : SAT_X(0x40000);
-        // Saturn sprite clut += 0x10 here: palette change, not ported
+        // Saturn sprite clut += 0x10: palette 1 of the bank, set in the
+        // conversion (rstage15_entities.py)
         ext->scale = 0x10;
         self->hitboxWidth = 0;
         self->hitboxHeight = 0;
