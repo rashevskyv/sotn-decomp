@@ -529,6 +529,14 @@ void RenderTilemap(void) {
     TilemapRenderer* r = &_r;
 
     if (g_PcStageLayerRenderer != NULL && g_PcStageLayerRenderer()) {
+        // a Saturn stage draws its own layers: the same room edge cover
+        // and vignette over them (no ApronPass, so no next room cells)
+        r->ot = g_CurrentBuffer->ot;
+        r->dr = &g_CurrentBuffer->drawModes[g_GpuUsage.drawModes];
+        r->x = g_cameraOffsetX;
+        r->y = g_cameraOffsetY;
+        s_NextCells[0] = s_NextCells[1] = 0;
+        WideVignette(r);
         return;
     }
 #else
