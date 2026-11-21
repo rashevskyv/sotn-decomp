@@ -258,6 +258,7 @@ set(SOURCE_FILES_PC
     src/pc/music.c
     src/pc/lang.c
     src/pc/cheats.c
+    src/pc/saturn_items.c
     src/pc/apron.c
     src/pc/editor_net.c
 )
@@ -2954,6 +2955,27 @@ if(EXISTS "${PSP_DRA_BIN}")
         COMPILE_DEFINITIONS SOTN_PSP_FAMILIAR_NAMES
         OBJECT_DEPENDS "${PSP_NAMES_H}")
 endif()
+
+# The Saturn's own hand items (include/items.h ITEM_ASTRAL_DAGGER..): their
+# numbers from the Saturn GAME.PRG. Without the disc the PS1 stand-in rows
+# are used. Konami's data: build dir only.
+set(_satitems_disc "${CMAKE_SOURCE_DIR}/disks/saturn")
+set(_satitems_h "${SOTN_GEN_DIR}/saturn_items/saturn_items.h")
+set(_satitems_deps tools/saturn/saturn_items.py assets/dra/us/equipment.yaml)
+if(EXISTS "${_satitems_disc}/GAME.PRG")
+    list(APPEND _satitems_deps "${_satitems_disc}/GAME.PRG")
+endif()
+add_custom_command(
+    OUTPUT "${_satitems_h}"
+    COMMAND "${SOTN_PYTHON3}" tools/saturn/saturn_items.py
+        "${_satitems_disc}" assets/dra/us/equipment.yaml "${_satitems_h}"
+    DEPENDS ${_satitems_deps}
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    VERBATIM
+    COMMENT "Saturn hand items from GAME.PRG")
+set_source_files_properties(src/dra/config_us.c PROPERTIES
+    INCLUDE_DIRECTORIES "${SOTN_GEN_DIR}/saturn_items"
+    OBJECT_DEPENDS "${_satitems_h}")
 
 # PC copies of overlay data that is still raw asm on PSX (tools/pcdata, from
 # sotn-vita). They hold disc bytes, so they are generated from disks/us into
