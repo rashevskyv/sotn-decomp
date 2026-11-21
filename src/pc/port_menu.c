@@ -2770,10 +2770,17 @@ static void DrawOverlay(void) {
         }
     }
     if (g_FpsOn) {
+        int hd_draws, hd_uploads;
         sprintf(lines[n], "FPS %d", fps);
         col[n][0] = col[n][2] = 128;
         col[n][1] = 255;
         n++;
+        if (Psyz_HdTexGetStats(&hd_draws, &hd_uploads) && n < 4) {
+            sprintf(lines[n], "HD %d UP %d", hd_draws, hd_uploads);
+            col[n][0] = col[n][2] = 128;
+            col[n][1] = 255;
+            n++;
+        }
     }
     if (!n) {
         return;

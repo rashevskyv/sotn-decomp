@@ -226,6 +226,7 @@ static const char ini_editor[] =
 
 int g_HdTextures = 1; // data/textures PNG files replace pictures
 int g_HdDump;         // write the sampled pictures to data/textures/dump
+int g_HdStats;        // "[hd] stats" log lines, HD counts under the FPS
 int g_MusicFiles = 1; // music/<ID>.mp3 or .flac replaces the XA track
 
 static const char ini_hd[] =
@@ -234,6 +235,8 @@ static const char ini_hd[] =
     "; data/textures/common/ replace pictures; 0 = the original pictures.\n"
     "; hd_dump: 1 = write every picture the game draws to data/textures/dump/\n"
     "; (for artists; slow; stock art: do not share the files).\n"
+    "; hd_stats: 1 = every 2 seconds the log gets the frame times and HD\n"
+    "; counts; with fps = 1 the corner shows the HD draws and uploads.\n"
     "; music_files: 1 = music/<ID>.mp3 or .flac plays in place of the disc\n"
     "; track with that id (tools/music/ost_map.py); 0 = always the disc.\n";
 
@@ -243,6 +246,7 @@ static const struct {
 } ini_flags[] = {
     {"hd_textures", &g_HdTextures},
     {"hd_dump", &g_HdDump},
+    {"hd_stats", &g_HdStats},
     {"music_files", &g_MusicFiles},
     {"cheat_refill", &g_Cheat.refill},
     {"cheat_invincible", &g_Cheat.invincible},
@@ -338,8 +342,8 @@ void Wide_SaveIni(void) {
     fputs(ini_overlay, f);
     fprintf(f, "overlay = %d\nfps = %d\n", g_OverlayOn, g_FpsOn);
     fputs(ini_hd, f);
-    fprintf(f, "hd_textures = %d\nhd_dump = %d\nmusic_files = %d\n",
-            g_HdTextures, g_HdDump, g_MusicFiles);
+    fprintf(f, "hd_textures = %d\nhd_dump = %d\nhd_stats = %d\nmusic_files = %d\n",
+            g_HdTextures, g_HdDump, g_HdStats, g_MusicFiles);
     fputs(ini_stitch, f);
     fprintf(f, "room_stitch = %d\nroom_edge_fade = %d\n", g_RoomStitch,
             g_RoomEdgeFade);
