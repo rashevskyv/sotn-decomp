@@ -128,11 +128,11 @@ CLUT_BASE = 0x210
 GAME_BASE, ENEMY_DEFS, FIRST, COUNT = 0x06066000, 0x06080288, 400, 26
 
 
-# Saturn-only hand items that enemies drop -> the closest PS1 hand item
-# (items.h): the PS1 has no such item, so a stand-in keeps the drop.
+# Saturn-only hand items that enemies drop -> the drop id of the port's own
+# item (items.h SATURN_DROP_BASE: 0x183 + k is ITEM_ASTRAL_DAGGER + k).
 SATURN_ONLY_DROPS = {
-    173: 0x05,  # Woodland Shield (Man Eater 414, rare) -> Leather shield
-    175: 0x62,  # Double Blade Axe (Gargoyle 416, rare) -> Claymore (2 hands)
+    173: 0x185,  # Woodland Shield (Man Eater 414, rare): ITEM_WOODLAND_SHIELD
+    175: 0x186,  # Double Blade Axe (Gargoyle 416, rare): ITEM_DOUBLE_BLADE_AXE
 }
 
 
@@ -143,7 +143,7 @@ def ps1_drop(n):
     0x80 + n: Saturn hand item n (176 of them, GAME.PRG g_EquipDefs). 0-69
     are the PS1's, 72-168 the PS1's 70-166 (Mana Prism 292 -> 0x122,
     Antivenom 274 -> 0x110); 70-71, 169-175 are Saturn-only or unchecked
-    (SATURN_ONLY_DROPS gives two of them a PS1 stand-in).
+    (SATURN_ONLY_DROPS gives two of them the port's own item).
     0x130 + n: Saturn armor n (104, g_AccessoryDefs; the names decoded):
     0-52 are the PS1's (0x129 + n), 55-74 the PS1's 54-73 (Zircon 64 ->
     0x168); 53-54 and 75 on are Saturn-only or unchecked.
@@ -152,7 +152,7 @@ def ps1_drop(n):
         return n
     h = n - 0x80
     if h in SATURN_ONLY_DROPS:
-        return 0x80 + SATURN_ONLY_DROPS[h]
+        return SATURN_ONLY_DROPS[h]
     if h < 70:
         return 0x80 + h
     if 72 <= h <= 168:
@@ -167,7 +167,7 @@ def ps1_drop(n):
 
 assert (ps1_drop(292), ps1_drop(274), ps1_drop(289), ps1_drop(314),
         ps1_drop(368), ps1_drop(301), ps1_drop(303), ps1_drop(298),
-        ps1_drop(5)) == (0x122, 0x110, 0x11F, 0x133, 0x168, 0x85, 0xE2, 0, 5)
+        ps1_drop(5)) == (0x122, 0x110, 0x11F, 0x133, 0x168, 0x185, 0x186, 0, 5)
 
 
 def quad_vram(tpage, quad):
