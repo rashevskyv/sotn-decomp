@@ -5470,6 +5470,11 @@ const char* func_us_801B7C94(u16 itemId) {
 #endif
     if (itemId >= 0x80) {
         itemId -= 0x80;
+#ifdef PLATFORM_PSYZ
+        if (itemId >= SATURN_DROP_BASE) { // the Saturn's own (items.h)
+            name = g_api.equipDefs[SATURN_DROP_HAND(itemId)].name;
+        } else
+#endif
         if (itemId < NUM_HAND_ITEMS) {
             name = g_api.equipDefs[itemId].name;
         } else {
