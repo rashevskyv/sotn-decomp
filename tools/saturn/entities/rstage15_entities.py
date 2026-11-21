@@ -35,7 +35,9 @@ RGARDEN = dict(
     DECORATION_GROUPS=["candles", "candles", "scene", "scene", "scene", "scene"],
     # the Cloaked Knight's aura draws in the palette after the knight's
     # (palette + 1, e_cloaked_knight.h)
-    PALETTE_BLOCKS={"KNIGHT": ("knight", 0x060F2C38)},
+    # the Blue Venus Weed's death and spike colours step through its block
+    PALETTE_BLOCKS={"KNIGHT": ("knight", 0x060F2C38),
+                    "VENUS": ("venus", 0x060F1A2C)},
     BLEED_BANKS=(),
     STP_BANKS=(),
     TRIM_BANKS={},
@@ -44,5 +46,7 @@ RGARDEN = dict(
                  "venus": (1, 3), "knight": (1,), "guardian": (3,)},
     ROOMS=4,
     BANNER=None,
-    PRIM_PARTS={},
+    # the Blue Venus Weed's primitives: the leaves (frame 59, the right
+    # half) and the stem (frame 2)
+    PRIM_PARTS={"VENUS_LEAVES": (7, 59), "VENUS_STEM": (7, 2)},
 )

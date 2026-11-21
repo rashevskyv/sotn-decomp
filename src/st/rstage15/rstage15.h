@@ -50,6 +50,12 @@ typedef enum EntityID {
     E_CLOAKED_KNIGHT_CLOAK,
     E_CLOAKED_KNIGHT_SWORD,
     E_CLOAKED_KNIGHT_AURA,
+    // Saturn 0x2C (RNO4 Blue Venus Weed); the others spawn from it
+    E_VENUS_WEED,
+    E_VENUS_WEED_FLOWER,
+    E_VENUS_WEED_TENDRIL,
+    E_VENUS_WEED_DART,
+    E_VENUS_WEED_SPIKE,
     NUM_RGDN_ENTITIES,
 } EntityID;
 // the names RNO4's Cave Troll code uses

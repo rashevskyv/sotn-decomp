@@ -29,6 +29,11 @@ void EntityCloakedKnight(Entity*);
 void EntityCloakedKnightCloak(Entity*);
 void EntityCloakedKnightSword(Entity*);
 void EntityCloakedKnightAura(Entity*);
+void EntityVenusWeed(Entity*);
+void EntityVenusWeedFlower(Entity*);
+void EntityVenusWeedTendril(Entity*);
+void EntityVenusWeedDart(Entity*);
+void EntityVenusWeedSpike(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -63,6 +68,11 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityCloakedKnightCloak,
     EntityCloakedKnightSword,
     EntityCloakedKnightAura,
+    EntityVenusWeed,
+    EntityVenusWeedFlower,
+    EntityVenusWeedTendril,
+    EntityVenusWeedDart,
+    EntityVenusWeedSpike,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_RGDN_ENTITIES - 1, "EntityUpdates");
 
@@ -77,5 +87,9 @@ EInit g_EInitBitterfly = {MOD_BITTERFLY_ANIMSET, 0x01, 0x00, PAL_NONE, ENEMY_BIT
 EInit g_EInitCloakedKnight = {MOD_KNIGHT_ANIMSET, 0x01, 0x00, PAL_NONE, ENEMY_CLOAKED_KNIGHT};
 EInit g_EInitCloakedKnightAura = {MOD_KNIGHT_ANIMSET, 0x01, 0x00, PAL_NONE, ENEMY_PARTICLE};
 EInit g_EInitCloakedKnightSword = {MOD_KNIGHT_ANIMSET, 0x01, 0x00, PAL_NONE, ENEMY_CLOAKED_KNIGHT_SWORD};
+EInit g_EInitVenusWeedRoot = {MOD_VENUS_ANIMSET, 0x00, 0x00, PAL_NONE, ENEMY_BLUE_VENUS_WEED_ROOT};
+EInit g_EInitVenusWeedFlower = {MOD_VENUS_ANIMSET, 0x00, 0x00, PAL_NONE, ENEMY_BLUE_VENUS_WEED_FLOWER};
+EInit g_EInitVenusWeedTendril = {MOD_VENUS_ANIMSET, 0x00, 0x00, PAL_NONE, ENEMY_BLUE_VENUS_WEED_TENDRIL};
+EInit g_EInitVenusWeedDart = {MOD_VENUS_ANIMSET, 0x37, 0x00, PAL_NONE, ENEMY_BLUE_VENUS_WEED_DART};
 #include "../e_init_common.h"
 // clang-format on
