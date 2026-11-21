@@ -177,6 +177,9 @@ set(SATURN_RGDN_SOURCES
     src/st/rstage15/e_collect.c
     src/st/rstage15/e_init.c
     src/st/rstage15/e_misc.c
+    src/st/rstage15/e_mod_copper.c
+    src/st/rstage15/e_mod_efreet.c
+    src/st/rstage15/e_mod_guardian.c
     src/st/rstage15/e_particles.c
     src/st/rstage15/e_room_bg.c
     src/st/rstage15/e_venus_weed.c
