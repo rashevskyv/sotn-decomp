@@ -157,6 +157,18 @@ static void LeaperSyncFlip(Entity* self) {
     self->facingLeft = LEAPER_FACING(self);
 }
 
+// The velocity of the frame on show (facing right in the table). On a step's
+// first frame animCurFrame can still be 0 or another animation's frame: the
+// Saturn reads past the table there. Keep the velocity then.
+static void LeaperFrameVel(Entity* self, Point32* vel, u32 n) {
+    u32 i = self->animCurFrame - 1;
+
+    if (i < n) {
+        self->velocityX = LEAPER_FACING(self) ? vel[i].x : -vel[i].x;
+        self->velocityY = vel[i].y;
+    }
+}
+
 static void LeaperEaseRotate(Entity* self) {
     if (self->rotate != LEAPER_EXT(self)->targetRot) {
         self->rotate += (LEAPER_EXT(self)->targetRot - self->rotate) >> 3;
@@ -264,11 +276,7 @@ void EntityModLeaper(Entity* self) {
 
     case LEAPER_SWIM:
         LeaperEaseRotate(self);
-        self->velocityX = leaper_swim_vel[self->animCurFrame - 1].x;
-        self->velocityY = leaper_swim_vel[self->animCurFrame - 1].y;
-        if (!LEAPER_FACING(self)) {
-            self->velocityX = -self->velocityX;
-        }
+        LeaperFrameVel(self, leaper_swim_vel, LEN(leaper_swim_vel));
         if (!AnimateEntity(leaper_anim_swim, self)) {
             if (Random() & 1) {
                 LEAPER_FACING(self) = (GetSideToPlayer() & 1) ^ 1;
@@ -420,11 +428,7 @@ void EntityModLeaper(Entity* self) {
                     SetSubStep(1);
                 }
             }
-            self->velocityX = leaper_cruise_vel[self->animCurFrame - 1].x;
-            self->velocityY = leaper_cruise_vel[self->animCurFrame - 1].y;
-            if (!LEAPER_FACING(self)) {
-                self->velocityX = -self->velocityX;
-            }
+            LeaperFrameVel(self, leaper_cruise_vel, LEN(leaper_cruise_vel));
             LeaperSyncFlip(self);
         } else if (self->step_s == 1) { // turn around
             self->velocityX = 0;
