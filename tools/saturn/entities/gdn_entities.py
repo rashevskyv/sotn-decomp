@@ -357,8 +357,9 @@ def main(disc, out_path, stage="STAGE_15"):
                 (sheets[BANNER[2]].quadrants[q][1] >> 1) * 128 + v, w, h)
             for q, u, v, w, h, clut in parts))
     # the primitives' textures: tpage, clut and u, v, width, height in it
+    # (a frame's first part)
     for name, (n, f) in PRIM_PARTS.items():
-        p, = dict(banks)[n][f - 1]
+        p = dict(banks)[n][f - 1][0]
         quad = p["tileset"] & 3
         for k, val in (("TPAGE", p["tileset"] >> 2), ("CLUT", p["clut"]),
                        ("U", (quad & 1) * 128 + p["left"]),
