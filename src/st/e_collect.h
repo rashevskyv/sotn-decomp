@@ -833,6 +833,13 @@ void EntityEquipItemDrop(Entity* self) {
 #if VERSION >= VER_BETA_HD && STAGE != STAGE_ST0
         self->ext.equipItemDrop.iconSlot = i;
 #endif
+#ifdef PLATFORM_PSYZ
+        if (itemId >= SATURN_DROP_BASE) { // the Saturn's own (items.h)
+            g_api.LoadEquipIcon(
+                g_api.equipDefs[SATURN_DROP_HAND(itemId)].icon,
+                g_api.equipDefs[SATURN_DROP_HAND(itemId)].iconPalette, i);
+        } else
+#endif
         if (itemId < NUM_HAND_ITEMS) {
             g_api.LoadEquipIcon(g_api.equipDefs[itemId].icon,
                                 g_api.equipDefs[itemId].iconPalette, i);
@@ -924,6 +931,12 @@ void EntityEquipItemDrop(Entity* self) {
             g_unkGraphicsStruct.BottomCornerTextTimer = 0;
         }
         g_api.PlaySfx(SFX_ITEM_PICKUP);
+#ifdef PLATFORM_PSYZ
+        if (itemId >= SATURN_DROP_BASE) { // the Saturn's own (items.h)
+            name = g_api.equipDefs[SATURN_DROP_HAND(itemId)].name;
+            g_api.AddToInventory(SATURN_DROP_HAND(itemId), EQUIP_HAND);
+        } else
+#endif
         if (itemId < NUM_HAND_ITEMS) {
             name = g_api.equipDefs[itemId].name;
             g_api.AddToInventory(itemId, EQUIP_HAND);

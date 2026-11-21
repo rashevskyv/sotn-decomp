@@ -203,6 +203,12 @@ void InitStatsAndGear(bool isDeathTakingItems) {
         g_Status.equipHandCount[i] = 0;
         g_Status.equipHandOrder[i] = i;
     }
+#ifdef PLATFORM_PSYZ
+    for (i = 0; i < NUM_SATURN_HAND_ITEMS; i++) {
+        g_Status.equipHandCount[ITEM_ASTRAL_DAGGER + i] = 0;
+        g_Status.equipHandOrder[NUM_HAND_ITEMS + i] = ITEM_ASTRAL_DAGGER + i;
+    }
+#endif
 
     for (i = 0; i < 90; i++) {
         g_Status.equipBodyCount[i] = 0;

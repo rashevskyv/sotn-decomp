@@ -103,9 +103,10 @@ static void FillInventory(void) {
             }
         }
     }
-    for (i = 0; i < 169; i++) {
-        if (g_Status.equipHandCount[i] < 50) {
-            g_Status.equipHandCount[i] = 50;
+    for (i = 0; i < NUM_HAND_ORDER; i++) { // the PS1's and the Saturn's
+        u8 id = g_Status.equipHandOrder[i];
+        if (g_Status.equipHandCount[id] < 50) {
+            g_Status.equipHandCount[id] = 50;
         }
     }
     for (i = 0; i < 90; i++) {

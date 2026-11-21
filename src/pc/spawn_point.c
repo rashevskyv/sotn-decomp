@@ -28,10 +28,15 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_ID_SATURN_16, 0, 280, 525, "prison-breeder"},
     {STAGE_ID_SATURN_15, 0, 40, 140, "garden-room0"},
     {STAGE_ID_SATURN_15, 0, 600, 360, "garden-slinger"},
+    // on the bridge over the pool (water x 1608-2140, y 441-512). The layout
+    // places the water entities at the room's edges (x 128, 2176): walk right
+    // to the room's end first
+    {STAGE_ID_SATURN_15, 0, 1660, 380, "garden-water"},
     {STAGE_ID_SATURN_15, 1, 40, 140, "garden-room1"},
     {STAGE_ID_SATURN_15, 2, 40, 140, "garden-room2"},
     {STAGE_ID_SATURN_15, 3, 40, 140, "garden-room3"},
     {STAGE_ID_SATURN_15, 3, 400, 140, "garden-thornweed"},
+    {STAGE_ID_SATURN_15, 3, 420, 140, "garden-thornweed2"},
     {STAGE_ID_SATURN_15, 4, 40, 140, "garden-room4"},
     {STAGE_ID_SATURN_15, 5, 40, 140, "garden-room5"},
     {STAGE_ID_SATURN_15, 6, 40, 140, "garden-room6"},

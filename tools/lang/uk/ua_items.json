@@ -1,0 +1,14 @@
+{
+  "EQUIP_NAME": {
+    "Astral dagger": "Кинджал зорі",
+    "Kusai meshi": "Тюремна каша",
+    "Forest shield": "Лісовий щит",
+    "Twin blade axe": "Дволеза сокира"
+  },
+  "EQUIP_DESC": {
+    "Dagger of starlight": "Кинджал зоряного світла",
+    "Smelly prison meal ［use］": "Смердюча баланда ［вжити］",
+    "Wooden shield － low DEF": "Дерев’яний щит － слабкий ЗАХ",
+    "Two－bladed battle axe": "Бойова сокира з двома лезами"
+  }
+}

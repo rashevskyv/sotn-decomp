@@ -616,7 +616,11 @@ extern EnemyDef g_EnemyDefs[SATURN_ENEMY_DEFS_END];
 extern EnemyDef g_EnemyDefs[400];
 #endif
 extern Accessory g_AccessoryDefs[90];
+#ifdef PLATFORM_PSYZ
+extern Equipment g_EquipDefs[217 + NUM_SATURN_HAND_ITEMS]; // items.h
+#else
 extern Equipment g_EquipDefs[217];
+#endif
 #endif
 extern s32 g_ExpNext[];
 extern s16 D_800AC958[];

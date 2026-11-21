@@ -72,7 +72,7 @@ s32 func_800FD6C4(EquipKind equipTypeFilter) {
 
     switch (equipTypeFilter) {
     case EQUIP_HAND:
-        return NUM_HAND_ITEMS;
+        return NUM_HAND_ORDER;
     case EQUIP_HEAD:
         equipType = EQUIP_HEAD - 1;
         break;

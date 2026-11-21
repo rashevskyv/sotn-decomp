@@ -6,5 +6,7 @@
 // Saturn hand items 0-69 are the PS1's, 72-168 the PS1's 70-166 (the names
 // in GAME.PRG g_EquipDefs match); 70-71, 169 and 172-175 are Saturn-only.
 // 24 is the Karma Coin. 174 (Astral Dagger) and 70 (Kusai Meshi, a meal)
-// are Saturn-only: the Combat knife and the Turkey stand in.
-u16 PrizeDrops[] = {0x80 + 24, 0x80 + 20, 0x80 + 69};
+// are Saturn-only: the port's own items (items.h SATURN_DROP_BASE).
+// 0x80 + SATURN_DROP_BASE + k is ITEM_ASTRAL_DAGGER + k.
+u16 PrizeDrops[] = {0x80 + 24, 0x80 + SATURN_DROP_BASE + 0,
+                    0x80 + SATURN_DROP_BASE + 1};

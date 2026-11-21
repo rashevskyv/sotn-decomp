@@ -186,6 +186,29 @@ typedef enum HandItems {
     /* 0x0A9 */ NUM_HAND_ITEMS,
 } HandItems;
 
+#ifdef PLATFORM_PSYZ
+// PC: the Saturn's own hand items. Their g_EquipDefs rows follow the PS1's
+// 217 (169 items, then 48 special-move rows 0xA9-0xD8): the item id is the
+// row. The inventory keeps them after the PS1's in equipHandOrder.
+#define ITEM_ASTRAL_DAGGER 0xD9
+#define ITEM_KUSAI_MESHI 0xDA
+#define ITEM_WOODLAND_SHIELD 0xDB
+#define ITEM_DOUBLE_BLADE_AXE 0xDC
+#define NUM_SATURN_HAND_ITEMS 4
+#define NUM_HAND_IDS 0xDD // g_Status.equipHandCount
+#define NUM_HAND_ORDER (NUM_HAND_ITEMS + NUM_SATURN_HAND_ITEMS)
+#define IS_SATURN_HAND_ITEM(id)                                                \
+    ((id) >= ITEM_ASTRAL_DAGGER && (id) <= ITEM_DOUBLE_BLADE_AXE)
+// an item drop (EntityEquipItemDrop params, the drop id - 0x80) of a Saturn
+// hand item: after the body items, 0x183.. as a drop id
+#define SATURN_DROP_BASE (NUM_HAND_ITEMS + NUM_BODY_ITEMS)
+#define SATURN_DROP_HAND(params)                                               \
+    ((params) - SATURN_DROP_BASE + ITEM_ASTRAL_DAGGER)
+#else
+#define NUM_HAND_IDS NUM_HAND_ITEMS
+#define NUM_HAND_ORDER NUM_HAND_ITEMS
+#endif
+
 #if VERSION < VER_BETA_MAD
 // Earlier builds have a smaller amount of equippable armors.
 // Unfortunately the list of those armors is unknown.

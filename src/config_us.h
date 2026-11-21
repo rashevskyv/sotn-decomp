@@ -24,8 +24,25 @@ SubweaponDef g_SubwpnDefs[] = {
     {40, 5, 0x1020, 1, 0x18, 8, 0x5D, 0x06, 2, 0x01, 0, 0, 0},
 };
 
+#ifdef PLATFORM_PSYZ
+// the Saturn's numbers from its GAME.PRG (tools/saturn/saturn_items.py)
+#include "saturn_items.h"
+#endif
+
 Equipment g_EquipDefs[] = {
 #include DRA_GEN_VERSION(equipment.h)
+#ifdef PLATFORM_PSYZ
+    // 0xD9.. ITEM_ASTRAL_DAGGER: the Saturn's own items. Their uk text is in
+    // tools/lang/uk/ua_items.json. Names keep to 14 letters: a longer name
+    // runs into the count in the menu's 2-column list.
+    {_S("Astral dagger"), "Dagger of starlight", SATURN_EQUIP_ASTRAL_DAGGER},
+    {_S("Kusai meshi"), "Smelly prison meal \x81\x6Duse\x81\x6E",
+     SATURN_EQUIP_KUSAI_MESHI},
+    {_S("Forest shield"), "Wooden shield \x81\x7C low DEF",
+     SATURN_EQUIP_WOODLAND_SHIELD},
+    {_S("Twin blade axe"), "Two\x81\x7C" "bladed battle axe",
+     SATURN_EQUIP_DOUBLE_BLADE_AXE},
+#endif
 };
 
 Accessory g_AccessoryDefs[] = {

@@ -928,7 +928,8 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
 #include "../../st/rstage15/rstage15_ids.h"
 #else
 // Saturn STAGE_15 entity id -> stage15.h EntityID. The ids without a port
-// (water, CD room foreground) stay idle.
+// (the water surface strip 0x16, CD room foreground) stay idle. 0x1D sets the
+// VDP2 back colour (6, 0, 5): SaturnStageDrawBackScreen draws it already.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
     switch (saturnId) {
     case 0x01:
@@ -943,6 +944,10 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_SATURN_CONTROLLER;
     case 0x11:
         return E_ID_11;
+    case 0x15:
+        return E_MOD_WATER_TINT;
+    case 0x17: // params: region count << 8 | first region
+        return E_ALUCARD_WATER_EFFECT;
     case 0x1E:
         return E_MOD_DRIP_SPAWNER;
     case 0x20:

@@ -515,7 +515,11 @@ void StoreSaveData(SaveData* save, s32 block, s32 cardIcon) {
     MemcardHeader h;
 
     MemcardHeader* dstHeader;
+#ifdef PLATFORM_PSYZ
+    PlayerStatusPs1* dstStatus;
+#else
     PlayerStatus* dstStatus;
+#endif
     MenuNavigation* dstNav;
     GameSettings* dstSettings;
 
@@ -643,9 +647,20 @@ void StoreSaveData(SaveData* save, s32 block, s32 cardIcon) {
     dst->info.roomX = g_Tilemap.left;
     dst->info.roomY = g_Tilemap.top;
     dst->info.saveSize = sizeof(SaveData);
+#ifdef PLATFORM_PSYZ
+    // the PS1 layout, the Saturn items after SaveData (src/pc/saturn_items.c)
+    {
+        PlayerStatus status = g_Status;
+#ifdef USE_PLAYER_MARIA
+        Maria_SaveStash(&status.subWeapon, &status.D_80097C40);
+#endif
+        Status_ToPs1(dstStatus, &status, dst + 1);
+    }
+#else
     *dstStatus = g_Status;
 #ifdef USE_PLAYER_MARIA
     Maria_SaveStash(&dstStatus->subWeapon, &dstStatus->D_80097C40);
+#endif
 #endif
     *dstNav = g_MenuNavigation;
     *dstSettings = g_Settings;
@@ -668,7 +683,11 @@ s32 ApplySaveData(SaveData* save) {
     s32 i;
     u32 prevCompletionFlags1;
     u32 prevCompletionFlags2;
+#ifdef PLATFORM_PSYZ
+    PlayerStatusPs1* srcStatus;
+#else
     PlayerStatus* srcStatus;
+#endif
     MenuNavigation* srcNav;
     GameSettings* settings;
     SaveData* savePtr = save;
@@ -695,7 +714,11 @@ s32 ApplySaveData(SaveData* save) {
     g_Tilemap.left = savePtr->info.roomX;
     g_Tilemap.top = savePtr->info.roomY;
 
+#ifdef PLATFORM_PSYZ
+    Status_FromPs1(&g_Status, srcStatus, savePtr + 1);
+#else
     g_Status = *srcStatus;
+#endif
 #if defined(PLATFORM_PSYZ) && defined(USE_PLAYER_MARIA)
     Maria_SyncStash(); // the cheat CHARACTER plays: the owner's values wait
 #endif

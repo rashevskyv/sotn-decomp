@@ -234,6 +234,10 @@ void EntityModManEater(Entity* self) {
 
         case MANEATER_CHEW:
             if (!AnimateEntity(maneater_anim_chew, self)) {
+                // the player's death knock-back (func_80113F7C) reads the
+                // last entity that touched it: NULL if nothing did yet
+                // (the PS1 reads address 0, the PC crashes)
+                PLAYER.unkB8 = self;
                 g_Player.grabDamage = MANEATER_GRAB_DAMAGE;
                 g_Player.grabState = GRAB_DAMAGE;
                 self->pose = 0;

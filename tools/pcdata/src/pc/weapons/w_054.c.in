@@ -5,7 +5,7 @@
 // matches the weapon code on both 32-bit and 64-bit hosts.
 #include <common.h>
 
-typedef u8 T_D_17E000_8017AA44[672];
+typedef u8 T_D_17E000_8017AA44[768];
 typedef u8 T_D_17E000_8017ACE4[32];
 typedef u8 T_D_17E000_8017AD04[32];
 typedef u8 T_D_17E000_8017AD24[32];
