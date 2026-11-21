@@ -61,6 +61,13 @@ void EntitySlingerPieces(Entity*);
 void EntityThornweed(Entity*);
 void EntityCorpseweed(Entity*);
 void EntityCorpseweedProjectile(Entity*);
+void EntityAlucardWaterEffect(Entity*);
+void EntitySplashWater(Entity*);
+void EntitySurfacingWater(Entity*);
+void EntitySideWaterSplash(Entity*);
+void EntitySmallWaterDrop(Entity*);
+void EntityWaterDrop(Entity*);
+void EntityModWaterTint(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -127,6 +134,13 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityThornweed,
     EntityCorpseweed,
     EntityCorpseweedProjectile,
+    EntityAlucardWaterEffect,
+    EntitySplashWater,
+    EntitySurfacingWater,
+    EntitySideWaterSplash,
+    EntitySmallWaterDrop,
+    EntityWaterDrop,
+    EntityModWaterTint,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_GDN_ENTITIES - 1, "EntityUpdates");
 

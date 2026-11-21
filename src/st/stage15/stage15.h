@@ -87,6 +87,14 @@ typedef enum EntityID {
     E_THORNWEED,
     E_CORPSEWEED,
     E_CORPSEWEED_PROJECTILE,
+    // Saturn 0x17-0x1C (the PS1's water_effects.h) and 0x15 (e_water.c)
+    E_ALUCARD_WATER_EFFECT,
+    E_SPLASH_WATER,
+    E_SURFACING_WATER,
+    E_SIDE_WATER_SPLASH,
+    E_SMALL_WATER_DROP,
+    E_WATER_DROP,
+    E_MOD_WATER_TINT,
     NUM_GDN_ENTITIES,
 } EntityID;
 // the name e_mod_boss.h uses
@@ -114,10 +122,6 @@ typedef enum EntityID {
 #define MOD_SFX_TREE_FACE_FALL SFX_SCRAPE_B
 #define MOD_SFX_TREE_FACE_BURST SFX_BLOODY_ZOMBIE_SPLATTER
 #define MOD_SFX_TREE_DEATH SFX_STONE_ROSE_DEATH
-
-// the Leaper's water entities are not ported: its splashes are skipped
-#define MOD_LEAPER_E_SPLASH E_DUMMY_0F
-#define MOD_LEAPER_E_SURFACING E_DUMMY_0F
 
 // the Garden track is the stage music the PC module sets (g_StageMusicId,
 // stage_saturn.c). The Skeleton Leader's own track (Saturn SD2B) is not
