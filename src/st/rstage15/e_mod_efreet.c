@@ -335,6 +335,20 @@ static void EfreetEpilogue(Entity* self) {
     }
 }
 
+// The death column (0x2A) that case 3 of the death made: next step. None
+// when AllocEntity failed (lastHitBy -1) or the slot was reused.
+static void EfreetStepColumn(EfreetExt* ext) {
+    Entity* e;
+
+    if (ext->lastHitBy < 0) {
+        return;
+    }
+    e = &g_Entities[ext->lastHitBy];
+    if (e->entityId == E_MOD_EFREET_2A) {
+        e->step++;
+    }
+}
+
 void EntityModEfreet(Entity* self) {
     EfreetExt* ext = EFREET_EXT(self);
     Entity* e;
@@ -688,7 +702,7 @@ void EntityModEfreet(Entity* self) {
             if (ext->count < 1) {
                 self->step_s++;
                 ext->count = 0x40;
-                (&g_Entities[ext->lastHitBy])->step++;
+                EfreetStepColumn(ext);
                 self->velocityY = -0x8000;
                 self->velocityX = 0;
                 EfreetEpilogue(self);
@@ -699,7 +713,7 @@ void EntityModEfreet(Entity* self) {
             ext->count--;
             if (ext->count < 9) {
                 self->step_s++;
-                (&g_Entities[ext->lastHitBy])->step++;
+                EfreetStepColumn(ext);
                 ext->count = 0xE;
                 self->velocityY *= 2;
                 self->animCurFrame = 0;
@@ -1126,7 +1140,8 @@ void EntityModEfreet2A(Entity* self) {
         p1 = p0->next;
         EfreetSetColor(p0, 0x60, 0x30, 0x08); // stand-in colour
         EfreetSetColor(p1, 0x80, 0x70, 0x40);
-        // a light column: additive (the Saturn colour calculation)
+        // a light column: additive (a stand-in; the Saturn draw mode is not
+        // decoded)
         p0->drawMode = DRAW_TPAGE | DRAW_TPAGE2 | DRAW_TRANSP;
         p1->drawMode = DRAW_TPAGE | DRAW_TPAGE2 | DRAW_TRANSP;
         EfreetRectX(p0, self->posX.i.hi - 0x30, self->posX.i.hi + 0x30);
