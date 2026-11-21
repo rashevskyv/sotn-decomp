@@ -17,6 +17,12 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_ID_11;
     case 0x1E:
         return E_CAVE_TROLL;
+    case 0x21:
+        return E_MOD_COPPER;
+    case 0x23:
+        return E_MOD_EFREET;
+    case 0x38:
+        return E_MOD_GUARDIAN;
     case 0x2C:
         return E_VENUS_WEED;
     case 0x33:

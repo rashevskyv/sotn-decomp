@@ -34,6 +34,21 @@ void EntityVenusWeedFlower(Entity*);
 void EntityVenusWeedTendril(Entity*);
 void EntityVenusWeedDart(Entity*);
 void EntityVenusWeedSpike(Entity*);
+void EntityModCopper(Entity*);
+void EntityModCopper22(Entity*);
+void EntityModEfreet(Entity*);
+void EntityModEfreet24(Entity*);
+void EntityModEfreet25(Entity*);
+void EntityModEfreet26(Entity*);
+void EntityModEfreet27(Entity*);
+void EntityModEfreet28(Entity*);
+void EntityModEfreet29(Entity*);
+void EntityModEfreet2A(Entity*);
+void EntityModEfreet2B(Entity*);
+void EntityModGuardian(Entity*);
+void EntityModGuardian39(Entity*);
+void EntityModGuardian3A(Entity*);
+void EntityModGuardian3B(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -73,6 +88,21 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityVenusWeedTendril,
     EntityVenusWeedDart,
     EntityVenusWeedSpike,
+    EntityModCopper,
+    EntityModCopper22,
+    EntityModEfreet,
+    EntityModEfreet24,
+    EntityModEfreet25,
+    EntityModEfreet26,
+    EntityModEfreet27,
+    EntityModEfreet28,
+    EntityModEfreet29,
+    EntityModEfreet2A,
+    EntityModEfreet2B,
+    EntityModGuardian,
+    EntityModGuardian39,
+    EntityModGuardian3A,
+    EntityModGuardian3B,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_RGDN_ENTITIES - 1, "EntityUpdates");
 

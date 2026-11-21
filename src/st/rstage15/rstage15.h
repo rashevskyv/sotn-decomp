@@ -56,6 +56,22 @@ typedef enum EntityID {
     E_VENUS_WEED_TENDRIL,
     E_VENUS_WEED_DART,
     E_VENUS_WEED_SPIKE,
+    // Saturn-only enemies, SH-2 ports (e_mod_*.c), named by the Saturn id
+    E_MOD_COPPER,    // Saturn 0x21
+    E_MOD_COPPER_22, // Saturn 0x22
+    E_MOD_EFREET,    // Saturn 0x23
+    E_MOD_EFREET_24,
+    E_MOD_EFREET_25,
+    E_MOD_EFREET_26,
+    E_MOD_EFREET_27,
+    E_MOD_EFREET_28,
+    E_MOD_EFREET_29,
+    E_MOD_EFREET_2A,
+    E_MOD_EFREET_2B,
+    E_MOD_GUARDIAN, // Saturn 0x38
+    E_MOD_GUARDIAN_39,
+    E_MOD_GUARDIAN_3A,
+    E_MOD_GUARDIAN_3B,
     NUM_RGDN_ENTITIES,
 } EntityID;
 // the names RNO4's Cave Troll code uses
