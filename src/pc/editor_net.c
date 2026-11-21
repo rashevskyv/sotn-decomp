@@ -162,6 +162,8 @@ static void State(void) {
          g_CheatSaveChar, g_Status.subWeapon, g_Status.D_80097C40,
          g_Status.relics[RELIC_LEAP_STONE]);
     // tests: the hands, their attack, the defence and the Saturn items owned
+    Putf(",\"hpMax\":%d,\"lv\":%d,\"exp\":%u", g_Status.hpMax, g_Status.level,
+         g_Status.exp);
     Putf(",\"equip\":[%u,%u],\"atk\":[%d,%d],\"def\":%d,\"saturn\":[%d,%d,%d,%d]}",
          g_Status.equipment[0], g_Status.equipment[1],
          g_Status.attackHands[0], g_Status.attackHands[1],
@@ -436,14 +438,16 @@ static void Handle(int fd) {
         ReplyOut(fd, code, "application/json");
     } else if (!strcmp(path, "/ents")) {
         // tests: the live entities (slot, id, screen x y, hp, hitbox, step,
-        // params, enemy id)
+        // params, enemy id, hitbox x y w h, facing left)
         Put("[", 1);
         for (k = 0, code = 0; k < TOTAL_ENTITY_COUNT; k++) {
             Entity* e = &g_Entities[k];
             if (e->entityId) {
-                Putf("%s[%d,%d,%d,%d,%d,%d,%d,%d,%d]", code++ ? "," : "", k,
-                     e->entityId, e->posX.i.hi, e->posY.i.hi, e->hitPoints,
-                     e->hitboxState, e->step, e->params, e->enemyId);
+                Putf("%s[%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d]",
+                     code++ ? "," : "", k, e->entityId, e->posX.i.hi,
+                     e->posY.i.hi, e->hitPoints, e->hitboxState, e->step,
+                     e->params, e->enemyId, e->hitboxOffX, e->hitboxOffY,
+                     e->hitboxWidth, e->hitboxHeight, e->facingLeft);
             }
         }
         Put("]", 1);
