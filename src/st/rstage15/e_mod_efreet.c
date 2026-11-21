@@ -55,8 +55,10 @@ void MoveEntity(void);
 #define EFREET_TEKI_MAIN 402 // 0x192
 #define EFREET_TEKI_PART 0x2C
 
-static EInit g_EInitModEfreet = {MOD_EFREET_ANIMSET, 0, 0, PAL_NONE, EFREET_TEKI_MAIN};
-static EInit g_EInitModEfreetPart = {MOD_EFREET_ANIMSET, 0, 0, PAL_NONE, EFREET_TEKI_PART};
+static EInit g_EInitModEfreet = {
+    MOD_EFREET_ANIMSET, 0, 0, PAL_NONE, EFREET_TEKI_MAIN};
+static EInit g_EInitModEfreetPart = {
+    MOD_EFREET_ANIMSET, 0, 0, PAL_NONE, EFREET_TEKI_PART};
 static EInit g_EInitModEfreetTrail = {MOD_EFREET_ANIMSET, 0, 0, PAL_NONE, 5};
 
 // Frame tables: pairs (duration, frame). Duration 0 loops, 0xFF ends.
@@ -83,8 +85,8 @@ static u8 efr_anim_idle[] = {
 };
 /* Saturn 0x060F0410, main turn around */
 static u8 efr_anim_turn[] = {
-    0x08, 0x0F, 0x03, 0x16, 0x03, 0x17, 0x02, 0x18, 0x02, 0x19, 0x02, 0x1A,
-    0x04, 0x1B, 0x02, 0x1C, 0x02, 0x1D, 0x08, 0x1E, 0xFF, 0xFF,
+    0x08, 0x0F, 0x03, 0x16, 0x03, 0x17, 0x02, 0x18, 0x02, 0x19, 0x02,
+    0x1A, 0x04, 0x1B, 0x02, 0x1C, 0x02, 0x1D, 0x08, 0x1E, 0xFF, 0xFF,
 };
 /* Saturn 0x060F0426, main step 3 substep 0 */
 static u8 efr_anim_charge[] = {
@@ -112,14 +114,14 @@ static u8 efr_anim_spit_b[] = {
 };
 /* Saturn 0x060F045A, main step 8 substep 2 */
 static u8 efr_anim_spit_c[] = {
-    0x04, 0x22, 0x03, 0x26, 0x03, 0x27, 0x02, 0x28, 0x02, 0x29, 0x02, 0x2A,
-    0x03, 0x2B, 0x04, 0x2C, 0x04, 0x2D, 0x0A, 0x2E, 0x04, 0x2F, 0x04, 0x30,
-    0x04, 0x31, 0x37, 0x0F, 0xFF, 0xFF,
+    0x04, 0x22, 0x03, 0x26, 0x03, 0x27, 0x02, 0x28, 0x02, 0x29,
+    0x02, 0x2A, 0x03, 0x2B, 0x04, 0x2C, 0x04, 0x2D, 0x0A, 0x2E,
+    0x04, 0x2F, 0x04, 0x30, 0x04, 0x31, 0x37, 0x0F, 0xFF, 0xFF,
 };
 /* Saturn 0x060F0478, main step 6 substep 1 */
 static u8 efr_anim_fire_a[] = {
-    0x08, 0x0F, 0x08, 0x32, 0x08, 0x34, 0x40, 0x33, 0x08, 0x34, 0x04, 0x35,
-    0x03, 0x36, 0x03, 0x37, 0x03, 0x38, 0x03, 0x39, 0xFF, 0xFF,
+    0x08, 0x0F, 0x08, 0x32, 0x08, 0x34, 0x40, 0x33, 0x08, 0x34, 0x04,
+    0x35, 0x03, 0x36, 0x03, 0x37, 0x03, 0x38, 0x03, 0x39, 0xFF, 0xFF,
 };
 /* Saturn 0x060F048E, main step 6 substep 2 */
 static u8 efr_anim_fire_b[] = {
@@ -127,8 +129,8 @@ static u8 efr_anim_fire_b[] = {
 };
 /* Saturn 0x060F0494, main step 6 substep 3 */
 static u8 efr_anim_fire_c[] = {
-    0x03, 0x3C, 0x03, 0x3D, 0x03, 0x3E, 0x03, 0x36, 0x06, 0x35, 0x18, 0x0F,
-    0xFF, 0xFF,
+    0x03, 0x3C, 0x03, 0x3D, 0x03, 0x3E, 0x03,
+    0x36, 0x06, 0x35, 0x18, 0x0F, 0xFF, 0xFF,
 };
 /* Saturn 0x060F04A2, part 0x28 step 1 (flame shot) */
 static u8 efr_anim_e28_fly[] = {
@@ -142,14 +144,14 @@ static u8 efr_anim_step4[] = {
 };
 /* Saturn 0x060F04CE, main death step 0x14 substep 2 */
 static u8 efr_anim_death[] = {
-    0x10, 0x0F, 0x05, 0x32, 0x0F, 0x42, 0x02, 0x43, 0x02, 0x42, 0x02, 0x43,
-    0x02, 0x44, 0x02, 0x43, 0x2F, 0x44, 0xFF, 0xFF,
+    0x10, 0x0F, 0x05, 0x32, 0x0F, 0x42, 0x02, 0x43, 0x02, 0x42,
+    0x02, 0x43, 0x02, 0x44, 0x02, 0x43, 0x2F, 0x44, 0xFF, 0xFF,
 };
 /* Saturn 0x060F0774, part 0x27 update */
 static u8 efr_anim_e27_fly[] = {
-    0x03, 0x01, 0x03, 0x02, 0x03, 0x03, 0x03, 0x04, 0x03, 0x05, 0x03, 0x06,
-    0x03, 0x07, 0x03, 0x08, 0x03, 0x09, 0x03, 0x0A, 0x03, 0x0B, 0x03, 0x0C,
-    0x03, 0x0D, 0xFF, 0x00,
+    0x03, 0x01, 0x03, 0x02, 0x03, 0x03, 0x03, 0x04, 0x03, 0x05,
+    0x03, 0x06, 0x03, 0x07, 0x03, 0x08, 0x03, 0x09, 0x03, 0x0A,
+    0x03, 0x0B, 0x03, 0x0C, 0x03, 0x0D, 0xFF, 0x00,
 };
 
 /* Saturn 0x060F0534: {w, h, offX, offY} per frame (offX/offY signed) */
@@ -179,30 +181,25 @@ static s8 efr_hitbox[81][4] = {
 
 /* Saturn 0x060F0683, indexed by the parent frame */
 static s8 efr_child_x24[81] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 3, 6, 9, 12, 12, 9, 6, 3, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0,
+    0, 0, 0, 0, 0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 3, 6, 9, 12, 12, 9, 6, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,  0,  0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7,
+    0, 0, 0, 0, 0,  0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 /* Saturn 0x060F06D3, indexed by the parent frame */
 static s8 efr_child_x25[81] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 1, 14, 13, 3, -1, 0, 0, 0, 1, 0, 0, 2, 2, 2, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 16, 16, 17, 18, 18, 17, 17, 17,
-    11, 2, -8, -9, -8, 3, 15, 37, 37, 37, 37, 37, 37, 37, 37, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 17, 17, 17, 17,
-    17,
+    0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 1,
+    1,  14, 13, 3,  -1, 0,  0,  0,  1,  0,  0,  2,  2,  2,  0,  0, 0,
+    0,  0,  0,  0,  0,  0,  16, 16, 17, 18, 18, 17, 17, 17, 11, 2, -8,
+    -9, -8, 3,  15, 37, 37, 37, 37, 37, 37, 37, 37, 0,  0,  0,  0, 0,
+    0,  0,  0,  0,  0,  0,  0,  16, 17, 17, 17, 17, 17,
 };
 /* Saturn 0x060F0723, indexed by the parent frame */
 static s8 efr_child_y25[81] = {
-    17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2,
-    3, 1, 2, 0, 1, 0, 6, 15, 15, 15, 15, 15, 15, 15, 15, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2,
-    2,
+    17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  1,  1,  0,
+    1,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0,  2,  2,
+    2,  2, 2, 2, 2, 2, 3, 1, 2, 0, 1, 0, 6, 15, 15, 15, 15, 15, 15, 15, 15,
+    0,  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2,  2,  2,  2,  2,
 };
 
 // Main step ids (from the Saturn jump table at 060E690C; partly verified)
@@ -222,21 +219,22 @@ enum {
 // Ext fields at the Saturn offsets minus 0x78 (the Saturn ext base).
 typedef struct {
     u8 _00[0x0C];
-    s16 timer;      // Saturn 0x84: step timer
+    s16 timer; // Saturn 0x84: step timer
     u8 _0E[2];
-    s16 count;      // Saturn 0x88: step counter (field_0x88)
+    s16 count; // Saturn 0x88: step counter (field_0x88)
     u8 _12[0x06];
-    s16 counter90;  // Saturn 0x90: the flame shot counter (0x28)
+    s16 counter90; // Saturn 0x90: the flame shot counter (0x28)
     u8 _1A[0x02];
-    s16 sway;       // Saturn 0x94: bob phase
+    s16 sway; // Saturn 0x94: bob phase
     u8 _1E[2];
-    s32 spriteY;    // Saturn 0x98: sprite Y (posY + bob - 12 px)
-    s32 counter;    // Saturn 0x9C: counter of the trail (0x26) and projectile (0x27)
-    s16 scale;      // Saturn spr+0x0A: sprite scale of the projectile (0x27)
+    s32 spriteY; // Saturn 0x98: sprite Y (posY + bob - 12 px)
+    s32 counter; // Saturn 0x9C: counter of the trail (0x26) and projectile
+                 // (0x27)
+    s16 scale;   // Saturn spr+0x0A: sprite scale of the projectile (0x27)
     u8 _2A[0x02];
     s16 partCounter; // Saturn 0xA4: frame counter of the flame particles (0x29)
     u8 _2E[0x0E];
-    s16 lastHitBy;  // Saturn 0xB4: index of the child that last hit (g_Entities)
+    s16 lastHitBy; // Saturn 0xB4: index of the child that last hit (g_Entities)
 } EfreetExt;
 #define EFREET_EXT(e) ((EfreetExt*)&(e)->ext)
 
@@ -284,7 +282,6 @@ static s32 EfreetRectShrink(Primitive* p0, Primitive* p1) {
 
 // Sensors (Saturn 060F03C6): feet 32 px below, wall 8 px out
 static s16 efr_sensors[] = {0, 32, SAT_X(8), 0};
-
 
 // Saturn enemy sounds with PS1 enemy stand-ins (see the header).
 #define EFR_SFX_8F2 SFX_EXPLODE_A
@@ -391,7 +388,8 @@ void EntityModEfreet(Entity* self) {
             if (dist < SAT_X(0x20)) {
                 next = EFREET_STEP_RUN;
             } else if (dist < SAT_X(0x40)) {
-                next = (Random() & 1) == 0 ? EFREET_STEP_LUNGE : EFREET_STEP_RUN;
+                next =
+                    (Random() & 1) == 0 ? EFREET_STEP_LUNGE : EFREET_STEP_RUN;
             } else if (dist < SAT_X(0xA0)) {
                 r = (Random() & 0xFF) % 60;
                 if (r < 2) {
@@ -436,7 +434,8 @@ void EntityModEfreet(Entity* self) {
         case 0:
             if (AnimateEntity(efr_anim_charge, self) == 0) {
                 self->animCurFrame = 0x13;
-                self->velocityX = self->facingLeft == 0 ? -SAT_X(0x40000) : SAT_X(0x40000);
+                self->velocityX =
+                    self->facingLeft == 0 ? -SAT_X(0x40000) : SAT_X(0x40000);
                 ext->timer = (Random() & 0xFF) % 15 + 0x2D;
                 self->step_s++;
             }
@@ -477,7 +476,8 @@ void EntityModEfreet(Entity* self) {
 
     case EFREET_STEP_LUNGE: // step 4
         if (self->animCurFrame == 0x4C) {
-            self->velocityX = self->facingLeft == 0 ? -SAT_X(0x40000) : SAT_X(0x40000);
+            self->velocityX =
+                self->facingLeft == 0 ? -SAT_X(0x40000) : SAT_X(0x40000);
         }
         EfreetHalveVelX(self);
         if (AnimateEntity(efr_anim_step4, self) == 0) {
@@ -496,7 +496,8 @@ void EntityModEfreet(Entity* self) {
         case 0:
             if (AnimateEntity(efr_anim_run_a, self) == 0) {
                 self->animCurFrame = 0x15;
-                self->velocityX = self->facingLeft == 0 ? SAT_X(0x30000) : -SAT_X(0x30000);
+                self->velocityX =
+                    self->facingLeft == 0 ? SAT_X(0x30000) : -SAT_X(0x30000);
                 ext->timer = (Random() & 0xFF) % 15 + 0xF;
                 if (self->step == EFREET_STEP_HIT) {
                     ext->timer = (ext->timer * 2) / 3;
@@ -544,7 +545,8 @@ void EntityModEfreet(Entity* self) {
                 e = AllocEntity(&g_Entities[224], &g_Entities[256]);
                 if (e != NULL) {
                     CreateEntityFromEntity(E_MOD_EFREET_29, self, e);
-                    e->posX.i.hi += self->facingLeft == 0 ? SAT_X(4) : -SAT_X(4);
+                    e->posX.i.hi +=
+                        self->facingLeft == 0 ? SAT_X(4) : -SAT_X(4);
                     e->posY.val = ext->spriteY - 0x120000;
                     e->facingLeft = self->facingLeft;
                     e->parent = self;
@@ -568,7 +570,8 @@ void EntityModEfreet(Entity* self) {
                     e = AllocEntity(&g_Entities[160], &g_Entities[192]);
                     if (e != NULL) {
                         CreateEntityFromEntity(E_MOD_EFREET_27, self, e);
-                        e->posX.i.hi += self->facingLeft == 0 ? SAT_X(-0x30) : SAT_X(0x30);
+                        e->posX.i.hi +=
+                            self->facingLeft == 0 ? SAT_X(-0x30) : SAT_X(0x30);
                         e->posY.val = ext->spriteY - 0x20000;
                         e->facingLeft = self->facingLeft;
                         *(s32*)&e->ext = ext->count; // Saturn 0x78: the counter
@@ -626,7 +629,8 @@ void EntityModEfreet(Entity* self) {
                 e = AllocEntity(&g_Entities[160], &g_Entities[192]);
                 if (e != NULL) {
                     CreateEntityFromEntity(E_MOD_EFREET_28, self, e);
-                    e->posX.i.hi += self->facingLeft == 0 ? -SAT_X(0x3C) : SAT_X(0x3C);
+                    e->posX.i.hi +=
+                        self->facingLeft == 0 ? -SAT_X(0x3C) : SAT_X(0x3C);
                     e->posY.val = ext->spriteY - 0x40000;
                     e->facingLeft = self->facingLeft;
                     PlaySfxPositional(EFR_SFX_8F4);
@@ -772,8 +776,9 @@ void EntityModEfreet24(Entity* self) {
         InitializeEntity(g_EInitModEfreetPart); // TekiInit 0x2C
         self->zPriority = parent->zPriority - 1;
         self->step = 1;
-        self->flags = (self->flags | 0x2000) & 0x7FFFFFFF; // Saturn mask 7FFFFFFF
-        self->attack = E_MOD_EFREET;                       // Saturn 0x23
+        self->flags =
+            (self->flags | 0x2000) & 0x7FFFFFFF; // Saturn mask 7FFFFFFF
+        self->attack = E_MOD_EFREET;             // Saturn 0x23
         // falls into the idle
     case 1:
         AnimateEntity(efr_anim_e24_idle, self);
@@ -796,7 +801,8 @@ void EntityModEfreet24(Entity* self) {
     self->facingLeft = parent->facingLeft;
     self->hitboxState = parent->hitboxState;
     self->posX.i.hi = parent->posX.i.hi;
-    self->posY.val = parent->posY.val - 0xC0000; // Saturn: spriteY (no bob, see the header)
+    self->posY.val =
+        parent->posY.val - 0xC0000; // Saturn: spriteY (no bob, see the header)
     if (self->facingLeft == 0) {
         self->posX.i.hi -= efr_child_x24[parent->animCurFrame];
     } else {
@@ -840,11 +846,14 @@ void EntityModEfreet25(Entity* self) {
     self->facingLeft = parent->facingLeft;
     self->hitboxState = parent->hitboxState;
     self->posX.i.hi = parent->posX.i.hi;
-    self->posY.val = parent->posY.val - 0xC0000 - 0x150000; // Saturn: spriteY (no bob)
+    self->posY.val =
+        parent->posY.val - 0xC0000 - 0x150000; // Saturn: spriteY (no bob)
     if (self->facingLeft == 0) {
-        self->posX.i.hi = self->posX.i.hi + 1 - efr_child_x25[parent->animCurFrame];
+        self->posX.i.hi =
+            self->posX.i.hi + 1 - efr_child_x25[parent->animCurFrame];
     } else {
-        self->posX.i.hi = self->posX.i.hi - 1 + efr_child_x25[parent->animCurFrame];
+        self->posX.i.hi =
+            self->posX.i.hi - 1 + efr_child_x25[parent->animCurFrame];
     }
     self->posY.i.hi += efr_child_y25[parent->animCurFrame];
     EfreetChildHitbox(self);
@@ -901,8 +910,10 @@ void EntityModEfreet27(Entity* self) {
         self->drawFlags = ENTITY_OPACITY; // Saturn 8
         self->opacity = 0x80;
         ext->counter = Random() & 3;
-        self->velocityY = *(s32*)&self->ext * -0x1000 + 0x30000 + (Random() & 0x3FFF);
-        self->velocityX = self->facingLeft == 0 ? -SAT_X(0x40000) : SAT_X(0x40000);
+        self->velocityY =
+            *(s32*)&self->ext * -0x1000 + 0x30000 + (Random() & 0x3FFF);
+        self->velocityX =
+            self->facingLeft == 0 ? -SAT_X(0x40000) : SAT_X(0x40000);
         // Saturn sprite clut += 0x10 here: palette change, not ported
         ext->scale = 0x10;
         self->hitboxWidth = 0;
@@ -942,7 +953,8 @@ void EntityModEfreet28(Entity* self) {
         self->step = 1;
         self->pose = 0;
         self->poseTimer = 0;
-        self->velocityX = self->facingLeft == 0 ? -SAT_X(0x60000) : SAT_X(0x60000);
+        self->velocityX =
+            self->facingLeft == 0 ? -SAT_X(0x60000) : SAT_X(0x60000);
         self->hitboxWidth = SAT_X(5);
         self->hitboxHeight = 0xC;
         ext->counter90 = 0; // Saturn: not set here, zero assumed

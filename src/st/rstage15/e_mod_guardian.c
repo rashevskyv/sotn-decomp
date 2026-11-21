@@ -3,9 +3,9 @@
  * Skeleton Guardian (Saturn RSTAGE15, enemy record 425 = TekiInit 0x1A9),
  * Reverse Garden room 3. Translated from the SH-2 (Saturn port mod):
  *   EntityModGuardian    Saturn 0x38, func 060EB550, enemy 425 (body)
- *   EntityModGuardian39  Saturn 0x39, func 060EC174, enemy 397 (hitbox, self + 1)
- *   EntityModGuardian3A  Saturn 0x3A, func 060EC274, enemy 397 (hitbox, self + 2)
- *   EntityModGuardian3B  Saturn 0x3B, func 060EC374, enemy 5 (death debris)
+ *   EntityModGuardian39  Saturn 0x39, func 060EC174, enemy 397 (hitbox, self +
+ * 1) EntityModGuardian3A  Saturn 0x3A, func 060EC274, enemy 397 (hitbox, self +
+ * 2) EntityModGuardian3B  Saturn 0x3B, func 060EC374, enemy 5 (death debris)
  *
  * The sprite is the converted Saturn bank MOD_GUARDIAN_ANIMSET (frames 1:1).
  * The Saturn epilogue draws the sprite at entity + (0, 32): frames 1-18 (the
@@ -16,8 +16,9 @@
  * calls are dropped. The Saturn's FUN_06079DEC (walk, gravity, walls) is
  * UnkCollisionFunc2 with the Saturn's sensors. The debris (0x3B) is the
  * breeder's debris (e_mod_skeleton_breeder.h, the same code with frames
- * 0x13-0x1A). The death debris and its sparks use EntityExplosionVariantsSpawner
- * (Saturn SpawnDestructAnim, the same as the wight port).
+ * 0x13-0x1A). The death debris and its sparks use
+ * EntityExplosionVariantsSpawner (Saturn SpawnDestructAnim, the same as the
+ * wight port).
  *
  * Sounds (all have the same id on the PS1): 0x60C swing, 0x64A stomp, 0x62A
  * death. No palette changes: PAL_NONE only.
@@ -45,9 +46,9 @@ void EntityExplosionVariantsSpawner(
 
 #include "../stage15/e_mod_skeleton_breeder.h"
 
-#define MOD_GUARDIAN_SFX_SWING SFX_WEAPON_SWISH_C    // 0x60C
-#define MOD_GUARDIAN_SFX_STEP SFX_STOMP_HARD_E       // 0x64A
-#define MOD_GUARDIAN_SFX_DEATH SFX_SKELETON_DEATH_B  // 0x62A
+#define MOD_GUARDIAN_SFX_SWING SFX_WEAPON_SWISH_C   // 0x60C
+#define MOD_GUARDIAN_SFX_STEP SFX_STOMP_HARD_E      // 0x64A
+#define MOD_GUARDIAN_SFX_DEATH SFX_SKELETON_DEATH_B // 0x62A
 
 static EInit g_EInitModGuardian = {MOD_GUARDIAN_ANIMSET, 0, 0, PAL_NONE, 425};
 // the two hitbox entities: no sprite, enemy 397 (Saturn TekiInit 0x18D)
@@ -106,31 +107,30 @@ static s8 guardian_debris_off_y[8] = {-8, -5, -8, 22, 8, 19, -12, 11};
 // Body hitbox {w, h, offX, offY} for animCurFrame 1..18: Saturn 0x060F2E30 +
 // frame * 4. Index = frame - 1. Saturn space (w and offX scaled at runtime).
 static s8 guardian_hitbox[18][4] = {
-    {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8},
-    {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8},
-    {7, 16, 0, 8}, {4, 16, 0, 8}, {4, 16, 0, 8}, {4, 16, 0, 8},
-    {4, 16, 0, 8}, {4, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8},
-    {7, 16, 0, 8}, {7, 16, 0, 8},
+    {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8},
+    {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8}, {4, 16, 0, 8},
+    {4, 16, 0, 8}, {4, 16, 0, 8}, {4, 16, 0, 8}, {4, 16, 0, 8}, {7, 16, 0, 8},
+    {7, 16, 0, 8}, {7, 16, 0, 8}, {7, 16, 0, 8},
 };
 
 // Attack hitbox of 0x39 (self + 1), indexed by the body's frame - 1.
 // Saturn 0x060F2E78 + frame * 4.
 static s8 guardian_hitbox_39[18][4] = {
-    {6, 6, -24, 21},  {6, 6, -28, 20},  {6, 6, -31, 18},  {6, 6, 4, -34},
+    {6, 6, -24, 21},   {6, 6, -28, 20},   {6, 6, -31, 18},  {6, 6, 4, -34},
     {16, 6, -20, -32}, {8, 12, -38, -14}, {6, 12, -34, 20}, {6, 8, 8, -24},
-    {6, 8, 8, -24},   {6, 8, 8, -24},   {8, 8, -16, -18}, {8, 4, -32, 6},
-    {8, 4, -32, 4},   {8, 4, -32, 5},   {8, 4, -40, 5},   {8, 4, -41, 3},
-    {8, 4, -40, 3},   {8, 4, -32, 4},
+    {6, 8, 8, -24},    {6, 8, 8, -24},    {8, 8, -16, -18}, {8, 4, -32, 6},
+    {8, 4, -32, 4},    {8, 4, -32, 5},    {8, 4, -40, 5},   {8, 4, -41, 3},
+    {8, 4, -40, 3},    {8, 4, -32, 4},
 };
 
 // Hitbox of 0x3A (self + 2), indexed by the body's frame - 1.
 // Saturn 0x060F2EC0 + frame * 4.
 static s8 guardian_hitbox_3a[18][4] = {
-    {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},
-    {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},
-    {0, 0, -6, 0},    {4, 16, -6, 12},  {4, 16, -6, 12},  {4, 16, -6, 12},
-    {4, 16, -6, 12},  {4, 16, -6, 12},  {5, 18, -16, 6},  {5, 18, -16, 6},
-    {5, 18, -16, 6},  {4, 16, -8, 12},
+    {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},
+    {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},
+    {0, 0, -6, 0},   {4, 16, -6, 12}, {4, 16, -6, 12}, {4, 16, -6, 12},
+    {4, 16, -6, 12}, {4, 16, -6, 12}, {5, 18, -16, 6}, {5, 18, -16, 6},
+    {5, 18, -16, 6}, {4, 16, -8, 12},
 };
 
 // Saturn SpawnDestructAnim (func 060E1FAC): the sparks at the feet.
@@ -516,6 +516,4 @@ void EntityModGuardian3A(Entity* self) {
 
 // Saturn func_060EC374: the death debris (Saturn 3B). The breeder's debris
 // code is the same, with the frames 0x13-0x1A (set by the defines above).
-void EntityModGuardian3B(Entity* self) {
-    EntityModSkBreederDebris(self);
-}
+void EntityModGuardian3B(Entity* self) { EntityModSkBreederDebris(self); }

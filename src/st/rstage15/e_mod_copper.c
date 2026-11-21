@@ -39,7 +39,8 @@
  *  - SUB_06030E4C (called before the opacity) is skipped. It keeps the speed.
  *  - The death sound 0x8F0 is Saturn-only: SFX_SKELETON_DEATH_C stands in (not
  *    positional). Check g_api.PlaySfx is the right call.
- *  - Frame 0x35 + 7 = 60 (params 7 of a debris piece) is past the 60-frame bank.
+ *  - Frame 0x35 + 7 = 60 (params 7 of a debris piece) is past the 60-frame
+ * bank.
  */
 
 #include "rstage15.h"
@@ -48,8 +49,8 @@
 #define SAT_X(v) ((v) * 4 / 5)
 
 // Sounds (include/sfx.h): the Saturn id equals the PS1 id.
-#define MOD_COPPER_SFX_SWING SFX_WEAPON_SWISH_C // 0x60C
-#define MOD_COPPER_SFX_LUNGE SFX_WEAPON_SWISH_B // 0x60B
+#define MOD_COPPER_SFX_SWING SFX_WEAPON_SWISH_C   // 0x60C
+#define MOD_COPPER_SFX_LUNGE SFX_WEAPON_SWISH_B   // 0x60B
 #define MOD_COPPER_SFX_DEATH SFX_SKELETON_DEATH_C // Saturn-only 0x8F0
 
 // The collision helpers (st_common.c, e_misc.c).
@@ -90,57 +91,48 @@ enum {
 
 // Saturn animation scripts, frames 1:1. Pairs of (duration, frame). 0x00 0x00
 // loops. 0xFF 0x00 ends (AnimateEntity returns 0).
-static u8 copper_anim_328[] = {// 0x060EF328, armor IDLE (loops)
-                               0x17, 0x10, 0x0D, 0x11, 0x0D, 0x12,
-                               0x09, 0x13, 0x0D, 0x14, 0x00, 0x00};
-static u8 copper_anim_31C[] = {// 0x060EF31C, armor WALK
-                               0x12, 0x0C, 0x06, 0x0D, 0x10, 0x0E,
-                               0x05, 0x0F, 0x00, 0x00};
-static u8 copper_anim_304[] = {// 0x060EF304, LUNGE and HOP swipe
-                               0x02, 0x01, 0x02, 0x02, 0x02, 0x03, 0x08, 0x04,
-                               0x10, 0x05, 0x18, 0x06, 0x08, 0x07, 0x03, 0x08,
-                               0x03, 0x09, 0x03, 0x0A, 0x1E, 0x0B, 0x00, 0x00};
-static u8 copper_anim_334[] = {// 0x060EF334, LAND (stand up, sub-steps 0-2)
-                               0x02, 0x15, 0x03, 0x16, 0x03, 0x17, 0x03, 0x18,
-                               0x03, 0x19, 0x03, 0x1A, 0xFF, 0x00};
-static u8 copper_anim_344[] = {// 0x060EF344, LAND recover (sub-step 3)
-                               0x04, 0x1B, 0x04, 0x1C, 0x06, 0x1D,
-                               0x08, 0x1E, 0x18, 0x1F, 0xFF, 0x00};
-static u8 copper_anim_350[] = {// 0x060EF350, HIT
-                               0x06, 0x20, 0x0A, 0x21, 0x14, 0x22, 0x16, 0x23,
-                               0x07, 0x25, 0x18, 0x26, 0x00, 0x00};
-static u8 copper_anim_360[] = {// 0x060EF360, LUNGE_LONG and HOP_B swipe
-                               0x02, 0x27, 0x03, 0x28, 0x04, 0x29, 0x06, 0x2A,
-                               0x1C, 0x2B, 0x06, 0x2C, 0x03, 0x2D, 0x01, 0x2E,
-                               0x18, 0x2F, 0x03, 0x30, 0x03, 0x31, 0x04, 0x32,
-                               0x08, 0x33, 0x0A, 0x34, 0x00, 0x00};
-static u8 copper_anim_380[] = {// 0x060EF380, COMBO first part
-                               0x02, 0x01, 0x02, 0x02, 0x04, 0x03, 0x02, 0x04,
-                               0x10, 0x05, 0x20, 0x06, 0x04, 0x07, 0x02, 0x08,
-                               0x02, 0x09, 0x02, 0x0A, 0x02, 0x0B, 0x00, 0x00};
-static u8 copper_anim_398[] = {// 0x060EF398, COMBO second part
-                               0x02, 0x04, 0x04, 0x05, 0x04, 0x06, 0x04, 0x07,
-                               0x04, 0x08, 0x04, 0x09, 0x04, 0x0A, 0x04, 0x0B,
-                               0x00, 0x00};
-static u8 copper_anim_3AC[] = {// 0x060EF3AC, COMBO A third part
-                               0x02, 0x04, 0x06, 0x05, 0x06, 0x06, 0x06, 0x07,
-                               0x04, 0x08, 0x04, 0x09, 0x06, 0x0A, 0x18, 0x0B,
-                               0x00, 0x00};
-static u8 copper_anim_3D4[] = {// 0x060EF3D4, COMBO B third part
-                               0x02, 0x27, 0x03, 0x28, 0x04, 0x29, 0x06, 0x2A,
-                               0x1C, 0x2B, 0x06, 0x2C, 0x03, 0x2D, 0x01, 0x2E,
-                               0x30, 0x2F, 0x03, 0x30, 0x03, 0x31, 0x04, 0x32,
-                               0x08, 0x33, 0x0A, 0x34, 0x00, 0x00};
-static u8 copper_anim_3C0[] = {// 0x060EF3C0, HOP walk back (loops)
-                               0x02, 0x04, 0x02, 0x05, 0x02, 0x06, 0x02, 0x07,
-                               0x02, 0x08, 0x02, 0x09, 0x02, 0x0A, 0x02, 0x0B,
-                               0x00, 0x00};
+static u8 copper_anim_328[] = { // 0x060EF328, armor IDLE (loops)
+    0x17, 0x10, 0x0D, 0x11, 0x0D, 0x12, 0x09, 0x13, 0x0D, 0x14, 0x00, 0x00};
+static u8 copper_anim_31C[] = { // 0x060EF31C, armor WALK
+    0x12, 0x0C, 0x06, 0x0D, 0x10, 0x0E, 0x05, 0x0F, 0x00, 0x00};
+static u8 copper_anim_304[] = { // 0x060EF304, LUNGE and HOP swipe
+    0x02, 0x01, 0x02, 0x02, 0x02, 0x03, 0x08, 0x04, 0x10, 0x05, 0x18, 0x06,
+    0x08, 0x07, 0x03, 0x08, 0x03, 0x09, 0x03, 0x0A, 0x1E, 0x0B, 0x00, 0x00};
+static u8 copper_anim_334[] = { // 0x060EF334, LAND (stand up, sub-steps 0-2)
+    0x02, 0x15, 0x03, 0x16, 0x03, 0x17, 0x03,
+    0x18, 0x03, 0x19, 0x03, 0x1A, 0xFF, 0x00};
+static u8 copper_anim_344[] = { // 0x060EF344, LAND recover (sub-step 3)
+    0x04, 0x1B, 0x04, 0x1C, 0x06, 0x1D, 0x08, 0x1E, 0x18, 0x1F, 0xFF, 0x00};
+static u8 copper_anim_350[] = { // 0x060EF350, HIT
+    0x06, 0x20, 0x0A, 0x21, 0x14, 0x22, 0x16,
+    0x23, 0x07, 0x25, 0x18, 0x26, 0x00, 0x00};
+static u8 copper_anim_360[] = { // 0x060EF360, LUNGE_LONG and HOP_B swipe
+    0x02, 0x27, 0x03, 0x28, 0x04, 0x29, 0x06, 0x2A, 0x1C, 0x2B,
+    0x06, 0x2C, 0x03, 0x2D, 0x01, 0x2E, 0x18, 0x2F, 0x03, 0x30,
+    0x03, 0x31, 0x04, 0x32, 0x08, 0x33, 0x0A, 0x34, 0x00, 0x00};
+static u8 copper_anim_380[] = { // 0x060EF380, COMBO first part
+    0x02, 0x01, 0x02, 0x02, 0x04, 0x03, 0x02, 0x04, 0x10, 0x05, 0x20, 0x06,
+    0x04, 0x07, 0x02, 0x08, 0x02, 0x09, 0x02, 0x0A, 0x02, 0x0B, 0x00, 0x00};
+static u8 copper_anim_398[] = { // 0x060EF398, COMBO second part
+    0x02, 0x04, 0x04, 0x05, 0x04, 0x06, 0x04, 0x07, 0x04,
+    0x08, 0x04, 0x09, 0x04, 0x0A, 0x04, 0x0B, 0x00, 0x00};
+static u8 copper_anim_3AC[] = { // 0x060EF3AC, COMBO A third part
+    0x02, 0x04, 0x06, 0x05, 0x06, 0x06, 0x06, 0x07, 0x04,
+    0x08, 0x04, 0x09, 0x06, 0x0A, 0x18, 0x0B, 0x00, 0x00};
+static u8 copper_anim_3D4[] = { // 0x060EF3D4, COMBO B third part
+    0x02, 0x27, 0x03, 0x28, 0x04, 0x29, 0x06, 0x2A, 0x1C, 0x2B,
+    0x06, 0x2C, 0x03, 0x2D, 0x01, 0x2E, 0x30, 0x2F, 0x03, 0x30,
+    0x03, 0x31, 0x04, 0x32, 0x08, 0x33, 0x0A, 0x34, 0x00, 0x00};
+static u8 copper_anim_3C0[] = { // 0x060EF3C0, HOP walk back (loops)
+    0x02, 0x04, 0x02, 0x05, 0x02, 0x06, 0x02, 0x07, 0x02,
+    0x08, 0x02, 0x09, 0x02, 0x0A, 0x02, 0x0B, 0x00, 0x00};
 
 // Collision sensors. X is scaled (SAT_X), Y as is.
 // 0x060EF2CA: UnkCollisionFunc2 (floor, then wall).
 static s16 copper_sensors_2ca[] = {0, 0, SAT_X(8), 0};
 // 0x060EF2D2: UnkCollisionFunc3 (four pairs).
-static s16 copper_sensors_2d2[] = {0, 0, 0, -28, SAT_X(12), -36, SAT_X(-24), -32};
+static s16 copper_sensors_2d2[] = {
+    0, 0, 0, -28, SAT_X(12), -36, SAT_X(-24), -32};
 // 0x060EF2B8: CheckColliderOffsets, one point, facing 0 (0xFF ends it).
 static s16 copper_wall_2b8[] = {SAT_X(0), 8, 0xFF};
 // 0x060EF2BE: CheckColliderOffsets, one point (0xFF ends it).
@@ -154,19 +146,19 @@ static s16 copper_child_y[8] = {24, 24, 8, -4, 0, -2, -4, -16};
 // 0x060EF410 (+ 0x060EF4E4): the weapon hitbox for armor frames 0..52. Each
 // row: {offX, offY, width, height}, Saturn space. Frames above 52 use row 0.
 static s8 copper_hitbox_22[53][4] = {
-    {0, 0, 0, 0},     {-17, 1, 0, 0},   {-22, 24, 0, 0},  {-14, 22, 0, 0},
-    {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},     {-42, 1, 16, 4},
-    {-40, 4, 8, 1},   {-37, 2, 8, 1},   {-32, 2, 0, 0},   {-16, -8, 0, 0},
-    {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},
-    {-17, -4, 0, 0},  {-18, -3, 0, 0},  {-18, -2, 0, 0},  {-18, -3, 0, 0},
-    {-18, -3, 0, 0},  {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},
-    {-16, 24, 3, 6},  {-19, 21, 1, 8},  {-25, 4, 8, 1},   {-24, 2, 8, 1},
-    {-17, 0, 5, 4},   {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},
-    {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},
-    {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},     {0, 0, 0, 0},
-    {0, 0, 0, 0},     {-12, 15, 3, 8},  {-6, 13, 3, 8},   {-10, 21, 3, 8},
-    {-19, 17, 1, 10}, {-53, -8, 8, 1},  {-55, -6, 8, 1},  {-19, 18, 0, 0},
-    {-11, 20, 0, 0},  {-7, 13, 0, 0},   {0, 0, 0, 0},     {0, 0, 0, 0},
+    {0, 0, 0, 0},     {-17, 1, 0, 0},  {-22, 24, 0, 0}, {-14, 22, 0, 0},
+    {0, 0, 0, 0},     {0, 0, 0, 0},    {0, 0, 0, 0},    {-42, 1, 16, 4},
+    {-40, 4, 8, 1},   {-37, 2, 8, 1},  {-32, 2, 0, 0},  {-16, -8, 0, 0},
+    {0, 0, 0, 0},     {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},
+    {-17, -4, 0, 0},  {-18, -3, 0, 0}, {-18, -2, 0, 0}, {-18, -3, 0, 0},
+    {-18, -3, 0, 0},  {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},
+    {-16, 24, 3, 6},  {-19, 21, 1, 8}, {-25, 4, 8, 1},  {-24, 2, 8, 1},
+    {-17, 0, 5, 4},   {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},
+    {0, 0, 0, 0},     {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},
+    {0, 0, 0, 0},     {0, 0, 0, 0},    {0, 0, 0, 0},    {0, 0, 0, 0},
+    {0, 0, 0, 0},     {-12, 15, 3, 8}, {-6, 13, 3, 8},  {-10, 21, 3, 8},
+    {-19, 17, 1, 10}, {-53, -8, 8, 1}, {-55, -6, 8, 1}, {-19, 18, 0, 0},
+    {-11, 20, 0, 0},  {-7, 13, 0, 0},  {0, 0, 0, 0},    {0, 0, 0, 0},
 };
 
 // Saturn (v * 5) >> 2, rounded toward zero for negative v, then to PC space.
@@ -180,8 +172,8 @@ static s32 CopperScale54(s32 v) {
 
 // One dust puff at the feet. Saturn SpawnDestructAnim(self, 1, 1, x, 0, n, 0).
 static void CopperDust(Entity* self, s32 x) {
-    EntityExplosionVariantsSpawner(self, 1, 1, SAT_X(x), 0,
-                                   (Random() & 3) + 1, 0);
+    EntityExplosionVariantsSpawner(
+        self, 1, 1, SAT_X(x), 0, (Random() & 3) + 1, 0);
 }
 
 // The epilogue (Saturn 060E6608): opacity from speed, and dust.
@@ -242,8 +234,7 @@ static s32 CopperLandSub(Entity* self, u8 flip) {
         return 0;
     case 2: // wait for the landing
         AnimateEntity(copper_anim_334, self);
-        if (self->velocityY >= 0 &&
-            CheckColliderOffsets(copper_wall_2b8, 0)) {
+        if (self->velocityY >= 0 && CheckColliderOffsets(copper_wall_2b8, 0)) {
             self->pose = 0;
             self->poseTimer = 0;
             self->step_s++;
@@ -299,7 +290,8 @@ void EntityModCopper(Entity* self) {
         self->facingLeft = (GetSideToPlayer() & 1) ^ 1;
         dist = GetDistanceToPlayerX();
         next = 0;
-        if (dist < SAT_X(0x20) || (dist < SAT_X(0x70) && (Random() & 0x3F) == 0)) {
+        if (dist < SAT_X(0x20) ||
+            (dist < SAT_X(0x70) && (Random() & 0x3F) == 0)) {
             // too close: jump back
             self->velocityX = SAT_X(-0x20000);
             self->velocityY = -0x48000;
@@ -407,7 +399,8 @@ void EntityModCopper(Entity* self) {
             PlaySfxPositional(MOD_COPPER_SFX_SWING);
         }
         if (self->animCurFrame == 7) {
-            self->velocityX = self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
+            self->velocityX =
+                self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
         }
         self->velocityX = (self->velocityX + (self->velocityX < 0)) >> 1;
         if (AnimateEntity(copper_anim_304, self) == 0) {
@@ -425,7 +418,8 @@ void EntityModCopper(Entity* self) {
             PlaySfxPositional(MOD_COPPER_SFX_LUNGE);
         }
         if (self->animCurFrame == 0x2E) {
-            self->velocityX = self->facingLeft ? SAT_X(0x80000) : SAT_X(-0x80000);
+            self->velocityX =
+                self->facingLeft ? SAT_X(0x80000) : SAT_X(-0x80000);
         }
         self->velocityX = (self->velocityX * 6) / 7;
         if (AnimateEntity(copper_anim_360, self) == 0) {
@@ -448,7 +442,8 @@ void EntityModCopper(Entity* self) {
                 PlaySfxPositional(MOD_COPPER_SFX_SWING);
             }
             if (self->animCurFrame == 7) {
-                self->velocityX = self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
+                self->velocityX =
+                    self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
             }
             self->velocityX = (self->velocityX + (self->velocityX < 0)) >> 1;
             if (AnimateEntity(copper_anim_380, self) == 0) {
@@ -462,7 +457,8 @@ void EntityModCopper(Entity* self) {
                 PlaySfxPositional(MOD_COPPER_SFX_SWING);
             }
             if (self->animCurFrame == 7) {
-                self->velocityX = self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
+                self->velocityX =
+                    self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
             }
             self->velocityX = (self->velocityX + (self->velocityX < 0)) >> 1;
             if (AnimateEntity(copper_anim_398, self) == 0) {
@@ -478,7 +474,8 @@ void EntityModCopper(Entity* self) {
             if (self->animCurFrame == 4) {
                 self->facingLeft = (GetSideToPlayer() & 1) ^ 1;
             } else if (self->animCurFrame == 7) {
-                self->velocityX = self->facingLeft ? SAT_X(0x60000) : SAT_X(-0x60000);
+                self->velocityX =
+                    self->facingLeft ? SAT_X(0x60000) : SAT_X(-0x60000);
             }
             self->velocityX = (self->velocityX * 4) / 5;
             if (AnimateEntity(copper_anim_3AC, self) == 0) {
@@ -508,7 +505,8 @@ void EntityModCopper(Entity* self) {
                 PlaySfxPositional(MOD_COPPER_SFX_SWING);
             }
             if (self->animCurFrame == 7) {
-                self->velocityX = self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
+                self->velocityX =
+                    self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
             }
             self->velocityX = (self->velocityX + (self->velocityX < 0)) >> 1;
             if (AnimateEntity(copper_anim_380, self) == 0) {
@@ -522,7 +520,8 @@ void EntityModCopper(Entity* self) {
                 PlaySfxPositional(MOD_COPPER_SFX_SWING);
             }
             if (self->animCurFrame == 7) {
-                self->velocityX = self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
+                self->velocityX =
+                    self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
             }
             self->velocityX = (self->velocityX + (self->velocityX < 0)) >> 1;
             if (AnimateEntity(copper_anim_398, self) == 0) {
@@ -538,7 +537,8 @@ void EntityModCopper(Entity* self) {
             if (self->animCurFrame == 0x2A) {
                 self->facingLeft = (GetSideToPlayer() & 1) ^ 1;
             } else if (self->animCurFrame == 0x2E) {
-                self->velocityX = self->facingLeft ? SAT_X(0x100000) : SAT_X(-0x100000);
+                self->velocityX =
+                    self->facingLeft ? SAT_X(0x100000) : SAT_X(-0x100000);
             }
             self->velocityX = (self->velocityX * 5) / 6;
             if (AnimateEntity(copper_anim_3D4, self) == 0) {
@@ -570,7 +570,8 @@ void EntityModCopper(Entity* self) {
             if (self->animCurFrame == 4) {
                 self->facingLeft = (GetSideToPlayer() & 1) ^ 1;
             } else if (self->animCurFrame == 7) {
-                self->velocityX = self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
+                self->velocityX =
+                    self->facingLeft ? SAT_X(0x40000) : SAT_X(-0x40000);
             }
             self->velocityX = (self->velocityX * 5) / 6;
             if (AnimateEntity(copper_anim_304, self) == 0) {
@@ -594,7 +595,8 @@ void EntityModCopper(Entity* self) {
             self->facingLeft = (GetSideToPlayer() & 1) ^ 1;
         }
         if (self->animCurFrame == 7) {
-            self->velocityX = self->facingLeft ? SAT_X(0x10000) : SAT_X(-0x10000);
+            self->velocityX =
+                self->facingLeft ? SAT_X(0x10000) : SAT_X(-0x10000);
         }
         self->velocityX = (self->velocityX + (self->velocityX < 0)) >> 1;
         if (AnimateEntity(copper_anim_3C0, self) != 0 || (Random() & 3) != 0) {
@@ -619,7 +621,8 @@ void EntityModCopper(Entity* self) {
             if (self->animCurFrame == 0x2A) {
                 self->facingLeft = (GetSideToPlayer() & 1) ^ 1;
             } else if (self->animCurFrame == 0x2E) {
-                self->velocityX = self->facingLeft ? SAT_X(0x80000) : SAT_X(-0x80000);
+                self->velocityX =
+                    self->facingLeft ? SAT_X(0x80000) : SAT_X(-0x80000);
             }
             self->velocityX = (self->velocityX * 5) / 6;
             if (AnimateEntity(copper_anim_360, self) == 0) {
@@ -641,7 +644,8 @@ void EntityModCopper(Entity* self) {
             self->facingLeft = (GetSideToPlayer() & 1) ^ 1;
         }
         if (self->animCurFrame == 7) {
-            self->velocityX = self->facingLeft ? SAT_X(0x18000) : SAT_X(-0x18000);
+            self->velocityX =
+                self->facingLeft ? SAT_X(0x18000) : SAT_X(-0x18000);
         }
         self->velocityX = (self->velocityX + (self->velocityX < 0)) >> 1;
         if (AnimateEntity(copper_anim_3C0, self) == 0 && (Random() & 3) == 0) {
@@ -694,7 +698,8 @@ void EntityModCopper(Entity* self) {
                 DestroyEntity(e);
                 CreateEntityFromEntity(E_EXPLOSION, self, e);
                 e->params = 2;
-                e->posX.i.hi += (s16)CopperScale54(copper_child_x[self->params]);
+                e->posX.i.hi +=
+                    (s16)CopperScale54(copper_child_x[self->params]);
                 e->posY.i.hi += -0x20 + copper_child_y[self->params];
             }
         }
@@ -716,14 +721,16 @@ void EntityModCopper(Entity* self) {
     }
 }
 
-// Saturn func_060E6750: the armor's weapon. Its hitbox follows the armor's frame.
+// Saturn func_060E6750: the armor's weapon. Its hitbox follows the armor's
+// frame.
 void EntityModCopper22(Entity* self) {
     Entity* parent = self - 1;
     s32 idx;
     s32 w;
 
     if (self->step == 0) {
-        InitializeEntity(g_EInitModCopper22); // no sprite, as the breeder's weapon
+        InitializeEntity(
+            g_EInitModCopper22); // no sprite, as the breeder's weapon
         self->attack = 0x37;
         self->step = 1;
     }
