@@ -491,30 +491,39 @@ void InitMainMenuBackgroundAndFadeMask(void) {
 // last 16-bit column of the backdrop (576,0 and 767,0, 1x240): the stock
 // game, or a pack without them, draws nothing there. The fade mask (a TILE)
 // grows over them (Wide_Tile).
+// A wing is at least 240 wide and reaches the canvas edge (32:9 at 1080 rows
+// shows 288 per side); RenderPrimitives skips x0 < -512.
+int Wide_Canvas(int* x0, int* y0, int* x1, int* y1);
+
 static void SelBackdropWings(void) {
     static const s16 col[] = {576, 767};
     Primitive* bg = &g_PrimBuf[D_801BAFC0];
     Primitive* prim;
-    s32 i, x0, u, tw, th;
+    s32 i, x0, u, tw, th, w, cx0, cy0, cx1, cy1;
 
-    if (g_GameEngineStep <= Upd_Eng_Init) { // the prims are not made yet
+    // not made yet, or gone: the new game start (Upd_Eng_18) clears the whole
+    // prim buffer (func_801B2D1C), so the second prim has no next
+    if (g_GameEngineStep <= Upd_Eng_Init || sel_wings < 0 ||
+        g_PrimBuf[sel_wings].type != PRIM_GT4) {
         sel_wings = -1;
-    }
-    if (sel_wings < 0) {
         return;
     }
     prim = &g_PrimBuf[sel_wings];
-    for (i = 0; i < 2; i++, prim = prim->next) {
+    for (i = 0; i < 2 && prim; i++, prim = prim->next) {
         prim->drawMode = DRAW_HIDE;
         if ((bg->drawMode & DRAW_HIDE) ||
             !Psyz_HdTexSize(col[i], 0, 1, 0xF0, 16, &tw, &th)) {
             continue;
         }
-        x0 = i ? DISP_MENU_W : -0xF0;
+        w = 0xF0;
+        if (Wide_Canvas(&cx0, &cy0, &cx1, &cy1)) {
+            w = MIN(MAX(w, i ? cx1 - DISP_MENU_W : -cx0), 512);
+        }
+        x0 = i ? DISP_MENU_W : -w;
         u = col[i] & 0x3F;
         prim->tpage = 0x100 | (col[i] >> 6); // 16-bit texels
         prim->x0 = prim->x2 = x0;
-        prim->x1 = prim->x3 = x0 + 0xF0;
+        prim->x1 = prim->x3 = x0 + w;
         prim->y0 = prim->y1 = 0;
         prim->y2 = prim->y3 = 0xF0;
         prim->u0 = prim->u2 = u;
