@@ -203,11 +203,15 @@ def main():
     with open(game_bin, "rb") as f:
         game = f.read()
     sfx = music = 0
-    with tempfile.TemporaryDirectory() as tmp:
-        for stage, (overlay, ids) in STAGES.items():
-            sfx += convert_sfx(args, game, stage, overlay, ids, tmp)
-        for music_id, (stage, source) in MUSIC.items():
-            music += convert_music(args, music_id, stage, source, tmp)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            for stage, (overlay, ids) in STAGES.items():
+                sfx += convert_sfx(args, game, stage, overlay, ids, tmp)
+            for music_id, (stage, source) in MUSIC.items():
+                music += convert_music(args, music_id, stage, source, tmp)
+    except Exception as e:  # a bad or odd disc file must not stop the build
+        log(f"conversion stopped ({type(e).__name__}: {e}): the files not "
+            "written play the PS1 stand-ins")
     total = sum(len(ids) for _, ids in STAGES.values())
     log(f"{sfx}/{total} sounds, {music}/{len(MUSIC)} boss tracks in {args.data}")
     return 0
