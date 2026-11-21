@@ -165,6 +165,9 @@ RPRISON = dict(
                 "NOVA_LASER2": (10, 37, 2)},
 )
 STAGES = {"STAGE_15": GARDEN, "STAGE_16": PRISON, "RSTAGE16": RPRISON}
+# Reverse Garden (RSTAGE15): its own table, rstage15_entities.py
+from rstage15_entities import RGARDEN  # noqa: E402
+STAGES["RSTAGE15"] = RGARDEN
 QUADRANTS = [(t, q) for t in range(18, 24) for q in range(4)]
 CLUT_BASE = 0x210
 GAME_BASE, ENEMY_DEFS, FIRST, COUNT = 0x06066000, 0x06080288, 400, 26
@@ -248,6 +251,7 @@ def main(disc, out_path, stage="STAGE_15"):
             for n, f in SPRITE_SETS]
     saturn_sprites.BLEED_BANKS.update(BLEED_BANKS)
     saturn_sprites.STP_BANKS.update(STP_BANKS)
+    saturn_sprites.TRIM_BANKS.update(STAGES[stage].get("TRIM_BANKS", {}))
 
     def fill(sheets):
         for g, bank in PALETTE_BLOCKS.values():
@@ -264,7 +268,7 @@ def main(disc, out_path, stage="STAGE_15"):
                 bank.append([dict(p, y=p["y"] + dy) for p in parts])
             out.append((n, bank))
         if BANNER:
-            bank, imgs, g = BANNER
+            bank, imgs, g = BANNER[:3]
             clut = sheets[g]._clut(st.palettes(bank)[0])
             out.append(("banner", [sheets[g]._place(st, bank, i) + (clut,)
                                    for i in imgs]))
@@ -386,19 +390,19 @@ def main(disc, out_path, stage="STAGE_15"):
         defs.append("#define MOD_%s_COLORS %s" % (name, ", ".join(
             "0x%04X" % c for c in cluts[base - CLUT_BASE])))
     # the area name banner's images: {tpage, clut, u, v, width, height} each
-    # (PSX texel coordinates inside the 4bpp tpage)
+    # (PSX texel coordinates inside the 4bpp tpage); BANNER[3] renames them
     for parts in banner:
-        defs.append("#define MOD_BANNER_PARTS %s" % ", ".join(
+        defs.append("#define MOD_%s_PARTS %s" % ((BANNER + ("BANNER",))[3], ", ".join(
             "{%d, 0x%03X, %d, %d, %d, %d}" % (
                 sheets[BANNER[2]].quadrants[q][0], clut,
                 (sheets[BANNER[2]].quadrants[q][1] & 1) * 128 + u,
                 (sheets[BANNER[2]].quadrants[q][1] >> 1) * 128 + v, w, h)
-            for q, u, v, w, h, clut in parts))
+            for q, u, v, w, h, clut in parts)))
     # the primitives' textures: tpage, clut and u, v, width, height in it
-    # (n, frame): a one-part frame; (n, frame, k): part k of the frame
+    # (n, frame): a frame's first part; (n, frame, k): part k
     for name, (n, f, *k) in PRIM_PARTS.items():
         parts = dict(banks)[n][f - 1]
-        p, = [parts[k[0]]] if k else parts
+        p = parts[k[0]] if k else parts[0]
         quad = p["tileset"] & 3
         for k, val in (("TPAGE", p["tileset"] >> 2), ("CLUT", p["clut"]),
                        ("U", (quad & 1) * 128 + p["left"]),

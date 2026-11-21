@@ -32,6 +32,8 @@ static SpriteParts* s_SpriteBanks[0x14];
 #include "../../st/stage16/stage16.h"
 #elif defined(SATURN_STAGE_RPRISON)
 #include "../../st/rstage16/rstage16.h"
+#elif defined(SATURN_STAGE_RGARDEN)
+#include "../../st/rstage15/rstage15.h"
 #else
 #include "../../st/stage15/stage15.h"
 #endif
@@ -921,6 +923,9 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_DUMMY_0F;
     }
 }
+#elif defined(SATURN_STAGE_RGARDEN)
+// Saturn RSTAGE15 entity id -> rstage15.h EntityID
+#include "../../st/rstage15/rstage15_ids.h"
 #else
 // Saturn STAGE_15 entity id -> stage15.h EntityID. The ids without a port
 // (water, CD room foreground) stay idle.

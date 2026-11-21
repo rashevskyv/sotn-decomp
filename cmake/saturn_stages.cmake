@@ -124,6 +124,7 @@ function(add_saturn_gdn_entities name source)
         DEPENDS
             "${CMAKE_SOURCE_DIR}/tools/saturn/entities/gdn_entities.py"
             "${CMAKE_SOURCE_DIR}/tools/saturn/entities/saturn_sprites.py"
+            "${CMAKE_SOURCE_DIR}/tools/saturn/entities/rstage15_entities.py"
             "${gdn_disc}/${source}.PRG"
             "${gdn_disc}/${source}.CHR"
             "${gdn_disc}/0.BIN"
@@ -161,7 +162,34 @@ set(SATURN_PRISON_SOURCES
     src/st/stage16/st_update.c)
 add_saturn_stage(stage16 STAGE_16 SD26 TEST_STAGE16 ${SATURN_PRISON_SOURCES})
 add_saturn_gdn_entities(stage16 STAGE_16 SATURN_STAGE_PRISON)
-add_saturn_stage(rstage15 RSTAGE15 SD29 TEST_RSTAGE15)
+# Reverse Garden: the same framework (src/st/rstage15) with the PS1's Cave
+# Troll, Blue Venus Weed, Bitterfly and Cloaked Knight and the Saturn-only
+# Copper Armor, Efreet and Skeleton Guardian (rstage15_entities.py)
+set(SATURN_RGDN_SOURCES
+    src/st/rstage15/bss.c
+    src/st/rstage15/collision.c
+    src/st/rstage15/create_entity.c
+    src/st/rstage15/d_prize_drops.c
+    src/st/rstage15/e_bitterfly.c
+    src/st/rstage15/e_breakable.c
+    src/st/rstage15/e_cave_troll.c
+    src/st/rstage15/e_cloaked_knight.c
+    src/st/rstage15/e_collect.c
+    src/st/rstage15/e_init.c
+    src/st/rstage15/e_misc.c
+    src/st/rstage15/e_mod_copper.c
+    src/st/rstage15/e_mod_efreet.c
+    src/st/rstage15/e_mod_guardian.c
+    src/st/rstage15/e_particles.c
+    src/st/rstage15/e_room_bg.c
+    src/st/rstage15/e_venus_weed.c
+    src/st/rstage15/e_water.c
+    src/st/rstage15/popup.c
+    src/st/rstage15/prim_helpers.c
+    src/st/rstage15/st_common.c
+    src/st/rstage15/st_update.c)
+add_saturn_stage(rstage15 RSTAGE15 SD29 TEST_RSTAGE15 ${SATURN_RGDN_SOURCES})
+add_saturn_gdn_entities(rstage15 RSTAGE15 SATURN_STAGE_RGARDEN)
 # the inverted Cursed Prison: the same framework (src/st/rstage16) with the
 # Gargoyle, the PS1's Flying Zombie, Jack O'Bones and Nova Skeleton, and the
 # Saturn-only Wight and Wraith
