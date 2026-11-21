@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "st0.h"
 #include "sfx.h"
+#ifdef PLATFORM_PSYZ
+#include <psyz/video.h>
+#endif
 
 #if TARGET == TARGET_PSP
 void* GetLang(void* en, void* fr, void* sp, void* ge, void* it);
@@ -411,6 +414,13 @@ void EntityStageTitleCard(Entity* self) {
         }
         break;
     }
+#ifdef PLATFORM_PSYZ
+    // the turning blue triangle is a polygon: at the output resolution its
+    // edges show no stairs of a low internal resolution
+    if (self->entityId) {
+        Psyz_HdTexHoldRes();
+    }
+#endif
     g_Player.demo_timer = 4;
     g_Player.padSim = 0;
 }

@@ -358,8 +358,9 @@ static bool StretchBackdrop(TilemapRenderer* r, BgLayer* bg) {
 // is the whole margin (the room art goes on there).
 // A GP0 command of the port switches the mode on and off in the OT. It
 // fades in and out over 30 frames, below the HUD (0x1EE) and the dialogue
-// (0x1FC), above the stage layers and entities.
-#define VIGNETTE_OT 0x1E0
+// (0x1FC), above the stage layers and entities, the room foreground
+// (E_ROOM_FOREGROUND 0x1EC: the save room arch) too.
+#define VIGNETTE_OT 0x1ED
 #define VIGNETTE_FADE 30
 #define VIGNETTE_STRIPS 12 // a side, and one flat strip
 #define VIGNETTE_RAMP 48      // px, 3 tiles
@@ -528,6 +529,14 @@ void RenderTilemap(void) {
     TilemapRenderer* r = &_r;
 
     if (g_PcStageLayerRenderer != NULL && g_PcStageLayerRenderer()) {
+        // a Saturn stage draws its own layers: the same room edge cover
+        // and vignette over them (no ApronPass, so no next room cells)
+        r->ot = g_CurrentBuffer->ot;
+        r->dr = &g_CurrentBuffer->drawModes[g_GpuUsage.drawModes];
+        r->x = g_cameraOffsetX;
+        r->y = g_cameraOffsetY;
+        s_NextCells[0] = s_NextCells[1] = 0;
+        WideVignette(r);
         return;
     }
 #else

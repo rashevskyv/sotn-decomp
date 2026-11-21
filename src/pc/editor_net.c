@@ -42,7 +42,12 @@ const char* Editor_Status(void) {
 #include <sys/time.h>
 #include <unistd.h>
 
-#define PORT 8080
+// tests: SOTN_EDITOR_PORT moves it, so parallel hidden runs do not collide
+static int EditorPort(void) {
+    const char* s = getenv("SOTN_EDITOR_PORT");
+    return s && atoi(s) > 0 ? atoi(s) : 8080;
+}
+#define PORT EditorPort()
 #define MAX_HEAD 8192
 #define MAX_BODY (1 << 20)
 
@@ -454,6 +459,20 @@ static void Handle(int fd) {
         }
         Put("]", 1);
         ReplyOut(fd, 200, "application/json");
+    } else if (!strcmp(path, "/hp") && !strcmp(method, "POST")) {
+        // tests: set the hit points of one entity (a boss to its next form)
+        k = Arg(query, "slot", -1);
+        code = k >= 0 && k < TOTAL_ENTITY_COUNT && g_Entities[k].entityId
+                   ? 200
+                   : 400;
+        if (code == 200) {
+            g_Entities[k].hitPoints = Arg(query, "v", 1);
+            if (g_Entities[k].hitPoints <= 0) { // v=0: killed, as by a hit
+                g_Entities[k].flags |= FLAG_DEAD;
+            }
+        }
+        State();
+        ReplyOut(fd, code, "application/json");
     } else if (!strcmp(path, "/c40") && !strcmp(method, "POST")) {
         // tests: set D_80097C40 (Alucard's Muramasa counter, Maria's slot)
         g_Status.D_80097C40 = Arg(query, "v", 0);
