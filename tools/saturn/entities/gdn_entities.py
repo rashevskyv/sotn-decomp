@@ -146,9 +146,13 @@ RPRISON = dict(
     DECORATION_GROUPS=["candles"] * 6,
     PALETTE_BLOCKS={"GARGOYLE": ("gargoyles", 0x060EDE90),
                     # the Wight's palette shimmer (e_mod_wight.c)
-                    "WIGHT": ("wight", 0x060EA3BC)},
+                    "WIGHT": ("wight", 0x060EA3BC),
+                    # one block, so STP_BANKS applies to it
+                    "NOVA": ("nova", 0x060EF730)},
     BLEED_BANKS=(),
-    STP_BANKS=(),
+    # the Nova Skeleton's ring, laser and pulse are drawn additive: their
+    # dark texels must blend away (opaque, they are big black shapes)
+    STP_BANKS=(0x060EF730,),
     GROUP_ROOMS={"candles": (0, 1), "gargoyles": (0,), "zombie": (0,),
                  "jack": (0,), "nova": (0,), "wight": (0, 1),
                  "wraith": (1,)},
