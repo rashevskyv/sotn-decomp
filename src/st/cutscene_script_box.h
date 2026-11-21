@@ -34,10 +34,10 @@ static void CutsceneUnk4(void) {
     prim->clut = g_Dialogue.clutIndex;
     prim->y0 = g_Dialogue.nextLineY;
     prim->u0 = 0;
-    prim->x0 = g_Dialogue.startX + 4;
+    prim->x0 = CS_TEXT_X(g_Dialogue.startX + 4);
     prim->v0 = g_Dialogue.nextCharY * 12 + 128;
 #endif
-    prim->u1 = 192;
+    prim->u1 = CS_LINE_W;
     prim->v1 = 12;
     prim->priority = 0x1FF;
     prim->drawMode = DRAW_DEFAULT;

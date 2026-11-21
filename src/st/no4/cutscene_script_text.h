@@ -64,7 +64,7 @@ static u8 SetCutsceneScript(u8* script) {
             prim->g2 = prim->g3 = prim->b2 = prim->b3 = 0;
         prim->b0 = prim->b1 = 127;
         prim->x0 = prim->x2 = 4;
-        prim->x1 = prim->x3 = 248;
+        prim->x1 = prim->x3 = LANG_DIALOGUE_BOX_RIGHT();
         prim->priority = 509;
         prim->drawMode = DRAW_HIDE;
 

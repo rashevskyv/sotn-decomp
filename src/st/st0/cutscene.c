@@ -372,7 +372,7 @@ void EntityCutscene(Entity* self) {
                         *g_Dialogue.scriptCur++;
                     continue;
                 case CSOP_SET_WAIT:
-                    g_Dialogue.nextCharTimer = *g_Dialogue.scriptCur++;
+                    g_Dialogue.nextCharTimer = CS_WAIT_TIMER();
                     if (g_SkipCutscene) {
                         continue;
                     }
@@ -458,7 +458,7 @@ void EntityCutscene(Entity* self) {
                     prim->y0 = prim->y1 = g_Dialogue.startY;
                     prim->y2 = prim->y3 = g_Dialogue.startY + 72;
 #ifdef PLATFORM_PSYZ
-                    // uk: wider to the right, the 23-cell lines fit
+                    // uk, PSP EN, JP-en: wider to the right (lang.c)
                     prim->x1 = prim->x3 = LANG_DIALOGUE_BOX_RIGHT();
 #endif
                     prim = prim->next;
@@ -638,7 +638,7 @@ void EntityCutscene(Entity* self) {
                     if (g_SkipCutscene) {
                         continue;
                     }
-                    g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                    g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
 
 #if TARGET == TARGET_PSP
                     endLoopFlag = true;
@@ -661,7 +661,7 @@ void EntityCutscene(Entity* self) {
                 } else {
                     nextByte = nextByte - 17;
                 }
-                g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
             }
             break; // This breaks the big while loop for psp
         } // This closes the big while loop for psp

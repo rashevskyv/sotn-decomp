@@ -388,7 +388,7 @@ void EntityCutscene(Entity* self) {
 #endif
                     continue;
                 case CSOP_SET_WAIT:
-                    g_Dialogue.nextCharTimer = *g_Dialogue.scriptCur++;
+                    g_Dialogue.nextCharTimer = CS_WAIT_TIMER();
                     if (g_SkipCutscene) {
                         continue;
                     }
@@ -486,7 +486,7 @@ void EntityCutscene(Entity* self) {
                     prim->y2 = prim->y3 = g_Dialogue.startY + 0x48;
                     prim = prim->next;
                     prim->y0 = g_Dialogue.startY - 1;
-                    prim->u0 = 0xF6;
+                    prim->u0 = LANG_DIALOGUE_BOX_RIGHT() - 2;
                     g_Dialogue.portraitAnimTimer = 0x18;
                     self->step = DIALOGUE_OPEN_DIALOG_BOX;
                     self->step_s = DIALOG_BOX_INIT;
@@ -682,7 +682,7 @@ void EntityCutscene(Entity* self) {
                     if (g_SkipCutscene) {
                         continue;
                     }
-                    g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                    g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
                     endLoop = true;
                 } // This closes the CSOP switch for psp
                 if (endLoop) {
@@ -703,7 +703,7 @@ void EntityCutscene(Entity* self) {
                 } else {
                     nextChar = nextChar - 0x11;
                 }
-                g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
             }
             break;
         } // This closes the big while loop for psp
@@ -819,7 +819,7 @@ void EntityCutscene(Entity* self) {
                 nextChar <<= 8;
                 nextChar |= *g_Dialogue.scriptCur++;
 #endif
-                g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
             }
 
             break; // This breaks the big while-loop!
@@ -928,13 +928,13 @@ void EntityCutscene(Entity* self) {
                 prim->r0 = prim->r1 = 127;
                 prim->b0 = prim->b1 = prim->g0 = prim->g1 = 0;
                 // Left (x0) and right (x1) edge of the dialogue box
-                prim->x0 = prim->x1 = 247;
+                prim->x0 = prim->x1 = LANG_DIALOGUE_BOX_RIGHT() - 1;
                 prim->y0 = prim->y1 = g_Dialogue.startY + uCoord;
                 prim->priority = 510;
                 prim->drawMode = DRAW_DEFAULT;
                 prim->x2 = red_line_increment[uCoord];
                 // Initialized as the right side of the dialogue box (247) * 16
-                prim->x3 = 3952;
+                prim->x3 = (LANG_DIALOGUE_BOX_RIGHT() - 1) * 16;
                 uCoord++;
             }
             self->step_s++;
