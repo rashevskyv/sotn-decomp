@@ -19,8 +19,11 @@ RGARDEN = dict(
         (4, [("troll", 0x060EEE94, 0x060EF1A8, f) for f in range(1, 35)]),
         # Saturn 0x21-0x22, Copper Armor (e_mod_copper.c)
         (5, [("copper", 0x060EF3F4, 0x060F0240, f) for f in range(1, 61)]),
-        # Saturn 0x23-0x2B, Efreet (e_mod_efreet.c)
-        (6, [("efreet", 0x060F04E4, 0x060F1648, f) for f in range(1, 82)]),
+        # Saturn 0x23-0x2B, Efreet (e_mod_efreet.c): the Saturn draws the
+        # body (frames 0x0F-0x3E, 0x42-0x4F) at the entity - (0, 12)
+        (6, [("efreet", 0x060F04E4, 0x060F1648, f,
+              -12 if 0x0F <= f <= 0x3E or 0x42 <= f <= 0x4F else 0)
+             for f in range(1, 82)]),
         # Saturn 0x2C-0x32 (RNO4 code)
         (7, [("venus", 0x060F1A2C, 0x060F2670, f) for f in range(1, 60)]),
         # Saturn 0x33 (RNZ0 code)
