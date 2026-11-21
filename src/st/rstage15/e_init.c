@@ -49,6 +49,13 @@ void EntityModGuardian(Entity*);
 void EntityModGuardian39(Entity*);
 void EntityModGuardian3A(Entity*);
 void EntityModGuardian3B(Entity*);
+void EntityWaterTint(Entity*);
+void EntityAlucardWaterEffect(Entity*);
+void EntitySplashWater(Entity*);
+void EntitySurfacingWater(Entity*);
+void EntitySideWaterSplash(Entity*);
+void EntitySmallWaterDrop(Entity*);
+void EntityWaterDrop(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -103,6 +110,13 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityModGuardian39,
     EntityModGuardian3A,
     EntityModGuardian3B,
+    EntityWaterTint,
+    EntityAlucardWaterEffect,
+    EntitySplashWater,
+    EntitySurfacingWater,
+    EntitySideWaterSplash,
+    EntitySmallWaterDrop,
+    EntityWaterDrop,
 };
 _Static_assert(LEN(EntityUpdates) == NUM_RGDN_ENTITIES - 1, "EntityUpdates");
 

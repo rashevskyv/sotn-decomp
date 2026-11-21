@@ -72,6 +72,14 @@ typedef enum EntityID {
     E_MOD_GUARDIAN_39,
     E_MOD_GUARDIAN_3A,
     E_MOD_GUARDIAN_3B,
+    // room 0's water (e_water.c): Saturn 0x15, 0x17; 0x18-0x1C spawn from it
+    E_WATER_TINT,
+    E_ALUCARD_WATER_EFFECT,
+    E_SPLASH_WATER,
+    E_SURFACING_WATER,
+    E_SIDE_WATER_SPLASH,
+    E_SMALL_WATER_DROP,
+    E_WATER_DROP,
     NUM_RGDN_ENTITIES,
 } EntityID;
 // the names RNO4's Cave Troll code uses
