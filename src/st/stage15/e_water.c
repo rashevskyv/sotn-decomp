@@ -11,6 +11,29 @@ s16 g_WaterXTbl[] = {1608, 532, 0, 441, 512, 7, 7, 0};
 
 #include "../water_effects.h"
 
+// The layout puts 0x15 and 0x17 at both room edges (x 128 and 2176): the copy
+// at the door the player comes in by spawns, and it must live on to the pool.
+// The other copy, met at the far edge, goes away.
+static bool IsSecondWater(Entity* self) {
+    Entity* e;
+
+    for (e = g_Entities; e < &g_Entities[TOTAL_ENTITY_COUNT]; e++) {
+        if (e != self && e->entityId == self->entityId && e->step) {
+            DestroyEntity(self);
+            return true;
+        }
+    }
+    return false;
+}
+
+// Saturn 0x17
+void EntityModWaterEffect(Entity* self) {
+    if (self->step == 0 && IsSecondWater(self)) {
+        return;
+    }
+    EntityAlucardWaterEffect(self); // its spawner init keeps it off camera
+}
+
 // Saturn 0x15: one meshed (half see-through) polygon of RGB555 (6, 8, 12)
 // over the water region params, in front of the player (Saturn z 0x9A)
 void EntityModWaterTint(Entity* self) {
@@ -19,7 +42,11 @@ void EntityModWaterTint(Entity* self) {
     s32 x, y0, y1;
 
     if (self->step == 0) {
+        if (IsSecondWater(self)) {
+            return;
+        }
         InitializeEntity(g_EInitCommon);
+        self->flags &= ~FLAG_DESTROY_IF_OUT_OF_CAMERA;
         self->primIndex = g_api.AllocPrimitives(PRIM_G4, 1);
         if (self->primIndex == -1) {
             DestroyEntity(self);

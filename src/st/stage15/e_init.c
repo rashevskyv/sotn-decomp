@@ -68,6 +68,7 @@ void EntitySideWaterSplash(Entity*);
 void EntitySmallWaterDrop(Entity*);
 void EntityWaterDrop(Entity*);
 void EntityModWaterTint(Entity*);
+void EntityModWaterEffect(Entity*);
 
 // index = EntityID - 1
 PfnEntityUpdate EntityUpdates[] = {
@@ -134,7 +135,7 @@ PfnEntityUpdate EntityUpdates[] = {
     EntityThornweed,
     EntityCorpseweed,
     EntityCorpseweedProjectile,
-    EntityAlucardWaterEffect,
+    EntityModWaterEffect,
     EntitySplashWater,
     EntitySurfacingWater,
     EntitySideWaterSplash,
