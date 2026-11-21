@@ -196,7 +196,12 @@ static Primitive* func_80103148(Primitive* prim, Primitive* basis) {
 }
 
 static s32 HandleSaveMenu(s32 arg0) {
-#if REGION != REGION_JP
+#if defined(PLATFORM_PSYZ) && REGION != REGION_JP
+// the gamepad gives the menu buttons while the save menu reads them
+// (menu_confirm, src/pc/port_menu.c)
+#define CONFIRM PortMenu_MenuPad(PAD_CROSS)
+#define EXIT PortMenu_MenuPad(PAD_TRIANGLE)
+#elif REGION != REGION_JP
 #define CONFIRM PAD_CROSS
 #define EXIT PAD_TRIANGLE
 #elif TARGET != TARGET_PSP

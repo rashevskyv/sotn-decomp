@@ -284,6 +284,11 @@ extern u8** D_psp_092A5F48;
 extern u8** D_psp_092A5F98;
 #define BUTTON_CONFIRM g_ConfirmButton
 #define BUTTON_CANCEL g_CancelButton
+#elif defined(PLATFORM_PSYZ)
+// the gamepad gives the menu buttons while the shop reads them
+// (menu_confirm, src/pc/port_menu.c)
+#define BUTTON_CONFIRM PortMenu_MenuPad(PAD_CROSS)
+#define BUTTON_CANCEL PortMenu_MenuPad(PAD_TRIANGLE)
 #else
 #define BUTTON_CONFIRM PAD_CROSS
 #define BUTTON_CANCEL PAD_TRIANGLE

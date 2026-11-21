@@ -296,32 +296,59 @@ static const u16 sel_marks[2][256] = {
     },
 };
 
+// menu_confirm right (PortMenu_ConfirmEast): the Decide tip (Cross, the
+// cell at v 0xE0) shows the right button and the Cancel tip (Triangle, v
+// 0xD0) the bottom one. The right button of one set is the bottom one of the
+// other (Switch A = Xbox A, Xbox B = Switch B): the cells come from there.
+// The PSX set keeps its marks.
+static u16 east_marks[2][256];
+
+static int OurMarks(const u16* now) {
+    int s;
+    for (s = 0; s < 2; s++) {
+        if (!memcmp(now, sel_marks[s], sizeof(sel_marks[s])) ||
+            !memcmp(now, east_marks[s], sizeof(east_marks[s]))) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void Buttons_SelPrims(Primitive* p) {
     static const u8 v_psx[] = {0x50, 0x70, 0x60, 0x80};
     static const u8 v_pad[] = {0xC0, 0xE0, 0xD0, 0xF0};
     static const u16 clut_psx[] = {0x200, 0x200, 0x202, 0x200};
-    static const u16 clut_xbox[] = {0x200, 0x202, 0x200, 0x200};
+    static const u16 clut_xbox[2][4] = {{0x200, 0x202, 0x200, 0x200},
+                                        {0x200, 0x200, 0x202, 0x200}};
     static u16 saved[256], now[256];
-    static int have_saved;
+    static int have_saved, built;
     RECT r = {960, 448, 4, 64};
-    int set = g_ButtonSet, i, u, v;
+    int set = g_ButtonSet, east = PortMenu_ConfirmEast(), i, u, v, s;
+    const u16* want;
     _Static_assert(BUTTONS_SWITCH == 0 && BUTTONS_XBOX == 1, "sel_marks");
 
+    // a cell is 16 rows of 4 halfwords: cell k at 64 k
+    for (s = 0; !built && s < 2; s++) {
+        memcpy(east_marks[s], sel_marks[s], sizeof(east_marks[s]));
+        memcpy(east_marks[s] + 64, sel_marks[s] + 128, 128);
+        memcpy(east_marks[s] + 128, sel_marks[!s] + 128, 128);
+    }
+    built = 1;
+    want = set == BUTTONS_PSX ? NULL : east ? east_marks[set] : sel_marks[set];
     // the VRAM is read each frame: a stage that came between may have
     // written there, so a flag alone could keep a stale picture
     StoreImage(&r, (u_long*)now);
     DrawSync(0);
-    if (set != BUTTONS_PSX) {
-        if (memcmp(now, sel_marks[set], sizeof(now))) {
-            if (memcmp(now, sel_marks[!set], sizeof(now))) {
+    if (want) {
+        if (memcmp(now, want, sizeof(now))) {
+            if (!OurMarks(now)) {
                 memcpy(saved, now, sizeof(saved));
                 have_saved = 1;
             }
-            LoadImage(&r, (u_long*)sel_marks[set]);
+            LoadImage(&r, (u_long*)want);
             DrawSync(0);
         }
-    } else if (have_saved && (!memcmp(now, sel_marks[0], sizeof(now)) ||
-                              !memcmp(now, sel_marks[1], sizeof(now)))) {
+    } else if (have_saved && OurMarks(now)) {
         LoadImage(&r, (u_long*)saved);
         DrawSync(0);
     }
@@ -330,7 +357,7 @@ void Buttons_SelPrims(Primitive* p) {
         v = set == BUTTONS_PSX ? v_psx[i] : v_pad[i];
         p->tpage = set == BUTTONS_PSX ? 0xC : 0x1F;
         p->clut = set == BUTTONS_PSX  ? clut_psx[i]
-                  : set == BUTTONS_XBOX ? clut_xbox[i]
+                  : set == BUTTONS_XBOX ? clut_xbox[east][i]
                                         : 0x200;
         p->u0 = p->u2 = u;
         p->u1 = p->u3 = u + 16;

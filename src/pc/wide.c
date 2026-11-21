@@ -13,7 +13,9 @@
 #include <game.h>
 #include <psyz/input.h>
 #include <psyz/video.h>
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "room_stitch.h"
 #include "wide.h"
@@ -29,6 +31,46 @@ static PsyzSize last_disp;
 static int last_fbw, last_fbh, last_rows;
 
 int Wide_GetScale(void) { return cfg_scale; }
+
+// aspect: the shape of the picture inside the window (auto: the window
+// shape). The game sees a display of that shape, psyz centres it in
+// the window: black bars on two sides.
+int g_Aspect;
+const char* const g_AspectNames[WIDE_ASPECTS] = {
+    "auto", "4:3", "16:10", "16:9", "21:9", "2.39:1", "32:9"};
+static const short aspect_wh[WIDE_ASPECTS][2] = {
+    {0, 0}, {4, 3}, {16, 10}, {16, 9}, {21, 9}, {239, 100}, {32, 9}};
+
+static PsyzSize DisplaySize(void) {
+    PsyzSize d = Psyz_VideoGetDisplaySize();
+    int w = aspect_wh[g_Aspect][0], h = aspect_wh[g_Aspect][1];
+    // within 1% of the window shape (2.39:1 on 3440x1440): the whole window,
+    // else a row less would drop the 240-row pictures to a smaller scale
+    if (!w || d.w <= 0 || d.h <= 0 ||
+        llabs((long long)d.w * h - (long long)d.h * w) * 100 <=
+            (long long)d.h * w) {
+        return d;
+    }
+    if ((long long)d.w * h > (long long)d.h * w) {
+        d.w = (int)((long long)d.h * w / h) & ~1;
+    } else {
+        d.h = (int)((long long)d.w * h / w) & ~1;
+    }
+    return d;
+}
+
+void Wide_SetAspect(int aspect) {
+    g_Aspect = (aspect + WIDE_ASPECTS) % WIDE_ASPECTS;
+    last_disp.w = last_disp.h = 0; // Wide_OnFrame applies it again
+    fprintf(stderr, "[video] menu: aspect %s\n", g_AspectNames[g_Aspect]);
+    Wide_SaveIni();
+}
+
+float Wide_PixelAspect(void) {
+    PsyzRect g = Psyz_VideoGetDrawArea(), p = Psyz_VideoGetPresentArea();
+    float gw = g.ex - g.sx, gh = g.ey - g.sy, pw = p.ex - p.sx, ph = p.ey - p.sy;
+    return gw > 0 && gh > 0 && pw > 0 && ph > 0 ? (pw / gw) / (ph / gh) : 1;
+}
 
 void Wide_Config(int scale) {
     cfg_scale = scale;
@@ -90,7 +132,18 @@ static const char ini_buttons[] =
     "\n"
     "; buttons: the button marks of the menus: auto = as the gamepad in use\n"
     "; (keyboard only: the last gamepad, at first psx; the Switch: switch),\n"
-    "; psx = PlayStation, xbox = Xbox, switch = Nintendo.\n";
+    "; psx = PlayStation, xbox = Xbox, switch = Nintendo.\n"
+    "; menu_confirm: the gamepad face button that confirms in the menus\n"
+    "; (title, file select, pause menu, shops, save, port menu); the other one\n"
+    "; goes back. auto = right on a Nintendo pad (A) and on the Switch, else\n"
+    "; bottom; right = the right face button; bottom = the bottom one. The\n"
+    "; keyboard and the gameplay buttons stay as they are.\n";
+
+static const char ini_aspect[] =
+    "\n"
+    "; aspect: the shape of the picture: auto = the window or\n"
+    "; screen shape; 4:3, 16:10, 16:9, 21:9, 2.39:1 (3440x1440), 32:9 = that\n"
+    "; shape inside the window with black bars.\n";
 
 // the PS buttons of the pad word, bit 0 first (psyz/input.h)
 static const char* const ps_buttons[PSYZ_PAD_BUTTONS] = {
@@ -250,6 +303,8 @@ void Wide_SaveIni(void) {
     fputs(ini_fullscreen, f);
     fprintf(f, "fullscreen = %d\n", g_Fullscreen);
 #endif
+    fputs(ini_aspect, f);
+    fprintf(f, "aspect = %s\n", g_AspectNames[g_Aspect]);
     fputs(ini_voice, f);
     fprintf(f, "voice = %s\n", g_VoiceSetNames[g_VoiceSet]);
     fputs(ini_language, f);
@@ -257,6 +312,7 @@ void Wide_SaveIni(void) {
     fputs(ini_buttons, f);
     fprintf(f, "buttons = %s\n",
             g_ButtonPick < 0 ? "auto" : g_ButtonSetNames[g_ButtonPick]);
+    fprintf(f, "menu_confirm = %s\n", g_MenuConfirmNames[g_MenuConfirm]);
     fputs(ini_controls, f);
     for (i = 0; i < 2 * PSYZ_PAD_BUTTONS; i++) {
         fprintf(f, "%s_%s = %s\n", input_dev[i & 1], ps_buttons[i >> 1],
@@ -300,8 +356,9 @@ void Wide_SaveIni(void) {
 // hd_textures = 0|1 (missing: 1), hd_dump = 0|1, music_files = 0|1 (1),
 // room_stitch = 0|1 (0), room_edge_fade = 0|1 (1), skip_cd_rooms = 0|1 (1),
 // show_loading_text = 0|1 (1).
+// aspect = auto|4:3|16:10|16:9|21:9|2.39:1|32:9 (auto),
+// menu_confirm = auto|right|bottom (auto).
 // A missing key keeps its default (cheats, editor, overlay and fps off).
-// The aspect key of an old file does nothing.
 void Wide_LoadIni(const char* path) {
     int scale = 5, v, i; // docked 5, handheld 3 (ScaleRange)
     char line[128], word[32];
@@ -319,7 +376,12 @@ void Wide_LoadIni(const char* path) {
                     scale = WIDE_SCALE_MAX;
                 }
             } else if (sscanf(line, " aspect = %15s", word) == 1) {
-                // an old key: ignored
+                g_Aspect = IniWord("aspect", word, g_AspectNames,
+                                   WIDE_ASPECTS, 0);
+            } else if (sscanf(line, " menu_confirm = %15s", word) == 1) {
+                g_MenuConfirm = IniWord("menu_confirm", word,
+                                        g_MenuConfirmNames, MENU_CONFIRMS,
+                                        MENU_CONFIRM_AUTO);
             } else if (sscanf(line, " voice = %15s", word) == 1) {
                 for (v = 0; v < VOICE_COUNT; v++) {
                     if (!strcmp(word, g_VoiceSetNames[v])) {
@@ -359,8 +421,11 @@ void Wide_LoadIni(const char* path) {
         }
         fclose(f);
     }
-    fprintf(stderr, "[video] settings: scale %d fullscreen %d\n", scale,
-            g_Fullscreen);
+    fprintf(stderr,
+            "[video] settings: scale %d fullscreen %d aspect %s menu_confirm "
+            "%s\n",
+            scale, g_Fullscreen, g_AspectNames[g_Aspect],
+            g_MenuConfirmNames[g_MenuConfirm]);
 #ifndef __SWITCH__
     Psyz_VideoSetFullscreen(g_Fullscreen); // before the window is shown
 #endif
@@ -449,11 +514,18 @@ void Wide_MoveCornerText(s32 prims, s32 left) {
 
 // Display pixels (window or touch) to frame pixels, the coordinates of the
 // port menu prims: 0,0 is the top-left of the 256x240 frame.
+// A frame of non-square pixels (the prologue scroll) gets the port menu in
+// square pixels (port_menu.c Rect): x is in those, about the frame centre.
 void Wide_ScreenToFrame(float sx, float sy, int* x, int* y) {
     PsyzRect g = Psyz_VideoGetDrawArea(), p = Psyz_VideoGetPresentArea();
-    float pw = p.ex - p.sx, ph = p.ey - p.sy;
-    *x = pw > 0 ? g.sx + (int)((sx - p.sx) * (g.ex - g.sx) / pw) : (int)sx;
-    *y = ph > 0 ? g.sy + (int)((sy - p.sy) * (g.ey - g.sy) / ph) : (int)sy;
+    float pw = p.ex - p.sx, ph = p.ey - p.sy, a = Wide_PixelAspect();
+    float fx = pw > 0 ? g.sx + (sx - p.sx) * (g.ex - g.sx) / pw : sx;
+    int cx = g_CurrentBuffer->disp.disp.w / 2;
+    if (a < 0.98f || a > 1.02f) {
+        fx = cx + (fx - cx) * a;
+    }
+    *x = (int)floorf(fx); // floor: the margin left of the frame is negative
+    *y = (int)floorf(ph > 0 ? g.sy + (sy - p.sy) * (g.ey - g.sy) / ph : sy);
 }
 
 static int Clamp(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -541,7 +613,7 @@ void Wide_OnFrame(void) {
     if (!cfg_scale) {
         return;
     }
-    d = Psyz_VideoGetDisplaySize();
+    d = DisplaySize();
     fbw = g_GpuBuffers[0].disp.disp.w;
     fbh = g_GpuBuffers[0].disp.disp.h;
     if (fbw <= 0 || fbh <= 0) {
@@ -630,14 +702,16 @@ void Wide_OnFrame(void) {
     }
     fprintf(stderr,
             "[video] output %dx%d scale %d (asked %d) "
-            "frame %dx%d internal %dx%d margin x %d y %d keep rows %d\n",
+            "frame %dx%d internal %dx%d margin x %d y %d keep rows %d "
+            "aspect %s\n",
             d.w, d.h, s, cfg_scale, fbw, fbh, req.w / s & ~1,
-            req.h / s & ~1, (int)g_WideX, (int)g_WideY, keep);
+            req.h / s & ~1, (int)g_WideX, (int)g_WideY, keep,
+            g_AspectNames[g_Aspect]);
 }
 
 // Port menu state.
 void Wide_MenuGet(int* scale, int* lo, int* hi) {
-    ScaleRange(StageRect(Psyz_VideoGetDisplaySize()), lo, hi);
+    ScaleRange(StageRect(DisplaySize()), lo, hi);
     *scale = cfg_scale == WIDE_SCALE_MAX ? WIDE_SCALE_MAX
              : cfg_scale                ? Clamp(cfg_scale, *lo, *hi)
                                         : 0;

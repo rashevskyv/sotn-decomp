@@ -1202,6 +1202,23 @@ void Wide_ScreenToFrame(float sx, float sy, int* x, int* y);
 void PortMenu_Touch(int n, const int* x, const int* y);
 void PortMenu_Wheel(int dir, int x, int y);
 int PortMenu_IsOpen(void);
+// menu_confirm (sotn.ini): the gamepad face button that confirms in the
+// menus, auto (right on a Nintendo pad and the Switch, else bottom), right
+// or bottom; the other one goes back. Gameplay keeps its buttons.
+enum { MENU_CONFIRM_AUTO, MENU_CONFIRM_EAST, MENU_CONFIRM_SOUTH, MENU_CONFIRMS };
+extern int g_MenuConfirm;
+extern const char* const g_MenuConfirmNames[MENU_CONFIRMS];
+int PortMenu_ConfirmEast(void);
+// A game menu (shop, save) reads its buttons through this: for a few frames
+// the gamepad gives the menu buttons. Returns bits.
+u32 PortMenu_MenuPad(u32 bits);
+// aspect (sotn.ini): the picture shape inside the window (black bars around it)
+enum { WIDE_ASPECTS = 7 };
+extern int g_Aspect; // 0 auto: the window shape
+extern const char* const g_AspectNames[WIDE_ASPECTS];
+void Wide_SetAspect(int aspect);
+// the width of a frame pixel on the screen over its height (1: square)
+float Wide_PixelAspect(void);
 // The main loop asks once a frame: 1 while the menu holds normal play.
 int PortMenu_Freeze(void);
 // Apron tiles around a room (src/pc/apron.c), visual only.
