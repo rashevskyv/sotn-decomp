@@ -183,6 +183,7 @@ set(SATURN_RGDN_SOURCES
     src/st/rstage15/e_particles.c
     src/st/rstage15/e_room_bg.c
     src/st/rstage15/e_venus_weed.c
+    src/st/rstage15/e_water.c
     src/st/rstage15/popup.c
     src/st/rstage15/prim_helpers.c
     src/st/rstage15/st_common.c
