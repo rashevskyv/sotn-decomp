@@ -1771,13 +1771,13 @@ def cmd_pack(_args):
         f.write(b"SOTNLANG" + struct.pack("<II", 2, len(entries)))
         f.write(ents)
         f.write(blob)
-    # dialogue*.bin and the uk script tables (FORMAT.md): ps1 script.bin, psp script_psp.bin
-    # (ua_psp.json over ua.json), jp script_jp.bin (ua_jp.json over ua.json; ua.json is from the
-    # Japanese script)
+    # dialogue*.bin and the uk script tables (FORMAT.md): ps1 script.bin (ua_ps1.json over ua.json;
+    # ua_ps1.json is from the US PS1 English script), psp script_psp.bin (ua_psp.json over ua.json),
+    # jp script_jp.bin (ua_jp.json over ua.json; ua.json is from the Japanese script)
     psp = load_json(os.path.join(UK, "ua_psp.json"))
     rels = sorted({b["file"] for b in boxes.values()})
     counts = {}
-    for fname, over in (("dialogue.bin", {}), ("dialogue_psp.bin", psp),
+    for fname, over in (("dialogue.bin", load_json_opt(os.path.join(UK, "ua_ps1.json"))), ("dialogue_psp.bin", psp),
                         ("dialogue_jp.bin", load_json_opt(os.path.join(UK, "ua_jp.json")))):
         recs, nbad = {}, 0
         for l in lines:

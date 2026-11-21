@@ -16,7 +16,8 @@ static int _symbolCount = 0;
 // tables). A table is a SOTNSCR1 file of the pack: the stage scripts rebuilt
 // with other boxes.
 //   en: ps1 = the stock scripts, jp = script_jp_en.bin, psp = script_psp_en.bin
-//   uk: ps1 = script.bin, jp = script_jp.bin, psp = script_psp.bin
+//   uk: ps1 = script.bin (from ua_ps1.json, the US lines), jp = script_jp.bin,
+//       psp = script_psp.bin
 // A missing en table gives the stock scripts, a missing uk table script.bin.
 // A voice set without clips plays the US voice, so it takes the ps1 table.
 // CutscenePcAlloc copies, for each table, every registered range that starts
