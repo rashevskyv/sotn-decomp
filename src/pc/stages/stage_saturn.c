@@ -30,6 +30,8 @@ static SpriteParts* s_SpriteBanks[0x14];
 // (gdn_entities.py)
 #ifdef SATURN_STAGE_PRISON
 #include "../../st/stage16/stage16.h"
+#elif defined(SATURN_STAGE_RPRISON)
+#include "../../st/rstage16/rstage16.h"
 #else
 #include "../../st/stage15/stage15.h"
 #endif
@@ -883,6 +885,38 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_MOD_PILLAR_SWITCH;
     case 0x17:
         return E_MOD_PILLAR;
+    default:
+        return E_DUMMY_0F;
+    }
+}
+#elif defined(SATURN_STAGE_RPRISON)
+// Saturn RSTAGE16 entity id -> rstage16.h EntityID. The helpers (0x16, 0x17,
+// 0x19-0x1B, 0x1D-0x1F, 0x21, 0x22, 0x24, 0x25, 0x27-0x2A) are spawned by
+// their enemies; no layout places them.
+static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
+    switch (saturnId) {
+    case 0x01:
+        return E_BREAKABLE;
+    case 0x05:
+        return E_RED_DOOR;
+    case 0x0F:
+        return saveRoom ? E_SATURN_MASONRY : E_DUMMY_0F;
+    case 0x10:
+        return E_SATURN_CONTROLLER;
+    case 0x11:
+        return E_ID_11;
+    case 0x15:
+        return E_MOD_WIGHT;
+    case 0x18:
+        return E_MOD_WRAITH;
+    case 0x1C:
+        return E_FLYING_ZOMBIE;
+    case 0x20:
+        return E_MOD_GARGOYLE;
+    case 0x23:
+        return E_JACK_O_BONES;
+    case 0x26:
+        return E_NOVA_SKELETON;
     default:
         return E_DUMMY_0F;
     }

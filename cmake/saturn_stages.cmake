@@ -162,7 +162,32 @@ set(SATURN_PRISON_SOURCES
 add_saturn_stage(stage16 STAGE_16 SD26 TEST_STAGE16 ${SATURN_PRISON_SOURCES})
 add_saturn_gdn_entities(stage16 STAGE_16 SATURN_STAGE_PRISON)
 add_saturn_stage(rstage15 RSTAGE15 SD29 TEST_RSTAGE15)
-add_saturn_stage(rstage16 RSTAGE16 SD2C TEST_RSTAGE16)
+# the inverted Cursed Prison: the same framework (src/st/rstage16) with the
+# Gargoyle, the PS1's Flying Zombie, Jack O'Bones and Nova Skeleton, and the
+# Saturn-only Wight and Wraith
+set(SATURN_RPRISON_SOURCES
+    src/st/rstage16/bss.c
+    src/st/rstage16/collision.c
+    src/st/rstage16/create_entity.c
+    src/st/rstage16/d_prize_drops.c
+    src/st/rstage16/e_bloody_zombie.c
+    src/st/rstage16/e_breakable.c
+    src/st/rstage16/e_collect.c
+    src/st/rstage16/e_flying_zombie.c
+    src/st/rstage16/e_init.c
+    src/st/rstage16/e_jack_o_bones.c
+    src/st/rstage16/e_misc.c
+    src/st/rstage16/e_mod_wight.c
+    src/st/rstage16/e_mod_wraith.c
+    src/st/rstage16/e_nova_skeleton.c
+    src/st/rstage16/e_particles.c
+    src/st/rstage16/e_room_bg.c
+    src/st/rstage16/popup.c
+    src/st/rstage16/prim_helpers.c
+    src/st/rstage16/st_common.c
+    src/st/rstage16/st_update.c)
+add_saturn_stage(rstage16 RSTAGE16 SD2C TEST_RSTAGE16 ${SATURN_RPRISON_SOURCES})
+add_saturn_gdn_entities(rstage16 RSTAGE16 SATURN_STAGE_RPRISON)
 
 # Saturn-only sounds and the boss track (tools/saturn/saturn_audio.py): WAVs
 # in data/ST/<STAGE>/sfx/ and data/ST/STAGE15/music/, played by

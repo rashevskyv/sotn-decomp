@@ -42,6 +42,17 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_ID_REVERSE_SATURN_15, 3, 40, 136, "hell-garden-room3"},
     {STAGE_ID_REVERSE_SATURN_16, 0, 60, 648, "soul-prison-room0"},
     {STAGE_ID_REVERSE_SATURN_16, 1, 1200, 136, "soul-prison-room1"},
+    // the inverted Prison's enemy floors (room 0, top to bottom) and room 1
+    {STAGE_ID_REVERSE_SATURN_16, 0, 150, 150, "soul-prison-wight"},
+    {STAGE_ID_REVERSE_SATURN_16, 0, 100, 290, "soul-prison-jack"},
+    {STAGE_ID_REVERSE_SATURN_16, 0, 150, 420, "soul-prison-nova"},
+    {STAGE_ID_REVERSE_SATURN_16, 0, 100, 550, "soul-prison-zombie"},
+    {STAGE_ID_REVERSE_SATURN_16, 1, 60, 136, "soul-prison-wight2"},
+    {STAGE_ID_REVERSE_SATURN_16, 1, 860, 136, "soul-prison-wraith"},
+    // the inverted Prison's one-cell rooms (room 4: the save room)
+    {STAGE_ID_REVERSE_SATURN_16, 2, 128, 136, "soul-prison-room2"},
+    {STAGE_ID_REVERSE_SATURN_16, 3, 128, 136, "soul-prison-room3"},
+    {STAGE_ID_REVERSE_SATURN_16, 4, 128, 136, "soul-prison-room4"},
 };
 
 enum SpawnPointStep {

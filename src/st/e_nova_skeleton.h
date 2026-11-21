@@ -57,6 +57,19 @@ static SVECTOR vec_pospos = {32, 32, 0, 0};
 // uv data
 static u8 primData[] = {96, 127, 128, 128, 32, 95, 64, 128, 0, 31, 32, 64};
 
+// The PC's Saturn stages (src/st/rstage16) give their own texture places
+#ifndef NOVA_RING_TPAGE
+#define NOVA_RING_TPAGE 0x12
+#define NOVA_RING_CLUT 0x216
+#define NOVA_RING_U 0xC0
+#define NOVA_RING_V 0
+#define NOVA_LASER_CLUT_B 0x217
+#endif
+#ifdef NOVA_LASER_PARTS
+// the laser's three primitives: {tpage, u0, u1, v0, v1}
+static u8 laserParts[3][5] = NOVA_LASER_PARTS;
+#endif
+
 typedef enum {
     NOVA_INIT,
     NOVA_1,
@@ -179,12 +192,12 @@ void EntityNovaSkeleton(Entity* self) {
         prim = &g_PrimBuf[primIndex];
         self->ext.nova.prim = prim;
         UnkPolyFunc2(prim);
-        prim->tpage = 0x12;
-        prim->clut = 0x216;
-        prim->u0 = prim->u2 = 0xC0;
-        prim->u1 = prim->u3 = 0xFF;
-        prim->v0 = prim->v1 = 0;
-        prim->v2 = prim->v3 = 0x40;
+        prim->tpage = NOVA_RING_TPAGE;
+        prim->clut = NOVA_RING_CLUT;
+        prim->u0 = prim->u2 = NOVA_RING_U;
+        prim->u1 = prim->u3 = NOVA_RING_U + 0x3F;
+        prim->v0 = prim->v1 = NOVA_RING_V;
+        prim->v2 = prim->v3 = NOVA_RING_V + 0x40;
         prim->priority = self->zPriority + 1;
         prim->drawMode = DRAW_HIDE;
         break;
@@ -348,12 +361,22 @@ void EntityNovaLaser(Entity* self) {
         self->ext.nova.prim = prim;
         var_s1 = &primData[0];
         for (var_s2 = 0; var_s2 < 3; prim = prim->next, var_s2++) {
+#ifdef NOVA_LASER_PARTS
+            prim->tpage = laserParts[var_s2][0];
+            prim->clut = NOVA_RING_CLUT;
+            prim->u0 = prim->u2 = laserParts[var_s2][1];
+            prim->u1 = prim->u3 = laserParts[var_s2][2];
+            prim->v0 = prim->v1 = laserParts[var_s2][3];
+            prim->v2 = prim->v3 = laserParts[var_s2][4];
+            var_s1 += 2;
+#else
             prim->tpage = 0x12;
             prim->clut = 0x216;
             prim->u0 = prim->u2 = *var_s1++ + 0x80;
             prim->u1 = prim->u3 = *var_s1++ + 0x80;
             prim->v0 = prim->v1 = 0x40;
             prim->v2 = prim->v3 = 0x5F;
+#endif
             prim->r0 = prim->g0 = prim->b0 = *var_s1++;
             LOW(prim->r2) = LOW(prim->r0);
             prim->r1 = prim->g1 = prim->b1 = *var_s1++;
@@ -425,9 +448,9 @@ void EntityNovaLaser(Entity* self) {
         prim->y0 = prim->y1 = centerY - self->ext.nova.laserFadeTimer;
         prim->y2 = prim->y3 = centerY + self->ext.nova.laserFadeTimer;
         if (g_Timer & 1) {
-            prim->clut = 0x216;
+            prim->clut = NOVA_RING_CLUT;
         } else {
-            prim->clut = 0x217;
+            prim->clut = NOVA_LASER_CLUT_B;
         }
     }
     prim = self->ext.nova.prim;
@@ -475,6 +498,10 @@ void EntityNovaLaserPulse(Entity* self) {
         self->hitboxState = 0;
         self->animCurFrame = 0x24;
         self->drawFlags |= ENTITY_SCALEY | ENTITY_SCALEX;
+#ifdef NOVA_LASER_PARTS
+        // the Saturn's frame has no PS1 blend flag: additive, as the PS1's
+        self->blendMode = BLEND_TRANSP | BLEND_ADD;
+#endif
         self->scaleX = self->scaleY = 0x10;
         if (self->facingLeft) {
             self->velocityX = FIX(8.0);
