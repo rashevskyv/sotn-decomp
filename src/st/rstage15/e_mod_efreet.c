@@ -899,7 +899,6 @@ void EntityModEfreet26(Entity* self) {
 // the frames 0x01..0x0D with a 3-frame duration.
 void EntityModEfreet27(Entity* self) {
     EfreetExt* ext = EFREET_EXT(self);
-    s8 v;
 
     if (self->step == 0) {
         InitializeEntity(g_EInitModEfreetPart); // TekiInit 0x2C
@@ -922,8 +921,8 @@ void EntityModEfreet27(Entity* self) {
         self->scaleX = self->scaleY = ext->scale * 4; // Saturn 0x40 = 1
         self->hitboxWidth = 0;
         self->hitboxHeight = 0;
-        v = (s8)rsin((s16)(g_Timer << 7));
-        self->opacity = (u8)(v - 0x40);
+        // 06030E58 shifts r4 right by 6 (arithmetic)
+        self->opacity = (u8)((rsin((s16)(g_Timer << 7)) >> 6) - 0x40);
         return;
     }
 
