@@ -61,6 +61,7 @@ enum {
     ITEM_BUTTONS, // the button marks of the menus
     ITEM_CDROOMS, // skip_cd_rooms
     ITEM_LOADING, // show_loading_text
+    ITEM_EDGEFADE, // room_edge_fade
     ITEM_OVERLAY,
     ITEM_FPS,
     ITEM_EDITOR, // the HTTP editor server; its address shows in the next line
@@ -725,6 +726,10 @@ static void Change(int dir) {
                 "[cdroom] menu: skip_cd_rooms %d show_loading_text %d\n",
                 g_SkipCdRooms, g_ShowLoadingText);
         Wide_SaveIni();
+    } else if (sel == ITEM_EDGEFADE) {
+        g_RoomEdgeFade ^= 1;
+        fprintf(stderr, "[video] menu: room_edge_fade %d\n", g_RoomEdgeFade);
+        Wide_SaveIni();
     } else if (sel == ITEM_OVERLAY || sel == ITEM_FPS) {
         flag = sel == ITEM_OVERLAY ? &g_OverlayOn : &g_FpsOn;
         *flag ^= 1;
@@ -1185,6 +1190,7 @@ enum {
     P_MAX,
     P_CDROOMS, // the main page: SKIP CD ROOMS, LOADING TEXT
     P_LOADING,
+    P_EDGEFADE, // ROOM EDGE FADE
 };
 #define LINE_MAX 64
 #define MARK_ESC 0xFE
@@ -1392,19 +1398,21 @@ static void DrawMain(void) {
 #endif
         {P_VOICE, "VOICE"},     {P_LANGUAGE, "LANGUAGE"},
         {P_BUTTONS, "BUTTONS"}, {P_CDROOMS, "SKIP CD ROOMS"},
-        {P_LOADING, "LOADING TEXT"}, {P_OVERLAY, "OVERLAY"}, {-1, "FPS"},
+        {P_LOADING, "LOADING TEXT"}, {P_EDGEFADE, "ROOM EDGE FADE"},
+        {P_OVERLAY, "OVERLAY"}, {-1, "FPS"},
         {P_EDITOR, "EDITOR"},   {P_CONTROLS, "CONTROLS"},
         {P_CHEATS, "CHEATS"},   {P_EXIT, "EXIT GAME"},
         {P_CLOSE, "CLOSE"},
     };
-    int on[5];
+    int on[6];
     char lines[N_MAIN + 1][LINE_MAX], tmp[40];
     int scale, lo, hi, i, col = 0;
     on[0] = g_SkipCdRooms;
     on[1] = g_ShowLoadingText;
-    on[2] = g_OverlayOn;
-    on[3] = g_FpsOn;
-    on[4] = g_EditorOn;
+    on[2] = g_RoomEdgeFade;
+    on[3] = g_OverlayOn;
+    on[4] = g_FpsOn;
+    on[5] = g_EditorOn;
     Wide_MenuGet(&scale, &lo, &hi);
     for (i = 0; i < N_MAIN; i++) {
         Clear(lines[i]);
@@ -1457,7 +1465,7 @@ static void DrawMain(void) {
     } else {
         AddValue(lines[ITEM_BUTTONS], -1, sets[g_ButtonPick]);
     }
-    for (i = 0; i < 5; i++) { // CD ROOMS, LOADING, OVERLAY, FPS, EDITOR
+    for (i = 0; i < 6; i++) { // CD ROOMS, LOADING, EDGE, OVERLAY, FPS, EDITOR
         AddValue(lines[ITEM_CDROOMS + i], on[i] ? P_ON : P_OFF,
                  on[i] ? "ON" : "OFF");
     }
@@ -2130,6 +2138,7 @@ static void DrawMap(void) {
 
 int g_OverlayOn, g_FpsOn;
 int g_SkipCdRooms = 1, g_ShowLoadingText = 1; // sotn.ini, game.h
+int g_RoomEdgeFade = 1;                       // sotn.ini, game.h
 static int room_num = -1; // the index in g_api.o.rooms, as the teleport uses
 static int fps;
 

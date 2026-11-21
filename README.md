@@ -262,6 +262,8 @@ The port menu changes most of them in the game. A missing key keeps its default.
 | `relic_toggle` | `modern`, `stock` | `modern` | The picture of the relic switch. |
 | `skip_cd_rooms` | 0, 1 | 1 | 1: a door into a CD loading room (the corridor between two areas) goes on to the next area at once. 0: walk through the room, as on the disc. |
 | `show_loading_text` | 0, 1 | 1 | 1: the NOW LOADING word and logo show while a stage loads. 0: the screen stays black. |
+| `room_edge_fade` | 0, 1 | 1 | 1: in a room narrower than the wide view, nothing shows past its left and right edge (black), and the edge tile fades to black over its outer 8 pixels. 0: the old fill (the next room, a mirror image) under a wide dark gradient. |
+| `room_stitch` | 0, 1 | 0 | A test: some rooms side by side play as one wide room. |
 | `spawn` | a name, or empty | empty | Test start point: `np3-stage15-door`, `marble-soul`, `caverns-soul`, `reverse-trapdoor-underground`, `reverse-marble-soul`, `reverse-caverns-soul`. |
 | `cheat_refill` | 0, 1 | 0 | HP, MP and hearts stay full. |
 | `cheat_invincible` | 0, 1 | 0 | Hits do nothing. |

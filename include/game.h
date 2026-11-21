@@ -1127,6 +1127,10 @@ extern int g_OverlayOn, g_FpsOn;
 // the teleport on its far side at once (5087C.c). show_loading_text = 0: the
 // NOW LOADING word and logo stay hidden, the screen is black (game_handlers.c)
 extern int g_SkipCdRooms, g_ShowLoadingText;
+// sotn.ini room_edge_fade = 1 (default): the wide view shows nothing past
+// the left and right room edges, and the edge tile fades to black over its
+// outer 8 px (4CE2C.c). 0: the old fill and vignette.
+extern int g_RoomEdgeFade;
 // The door path (5087C.c) calls it before a room loads: a flushed log line
 // [room] <stage> (<zone>) id <hex> room <n> cell <x>,<y> pos <x>,<y>, and
 // the room for the overlay.
