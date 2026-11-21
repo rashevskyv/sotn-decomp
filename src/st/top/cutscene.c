@@ -346,7 +346,7 @@ void EntityCutscene(Entity* self) {
 #endif
                     continue;
                 case CSOP_SET_WAIT:
-                    g_Dialogue.nextCharTimer = *g_Dialogue.scriptCur++;
+                    g_Dialogue.nextCharTimer = CS_WAIT_TIMER();
                     if (g_SkipCutscene) {
                         continue;
                     }
@@ -444,7 +444,7 @@ void EntityCutscene(Entity* self) {
                     prim->y2 = prim->y3 = g_Dialogue.startY + 0x48;
                     prim = prim->next;
                     prim->y0 = g_Dialogue.startY - 1;
-                    prim->u0 = 0xF6;
+                    prim->u0 = LANG_DIALOGUE_BOX_RIGHT() - 2;
                     g_Dialogue.portraitAnimTimer = 0x18;
                     self->step = 5;
                     self->step_s = 0;
@@ -642,7 +642,7 @@ void EntityCutscene(Entity* self) {
                     if (g_SkipCutscene) {
                         continue;
                     }
-                    g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                    g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
 #if TARGET == TARGET_PSP
                     endLoop = true;
                 } // This closes the CSOP switch for psp
@@ -665,7 +665,7 @@ void EntityCutscene(Entity* self) {
                 } else {
                     nextChar = nextChar - 0x11;
                 }
-                g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
             }
             break;
         } // This closes the big while loop for psp
@@ -853,12 +853,12 @@ void EntityCutscene(Entity* self) {
                  prim = prim->next) {
                 prim->r0 = prim->r1 = 0x7F;
                 prim->b0 = prim->b1 = prim->g0 = prim->g1 = 0;
-                prim->x0 = prim->x1 = 0xF7;
+                prim->x0 = prim->x1 = LANG_DIALOGUE_BOX_RIGHT() - 1;
                 prim->y0 = prim->y1 = g_Dialogue.startY + uCoord;
                 prim->priority = 0x1FE;
                 prim->drawMode = DRAW_DEFAULT;
                 prim->x2 = red_line_increment[uCoord];
-                prim->x3 = 0xF70;
+                prim->x3 = (LANG_DIALOGUE_BOX_RIGHT() - 1) * 16;
                 uCoord++;
             }
             self->step_s++;

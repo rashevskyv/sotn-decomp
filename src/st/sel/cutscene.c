@@ -89,7 +89,7 @@ u8 SetCutsceneScript(u8* script) {
             prim->g2 = prim->g3 = prim->b2 = prim->b3 = 0;
         prim->b0 = prim->b1 = 0x7F;
         prim->x0 = prim->x2 = 4;
-        prim->x1 = prim->x3 = 0xF8;
+        prim->x1 = prim->x3 = LANG_DIALOGUE_BOX_RIGHT();
         prim->priority = 0x1FD;
         prim->drawMode = DRAW_HIDE;
 
@@ -265,7 +265,7 @@ void EntityCutscene(Entity* self) {
                 g_Dialogue.unk17 = *g_Dialogue.scriptCur++;
                 continue;
             case CSOP_SET_WAIT:
-                g_Dialogue.nextCharTimer = *g_Dialogue.scriptCur++;
+                g_Dialogue.nextCharTimer = CS_WAIT_TIMER();
                 if (g_SkipCutscene) {
                     continue;
                 }
@@ -481,14 +481,14 @@ void EntityCutscene(Entity* self) {
                 continue;
             }
             nextChar = (nextChar << 8) | *g_Dialogue.scriptCur++;
-            g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+            g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
 #else
             default:
                 if (g_SkipCutscene) {
                     g_Dialogue.scriptCur++;
                     continue;
                 }
-                g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
             }
 #endif
             break;
@@ -627,6 +627,11 @@ void EntityCutscene(Entity* self) {
             if (g_Dialogue.portraitAnimTimer & 1) {
                 prim->u0++;
             }
+#ifdef PLATFORM_PSYZ
+            if (g_Dialogue.portraitAnimTimer == 12) { // the wider box (lang.c)
+                prim->u0 = LANG_DIALOGUE_BOX_RIGHT() - 2;
+            }
+#endif
         } else {
             if (!g_Dialogue.portraitAnimTimer) {
                 self->step = 1;
@@ -645,6 +650,11 @@ void EntityCutscene(Entity* self) {
             if (g_Dialogue.portraitAnimTimer & 1) {
                 prim->u0--;
             }
+#ifdef PLATFORM_PSYZ
+            if (g_Dialogue.portraitAnimTimer == 12) {
+                prim->u0 = 0;
+            }
+#endif
         } else {
             if (!g_Dialogue.portraitAnimTimer) {
                 self->step = 1;

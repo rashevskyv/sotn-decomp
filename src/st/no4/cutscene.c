@@ -306,7 +306,7 @@ void EntityCutscene(Entity* self) {
                         *g_Dialogue.scriptCur++;
                     continue;
                 case CSOP_SET_WAIT:
-                    g_Dialogue.nextCharTimer = *g_Dialogue.scriptCur++;
+                    g_Dialogue.nextCharTimer = CS_WAIT_TIMER();
                     if (skip_cutscene) {
                         continue;
                     }
@@ -544,7 +544,7 @@ void EntityCutscene(Entity* self) {
                     if (skip_cutscene) {
                         continue;
                     }
-                    g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                    g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
 #if TARGET == TARGET_PSP
                     endLoopFlag = true;
                 } // This closes the CSOP switch for psp
@@ -566,7 +566,7 @@ void EntityCutscene(Entity* self) {
                 } else {
                     nextByte = nextByte - 17;
                 }
-                g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
             }
             break; // This breaks the big while loop for psp
         } // This closes the big while loop for psp
@@ -741,6 +741,11 @@ void EntityCutscene(Entity* self) {
             if (g_Dialogue.portraitAnimTimer & 1) {
                 prim->u0++;
             }
+#ifdef PLATFORM_PSYZ
+            if (g_Dialogue.portraitAnimTimer == 12) { // the wider box (lang.c)
+                prim->u0 = LANG_DIALOGUE_BOX_RIGHT() - 2;
+            }
+#endif
         } else {
             if (!g_Dialogue.portraitAnimTimer) {
                 self->step = DIALOGUE_RUN;
@@ -760,6 +765,11 @@ void EntityCutscene(Entity* self) {
             if (g_Dialogue.portraitAnimTimer & 1) {
                 prim->u0--;
             }
+#ifdef PLATFORM_PSYZ
+            if (g_Dialogue.portraitAnimTimer == 12) {
+                prim->u0 = 0;
+            }
+#endif
         } else {
             if (!g_Dialogue.portraitAnimTimer) {
                 self->step = DIALOGUE_RUN;

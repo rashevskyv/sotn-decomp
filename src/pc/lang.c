@@ -504,8 +504,21 @@ void Lang_DialogueGlyph(RECT* rect, s32 x, s32 y) {
 // the text, as 2 px lie between the box and the portrait (x 6). Its border
 // tile (x 3, width = edge - 2, 255 at most) keeps 3 px off the view edge,
 // as on the left: a 256 px view gets 252, and the text there still passes.
+// The en scripts of the JP and PSP EN voice sets (PSP EN and JP-en text)
+// have lines of up to 24 cells (tools/lang/sotn_lang.py DLG_LINE_CELLS): the
+// box takes the uk width (the border tile width is a u8, so 257 at most).
 s32 Lang_DialogueBoxRight(void) {
-    return g_Lang ? MIN(257, 252 + g_WideX) : 248;
+    return g_Lang || g_VoiceSet != VOICE_PS1 ? MIN(257, 252 + g_WideX) : 248;
+}
+
+// px the text line sprite moves left, so 24 cells end at the box edge: the
+// line at x 60 + 4 - shift, its first cell 8 px on, 24 cells of 8 px end
+// at 264 - shift. 8 in a box to 257, 12 in a 256 px view (box to 252). The
+// portrait (x 6..54) keeps its place; the ink starts 10 or 6 px after it.
+s32 Lang_DialogueTextShift(void) {
+    return g_Lang || g_VoiceSet == VOICE_PS1
+               ? 0
+               : MIN(12, 265 - Lang_DialogueBoxRight());
 }
 
 // The owner's serif 12x16 design for a stock Cyrillic code, or NULL.

@@ -69,6 +69,18 @@ u8* Lang_NextBox(u8* p);
 u8* CutsceneAddrToPc(u32 psxAddr);
 #define CS_NEXT(ptr) (u16*)CutsceneAddrToPc(ptr)
 #define CS_PTR(ptr) CutsceneAddrToPc((u32)(uintptr_t)(ptr) + 0x100000)
+// The wait after a char and a SET_WAIT inside the text: shorter while a
+// voice line plays, so the box ends with the line (src/pc/voice.c).
+u8 Cutscene_CharTimer(u8 n, const u8* p);
+u8 Cutscene_WaitTimer(u8** p, u8 n);
+#define CS_CHAR_TIMER(n) Cutscene_CharTimer(n, (const u8*)g_Dialogue.scriptCur)
+#define CS_WAIT_TIMER()                                                        \
+    Cutscene_WaitTimer((u8**)&g_Dialogue.scriptCur, g_Dialogue.unk17)
+// The text line sprite: 200 px wide (24 cells after the 8 px lead), and
+// moved left by Lang_DialogueTextShift (src/pc/lang.c).
+s32 Lang_DialogueTextShift(void);
+#define CS_TEXT_X(x) ((x) - Lang_DialogueTextShift())
+#define CS_LINE_W 200
 #elif TARGET == TARGET_PSP
 #define CS_NEXT(ptr) (u8*)(ptr)
 #define CS_PTR(ptr) (u8*)(ptr)
@@ -78,6 +90,12 @@ u8* CutsceneAddrToPc(u32 psxAddr);
 #endif
 #ifndef CS_VOICE_WAIT
 #define CS_VOICE_WAIT()
+#endif
+#ifndef CS_CHAR_TIMER
+#define CS_CHAR_TIMER(n) (n)
+#define CS_WAIT_TIMER() *g_Dialogue.scriptCur++
+#define CS_TEXT_X(x) (x)
+#define CS_LINE_W 192
 #endif
 
 #define script_half(x) (((x) & 0xFF0) >> 4), ((x) & 0xFF)

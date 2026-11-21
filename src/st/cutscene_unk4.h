@@ -15,18 +15,18 @@ void CutsceneUnk4(void) {
     prim->tpage = CUTSCENE_UNK4_TPAGE;
     prim->clut = g_Dialogue.clutIndex;
 #if CUTSCENE_EARLY_VER
-    prim->x0 = g_Dialogue.startX;
+    prim->x0 = CS_TEXT_X(g_Dialogue.startX);
     prim->y0 = g_Dialogue.nextLineY;
     prim->u0 = 0;
     prim->v0 = g_Dialogue.nextCharY * 16 + CUTSCENE_UNK4_V_OFFSET;
-    prim->u1 = 0xC0;
+    prim->u1 = CS_LINE_W;
     prim->v1 = 16;
 #else
     prim->y0 = g_Dialogue.nextLineY;
     prim->u0 = 0;
-    prim->x0 = g_Dialogue.startX + 4;
+    prim->x0 = CS_TEXT_X(g_Dialogue.startX + 4);
     prim->v0 = g_Dialogue.nextCharY * 12 + CUTSCENE_UNK4_V_OFFSET;
-    prim->u1 = 0xC0;
+    prim->u1 = CS_LINE_W;
     prim->v1 = 12;
 #endif
     prim->priority = 0x1FF;

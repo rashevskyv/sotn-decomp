@@ -128,6 +128,17 @@ bool Cutscene_VoiceBusy(void) {
             D_80139014, VSync(-1) - D_8013AEF4, D_8013AE90);
     return false;
 }
+
+// The voice line now playing, for the typing pace (src/pc/voice.c): its
+// length in vsyncs (the 20 of the box hold off) and *start its first vsync.
+// 0 while none plays or a new read is pending.
+s32 Cutscene_VoiceClip(s32* start) {
+    if (!g_PlayingXaBgmId || D_80139014 != 2 || D_801390A0 || Music_Playing()) {
+        return 0;
+    }
+    *start = D_8013AEF4;
+    return D_8013AE90 - 20;
+}
 #endif
 
 s16 GetCdVolume(void) { return g_CdVolume; }

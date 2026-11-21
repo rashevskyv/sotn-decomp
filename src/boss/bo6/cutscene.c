@@ -183,7 +183,7 @@ void func_us_801A7DC0(Entity* self) {
                 g_Dialogue.unk17 = *g_Dialogue.scriptCur++;
                 continue;
             case CSOP_SET_WAIT:
-                g_Dialogue.nextCharTimer = *g_Dialogue.scriptCur++;
+                g_Dialogue.nextCharTimer = CS_WAIT_TIMER();
                 if (g_SkipCutscene) {
                     continue;
                 }
@@ -260,7 +260,7 @@ void func_us_801A7DC0(Entity* self) {
                 prim->y2 = prim->y3 = g_Dialogue.startY + 72;
                 prim = prim->next;
                 prim->y0 = g_Dialogue.startY - 1;
-                prim->u0 = 246;
+                prim->u0 = LANG_DIALOGUE_BOX_RIGHT() - 2;
                 g_Dialogue.portraitAnimTimer = 24;
                 self->step = DIALOGUE_OPEN_DIALOG_BOX;
                 self->step_s = DIALOG_BOX_INIT;
@@ -396,7 +396,7 @@ void func_us_801A7DC0(Entity* self) {
                 if (g_SkipCutscene) {
                     continue;
                 }
-                g_Dialogue.nextCharTimer = g_Dialogue.unk17;
+                g_Dialogue.nextCharTimer = CS_CHAR_TIMER(g_Dialogue.unk17);
             }
             break;
         }
@@ -461,12 +461,12 @@ void func_us_801A7DC0(Entity* self) {
                  prim = prim->next) {
                 prim->r0 = prim->r1 = 127;
                 prim->b0 = prim->b1 = prim->g0 = prim->g1 = 0;
-                prim->x0 = prim->x1 = 247;
+                prim->x0 = prim->x1 = LANG_DIALOGUE_BOX_RIGHT() - 1;
                 prim->y0 = prim->y1 = g_Dialogue.startY + uCoord;
                 prim->priority = 510;
                 prim->drawMode = DRAW_DEFAULT;
                 prim->x2 = D_us_8018062C[uCoord];
-                prim->x3 = 3952;
+                prim->x3 = (LANG_DIALOGUE_BOX_RIGHT() - 1) * 16;
                 uCoord++;
             }
             self->step_s++;
