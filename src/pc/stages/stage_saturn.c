@@ -11,6 +11,7 @@
 #include "music/xa_config.h"
 #endif
 #include "overlay.h"
+#include "../spawn_point.h"
 
 #ifndef SATURN_STAGE_ASSET_DIR
 #define SATURN_STAGE_ASSET_DIR "stage15_assets"
@@ -237,9 +238,12 @@ EInit g_EInitCommon = {ANIMSET_DRA(0), 0x00, 0x00, PAL_NONE, ENEMY_COMMON};
 // clang-format on
 #endif
 u16 g_RedDoorTiles[2][8];
-static u16 s_SaturnStageRedDoorTiles[32];
+// The door's tile writes land here, not in the native-layer stage. With
+// hSize 0 the index is (screen x >> 4): an s16 screen x gives -2048..2047
+// (a door far off screen, as in the inverted castle's right-hand doors).
+static u16 s_SaturnStageRedDoorTiles[4096];
 static Tilemap s_SaturnStageRedDoorTilemap = {
-    .fg = &s_SaturnStageRedDoorTiles[4],
+    .fg = &s_SaturnStageRedDoorTiles[2048],
     .hSize = 0,
 };
 
@@ -871,6 +875,8 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_MOD_SPECTER;
     case 0x21:
         return E_MOD_GARGOYLE;
+    case 0x24: // the Garden's 0x40 code; no Prison layout places it
+        return E_MOD_SKBREEDER;
     case 0x28:
         return E_MOD_WISP_SPAWNER;
     case 0x16:
@@ -966,6 +972,16 @@ static void SaturnGdnBuildLayouts(void) {
                 SaturnGdnEntityId(src[i].entityId & 0x3FF, id == saveLayout);
             count++;
         }
+#ifdef SATURN_STAGE_PRISON
+        // the test spawn point "prison-breeder": a Skeleton Breeder on room
+        // 0's fourth floor (y 545), in free slots 0x5C-0x5E (it uses self + 1
+        // and + 2); the Saturn layouts place none
+        if (id == 1 && count < GDN_LAYOUT_MAX - 2 && SpawnPoint_Name() &&
+            !strcmp(SpawnPoint_Name(), "prison-breeder")) {
+            x[1 + count++] = (LayoutEntity){
+                200, 545 - 32, SaturnGdnEntityId(0x24, false), 0x5C5C, 0};
+        }
+#endif
         SaturnGdnSortLayout(&x[1], count, false);
         x[0] = head;
         x[1 + count] = tail;

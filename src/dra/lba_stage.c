@@ -91,4 +91,10 @@ Lba g_StagesLba[] = {
     {ST_TE2_F_BIN_OFF, ST_TE2_BIN_OFF, ST_TE2_BIN_LEN, ST_TE2_VH_OFF, ST_TE2_VH_LEN, ST_TE2_VB_LEN, MU_LOST_PAINTING, "F_NO0", "TE2", "rou", 0x7E, 0xFF},
     {ST_TE2_F_BIN_OFF, ST_TE2_BIN_OFF, ST_TE2_BIN_LEN, ST_TE2_VH_OFF, ST_TE2_VH_LEN, ST_TE2_VB_LEN, MU_LOST_PAINTING, "F_NO0", "TE2", "rou", 0x7E, 0xFF},
     {ST_TE2_F_BIN_OFF, ST_TE2_BIN_OFF, ST_TE2_BIN_LEN, ST_TE2_VH_OFF, ST_TE2_VH_LEN, ST_TE2_VB_LEN, MU_LOST_PAINTING, "F_NO0", "TE2", "rou", 0x7E, 0xFF},
+#ifdef PLATFORM_PSYZ
+    // the Saturn inverted-castle stages (src/pc/pc.h, 0x6C and 0x6D) index
+    // past the retail table: the same rows as their normal ones, 0x4C/0x4D
+    [0x6C] = {ST_TE2_F_BIN_OFF, ST_TE2_BIN_OFF, ST_TE2_BIN_LEN, ST_TE2_VH_OFF, ST_TE2_VH_LEN, ST_TE2_VB_LEN, MU_LOST_PAINTING, "F_NO0", "TE2", "rou", 0x7E, 0xFF},
+    [0x6D] = {ST_TE2_F_BIN_OFF, ST_TE2_BIN_OFF, ST_TE2_BIN_LEN, ST_TE2_VH_OFF, ST_TE2_VH_LEN, ST_TE2_VB_LEN, MU_LOST_PAINTING, "F_NO0", "TE2", "rou", 0x7E, 0xFF},
+#endif
 };

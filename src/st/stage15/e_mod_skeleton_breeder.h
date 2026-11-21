@@ -179,7 +179,9 @@ void EntityModSkBreeder(Entity* self) {
         init[3] = SKB_PAL;
         init[4] = 0x1A4; // "Skeleton Breeder"
         InitializeEntity(init);
+#ifdef MOD_GDN_ENEMY_FRONT_Z
         self->zPriority = MOD_GDN_ENEMY_FRONT_Z; // above the flowers
+#endif
         // Saturn-space values written after TekiInit
         self->hitboxWidth = SAT_X(6);
         self->hitboxHeight = 16;
@@ -375,7 +377,9 @@ void EntityModSkBreederBeast(Entity* self) {
         init[3] = SKB_PAL;
         init[4] = 0x1A5; // "Skeleton Beast"
         InitializeEntity(init);
+#ifdef MOD_GDN_ENEMY_FRONT_Z
         self->zPriority = MOD_GDN_ENEMY_FRONT_Z; // above the flowers
+#endif
         self->hitboxWidth = SAT_X(9);
         self->hitboxHeight = 5;
         self->hitboxOffX = 0;

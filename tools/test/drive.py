@@ -3,7 +3,7 @@
 """Hidden test run of the private Linux build copy (tools/test/setup.sh makes it).
 
 usage: drive.py <W>x<H> <ini> <outdir> step...
-steps: k:KEY[,KEY] tap | h:KEY:SEC hold | w:SEC wait | s:NAME screenshot | f: fit the window
+steps: k:KEY[,KEY] tap | h:KEY[+KEY]:SEC hold | w:SEC wait | s:NAME screenshot | f: fit the window
        m:X,Y mouse move | c:X,Y mouse move and left click (screen pixels)
        (KEY: xdotool names, for example Return, Right, z)
 env:   SOTN_ARGS     more game arguments, for example "--stage st0"
@@ -52,9 +52,10 @@ try:
         if op == "k":
             for key in arg.split(","):
                 x("keydown", key); time.sleep(0.12); x("keyup", key); time.sleep(0.25)
-        elif op == "h":
+        elif op == "h":  # KEY may be KEY+KEY: held together
             key, _, sec = arg.partition(":")
-            x("keydown", key); time.sleep(float(sec or 1)); x("keyup", key); time.sleep(0.25)
+            keys = key.split("+")
+            x("keydown", *keys); time.sleep(float(sec or 1)); x("keyup", *keys); time.sleep(0.25)
         elif op == "f":  # no window manager under Xvfb: size the window to the screen
             wid = subprocess.run(["xdotool", "search", "--pid", str(g.pid)], env=env, capture_output=True,
                                  text=True).stdout.split()

@@ -24,6 +24,8 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_ID_SATURN_16, 0, 560, 140, "prison-banner"},
     {STAGE_ID_SATURN_16, 1, 200, 150, "prison-specter"},
     {STAGE_ID_SATURN_16, 1, 640, 150, "prison-wisp"},
+    // adds a Skeleton Breeder to room 0 (no Saturn layout places one)
+    {STAGE_ID_SATURN_16, 0, 280, 525, "prison-breeder"},
     {STAGE_ID_SATURN_15, 0, 40, 140, "garden-room0"},
     {STAGE_ID_SATURN_15, 0, 600, 360, "garden-slinger"},
     {STAGE_ID_SATURN_15, 1, 40, 140, "garden-room1"},
@@ -33,6 +35,13 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_ID_SATURN_15, 4, 40, 140, "garden-room4"},
     {STAGE_ID_SATURN_15, 5, 40, 140, "garden-room5"},
     {STAGE_ID_SATURN_15, 6, 40, 140, "garden-room6"},
+    // the inverted castle's Saturn stages
+    {STAGE_ID_REVERSE_SATURN_15, 0, 2200, 392, "hell-garden-room0"},
+    {STAGE_ID_REVERSE_SATURN_15, 1, 40, 136, "hell-garden-room1"},
+    {STAGE_ID_REVERSE_SATURN_15, 2, 40, 136, "hell-garden-room2"},
+    {STAGE_ID_REVERSE_SATURN_15, 3, 40, 136, "hell-garden-room3"},
+    {STAGE_ID_REVERSE_SATURN_16, 0, 60, 648, "soul-prison-room0"},
+    {STAGE_ID_REVERSE_SATURN_16, 1, 1200, 136, "soul-prison-room1"},
 };
 
 enum SpawnPointStep {
@@ -59,6 +68,8 @@ static const struct SpawnPoint* FindSpawnPoint(const char* name) {
     }
     return NULL;
 }
+
+const char* SpawnPoint_Name(void) { return s_Spawn ? s_Spawn->name : NULL; }
 
 int SpawnPoint_StageForName(const char* name) {
     const struct SpawnPoint* spawn = FindSpawnPoint(name);
