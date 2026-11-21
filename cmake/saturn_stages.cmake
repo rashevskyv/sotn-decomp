@@ -170,7 +170,10 @@ set(SATURN_RGDN_SOURCES
     src/st/rstage15/collision.c
     src/st/rstage15/create_entity.c
     src/st/rstage15/d_prize_drops.c
+    src/st/rstage15/e_bitterfly.c
     src/st/rstage15/e_breakable.c
+    src/st/rstage15/e_cave_troll.c
+    src/st/rstage15/e_cloaked_knight.c
     src/st/rstage15/e_collect.c
     src/st/rstage15/e_init.c
     src/st/rstage15/e_misc.c
