@@ -15,6 +15,7 @@
 //   POST /warp?stage=&room=&cx=&cy=   teleport, 409 + reason when refused
 //   POST /cheat?name=&on=             switch a cheat (as the port menu)
 //   POST /equip?hand=&item=           equip a hand item (as the menu does)
+//   POST /save?slot=                  write the save (as the save coffin)
 //
 // No password: anyone on the network can use it while it is on. All work
 // runs on the game thread, one request per connection, Connection: close.
@@ -155,11 +156,19 @@ static void State(void) {
     PutJsonString(why ? why : "");
     Putf(",\"cheats\":{\"refill\":%d,\"invincible\":%d,\"walls\":%d,"
          "\"items\":%d,\"map\":%d,\"skip_prologue\":%d,\"character\":%d},"
-         "\"char\":%d,\"saveChar\":%d,\"sub\":[%d,%u],\"leap\":%d}",
+         "\"char\":%d,\"saveChar\":%d,\"sub\":[%d,%u],\"leap\":%d",
          g_Cheat.refill, g_Cheat.invincible, g_Cheat.walls, g_Cheat.items,
          g_Cheat.map, g_Cheat.skipPrologue, g_Cheat.character, g_PlayableCharacter,
          g_CheatSaveChar, g_Status.subWeapon, g_Status.D_80097C40,
          g_Status.relics[RELIC_LEAP_STONE]);
+    // tests: the hands, their attack, the defence and the Saturn items owned
+    Putf(",\"equip\":[%u,%u],\"atk\":[%d,%d],\"def\":%d,\"saturn\":[%d,%d,%d,%d]}",
+         g_Status.equipment[0], g_Status.equipment[1],
+         g_Status.attackHands[0], g_Status.attackHands[1],
+         g_Status.defenseEquip, g_Status.equipHandCount[ITEM_ASTRAL_DAGGER],
+         g_Status.equipHandCount[ITEM_KUSAI_MESHI],
+         g_Status.equipHandCount[ITEM_WOODLAND_SHIELD],
+         g_Status.equipHandCount[ITEM_DOUBLE_BLADE_AXE]);
 }
 
 static void Castle(void) {
@@ -426,14 +435,15 @@ static void Handle(int fd) {
         State();
         ReplyOut(fd, code, "application/json");
     } else if (!strcmp(path, "/ents")) {
-        // tests: the live entities (slot, id, screen x y, hp, hitbox, step)
+        // tests: the live entities (slot, id, screen x y, hp, hitbox, step,
+        // params, enemy id)
         Put("[", 1);
         for (k = 0, code = 0; k < TOTAL_ENTITY_COUNT; k++) {
             Entity* e = &g_Entities[k];
             if (e->entityId) {
-                Putf("%s[%d,%d,%d,%d,%d,%d,%d]", code++ ? "," : "", k,
+                Putf("%s[%d,%d,%d,%d,%d,%d,%d,%d,%d]", code++ ? "," : "", k,
                      e->entityId, e->posX.i.hi, e->posY.i.hi, e->hitPoints,
-                     e->hitboxState, e->step);
+                     e->hitboxState, e->step, e->params, e->enemyId);
             }
         }
         Put("]", 1);
@@ -460,6 +470,31 @@ static void Handle(int fd) {
                     item);
         }
         State();
+        ReplyOut(fd, code, "application/json");
+    } else if (!strcmp(path, "/save") && !strcmp(method, "POST")) {
+        // tests: write the save of the loaded slot, as the save coffin does
+        // (src/dra/62DEC.c steps 4-5)
+        void MakeMemcardPath(char* dstSaveName, s32 block);
+        void StoreSaveData(SaveData* save, s32 block, s32 cardIcon);
+        s32 MemcardWriteFile(s32 nPort, s32 nCard, const char* name,
+                             void* data, s32 flags, bool create);
+        s32 MemcardClose(s32 nPort);
+        int MemcardDetectSave(s32 nPort, u8* expectedSaveName, s32 block);
+        char name[32];
+        int slot = Arg(query, "slot", D_8006C378), wr = -9, cl = 0;
+        code = 409;
+        if (g_GameState == Game_Play && slot >= 0 && slot < 15) {
+            MakeMemcardPath(name, slot);
+            StoreSaveData((SaveData*)g_Pix, slot, 0);
+            wr = MemcardWriteFile(D_80097924, 0, name, g_Pix, 1,
+                                  MemcardDetectSave(D_80097924, name, 0) != 1);
+            for (k = 0; !wr && k < 100 && !(cl = MemcardClose(D_80097924));
+                 k++) {
+            }
+            code = !wr && cl == 1 ? 200 : 500;
+        }
+        Putf("{\"slot\":%d,\"port\":%d,\"write\":%d,\"close\":%d}", slot,
+             D_80097924, wr, cl);
         ReplyOut(fd, code, "application/json");
     } else {
         Reply(fd, 404, "text/plain", "not found", 9);
