@@ -22,11 +22,13 @@
 #define SAT_X(v) ((v) * 4 / 5)
 #define SAT_X_INV(v) ((v) * 5 / 4)
 
-// Saturn-only sounds (not in the PS1 sound banks): PS1 stand-ins
-#define MOD_SFX_SPECTER_CRY SFX_MAGIC_NOISE_SWEEP          // Saturn 0x901
-#define MOD_SFX_SPECTER_VANISH SFX_MAGIC_WEAPON_APPEAR_B   // Saturn 0x900
-#define MOD_SFX_WISP_BURST SFX_FIRE_SHOT                   // Saturn 0x903
-// the PS1's own numbers (the Saturn keeps the PS1 table below 0x900)
+// Saturn-only sounds (not in the PS1 sound banks): src/pc/saturn_sfx.c plays
+// their WAVs (data/ST/STAGE16/sfx/) or, with no WAV, a PS1 stand-in
+#define MOD_SFX_SPECTER_CRY 0x901
+#define MOD_SFX_SPECTER_VANISH 0x900
+#define MOD_SFX_WISP_BURST 0x903
+// the PS1's own numbers (the Saturn keeps the PS1 table below 0x900; 0x614
+// is in the Saturn's common bank, as on the PS1)
 #define MOD_SFX_WISP_FLAME SFX_ELECTRICITY                 // Saturn 0x614
 
 EInit g_EInitModSpecter = {MOD_SPECTER_ANIMSET, 1, 0, PAL_NONE, 417};

@@ -95,36 +95,38 @@ typedef enum EntityID {
 // the enemies are drawn above room 0's ground flowers (sotn-ultimate gdn.h)
 #define MOD_GDN_ENEMY_FRONT_Z 0xA8
 
-// The Saturn-only sounds are not in the PS1 sound banks: PS1 stand-ins.
-#define MOD_SFX_GARGOYLE_CLAW SFX_WEAPON_SWISH_C
-#define MOD_SFX_GARGOYLE_DEBRIS SFX_WALL_DEBRIS_B
-#define MOD_SFX_BOSS_BOMB SFX_EXPLODE_FAST_B
-#define MOD_SFX_BOSS_DEATH SFX_SKELETON_DEATH_C
-#define MOD_SFX_GARDENER_SHEARS SFX_WEAPON_SWISH_A
-#define MOD_SFX_GARDENER_DEATH SFX_SKELETON_DEATH_B
-#define MOD_SFX_WATER_SURFACE SFX_WATER_SPLASH_MOVE
-#define MOD_SFX_WATER_SPLASH SFX_WATER_SPLASH_JUMP
-#define MOD_SFX_LEAPER_LEAP SFX_WATER_SPLASH_JUMP
-#define MOD_SFX_LEAPER_FALL SFX_WATER_SPLASH_MOVE
-#define MOD_SFX_LEAPER_DEATH SFX_MERMAN_DEATH
-#define MOD_SFX_MANEATER_SNAP SFX_WEAPON_STAB_B
-#define MOD_SFX_MANEATER_OPEN SFX_SCRAPE_B
-#define MOD_SFX_MANEATER_BURST SFX_VENUS_WEED_DEATH
-#define MOD_SFX_TREE_HURT SFX_BLOODY_ZOMBIE_SPLATTER
-#define MOD_SFX_TREE_FACE_FALL SFX_SCRAPE_B
-#define MOD_SFX_TREE_FACE_BURST SFX_BLOODY_ZOMBIE_SPLATTER
-#define MOD_SFX_TREE_DEATH SFX_STONE_ROSE_DEATH
+// The Saturn-only sounds are not in the PS1 sound banks: the stage plays the
+// Saturn ids. src/pc/saturn_sfx.c plays their WAVs (data/ST/STAGE15/sfx/,
+// tools/saturn/saturn_audio.py) or, with no WAV, a PS1 stand-in.
+#define MOD_SFX_GARGOYLE_CLAW 0x8FE
+#define MOD_SFX_GARGOYLE_DEBRIS 0x8FF
+#define MOD_SFX_BOSS_BOMB 0x8F7
+#define MOD_SFX_BOSS_DEATH 0x8F8
+#define MOD_SFX_GARDENER_SHEARS 0x90F
+#define MOD_SFX_GARDENER_DEATH 0x90E
+#define MOD_SFX_WATER_SURFACE SFX_WATER_SPLASH_MOVE // Saturn 0x778
+#define MOD_SFX_WATER_SPLASH SFX_WATER_SPLASH_JUMP  // Saturn 0x777
+#define MOD_SFX_LEAPER_LEAP 0x912
+#define MOD_SFX_LEAPER_FALL 0x913
+#define MOD_SFX_LEAPER_DEATH 0x911
+#define MOD_SFX_MANEATER_SNAP 0x90D
+#define MOD_SFX_MANEATER_OPEN 0x90C
+#define MOD_SFX_MANEATER_BURST 0x90B
+#define MOD_SFX_TREE_HURT 0x8FC
+#define MOD_SFX_TREE_FACE_FALL 0x8FA
+#define MOD_SFX_TREE_FACE_BURST 0x8FB
+#define MOD_SFX_TREE_DEATH 0x8FD
 
 // the Leaper's water entities are not ported: its splashes are skipped
 #define MOD_LEAPER_E_SPLASH E_DUMMY_0F
 #define MOD_LEAPER_E_SURFACING E_DUMMY_0F
 
 // the Garden track is the stage music the PC module sets (g_StageMusicId,
-// stage_saturn.c). The Skeleton Leader's own track (Saturn SD2B) is not
-// exported, and a PS1 track cannot play: the CD path is the Garden's XA
-// file. The fight keeps the Garden track.
+// stage_saturn.c). The Skeleton Leader's own track (Saturn SD2B) plays from
+// data/ST/STAGE15/music/535.wav (src/pc/music.c, saturn_sfx.c); with no file
+// the fight keeps the Garden track.
 #define MOD_GDN_STAGE_MUSIC g_StageMusicId
-#define MOD_BOSS_MUSIC g_StageMusicId
+#define MOD_BOSS_MUSIC SATURN_BOSS_MUSIC
 // a fg tile with solid collision, found at module start (stage_saturn.c)
 extern u16 g_GdnSolidTile;
 #define MOD_BOSS_DOOR_TILE g_GdnSolidTile

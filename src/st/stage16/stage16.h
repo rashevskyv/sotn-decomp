@@ -71,9 +71,11 @@ typedef enum EntityID {
     NUM_PRISON_ENTITIES,
 } EntityID;
 
-// The Saturn-only sounds are not in the PS1 sound banks: PS1 stand-ins.
-#define MOD_SFX_GARGOYLE_CLAW SFX_WEAPON_SWISH_C
-#define MOD_SFX_GARGOYLE_DEBRIS SFX_WALL_DEBRIS_B
+// The Saturn-only sounds are not in the PS1 sound banks: the stage plays the
+// Saturn ids. src/pc/saturn_sfx.c plays their WAVs (data/ST/STAGE16/sfx/)
+// or, with no WAV, a PS1 stand-in.
+#define MOD_SFX_GARGOYLE_CLAW 0x8FE
+#define MOD_SFX_GARGOYLE_DEBRIS 0x8FF
 
 // the converted Saturn sprite banks (gdn_entities.py STAGE_16)
 #define MOD_CANDLE_ANIMSET ANIMSET_OVL(2)

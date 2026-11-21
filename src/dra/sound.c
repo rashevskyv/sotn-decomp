@@ -1277,6 +1277,11 @@ s32 PlaySfxVolPan(s16 sfxId, u16 sfxVol, s16 sfxPan) {
     if (!g_SoundInitialized) {
         return -2;
     }
+#ifdef PLATFORM_PSYZ
+    if (SaturnSfx_Play(&sfxId, sfxVol & 0x7F, sfxPan)) {
+        return 0;
+    }
+#endif
     if (sfxId > SFX_START && sfxId <= SFX_LAST) {
         g_SfxRingBuffer[g_sfxRingBufferWritePos].sndId = sfxId - SFX_START;
         g_SfxRingBuffer[g_sfxRingBufferWritePos].sndVol = sfxVol & 0x7F;
@@ -1301,6 +1306,11 @@ void PlaySfx(s16 sfxId) {
     if (!g_SoundInitialized) {
         return;
     }
+#ifdef PLATFORM_PSYZ
+    if (SaturnSfx_Play(&sfxId, 0x7F, 0)) {
+        return;
+    }
+#endif
     if (sfxId > SFX_START && sfxId <= SFX_LAST) {
         g_SfxRingBuffer[g_sfxRingBufferWritePos].sndId = sfxId - SFX_START;
         g_SfxRingBuffer[g_sfxRingBufferWritePos].sndVol = 0xFFFF;
@@ -1450,7 +1460,7 @@ void ExecSoundCommands(void) {
         }
 
 #ifdef PLATFORM_PSYZ
-        if (id > 0x300 && id < 0x535) {
+        if (id > 0x300 && id < SATURN_BOSS_MUSIC + 2) {
 #elif REGION == REGION_JP
         if (id > 0x300 && id < 0x531) {
 #elif TARGET == TARGET_PSP

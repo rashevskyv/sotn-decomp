@@ -493,7 +493,8 @@ def main():
             say(f"   no games/{UK_ART}: 10 Ukrainian labels (file select, name plate, HUD) stay English")
         on = {True: "ON", False: "OFF"}
         common = ["-DENABLE_ASAN=OFF", "-DPSYZ_RENDERER=sdl3_gl",
-                  f"-DENABLE_SATURN_STAGES={on[saturn]}", f"-DUSE_PLAYER_MARIA={on[maria]}"]
+                  f"-DENABLE_SATURN_STAGES={on[saturn]}", f"-DSATURN_STAGE_AUDIO={on[saturn]}",
+                  f"-DUSE_PLAYER_MARIA={on[maria]}"]
         common.append("-DSOTN_LANG_MEDIA=" + (os.path.dirname(uk_art[0]) if uk_art else ""))
         if pc:
             build = step("build pc", cmake, "pc", common + ["-DPSYZ_STATIC_MODULES=ON", "-DSOTN_PC_DATA_DIR=data"])

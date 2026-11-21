@@ -15,10 +15,18 @@ SeqData g_SeqInfo[] = {
 XaMusicConfig g_XaMusicConfigs[] = {
 #include GEN_VERSION(xa_music_config.h)
 #ifdef PLATFORM_PSYZ
+    // 0x533/0x534: the Saturn stage music (stage_saturn.c); 0x535/0x536:
+    // the Saturn boss track, a copy of them (src/pc/saturn_sfx.c)
+    {0},
+    {0},
     {0},
     {0},
 #endif
 };
+#ifdef PLATFORM_PSYZ
+STATIC_ASSERT(LEN(g_XaMusicConfigs) == SATURN_BOSS_MUSIC + 2 - 0x300,
+              "xa table size");
+#endif
 
 Unkstruct_800BF554 g_SfxData[] = {
 #include GEN_VERSION(sfx_config.h)

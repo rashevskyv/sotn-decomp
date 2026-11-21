@@ -298,6 +298,33 @@ Without a line, a looping track repeats the whole file.
 `tools/music/ost_map.py copy <ost folder> <game>/music` names the tracks of the soundtrack album
 and writes `loops.txt` for them. No audio is in this repository.
 
+## Saturn stage sounds
+
+The Underground Garden (Saturn STAGE_15) and the Cursed Prison (STAGE_16) have sounds
+that are not in the PS1 sound banks, and the Skeleton Leader has his own track (Saturn SD2B).
+The build can convert them from your Saturn disc. Without them the game plays a PS1 stand-in
+sound, and the boss fight keeps the Garden track.
+
+1. Get the sound player source (once): `git submodule update --init --recursive tools/saturn/sound-player`.
+2. Add `-DSATURN_STAGE_AUDIO=ON` to the cmake command (with `-DENABLE_SATURN_STAGES=ON`).
+   `build.py` does it when the Saturn stages are on.
+3. Build. The step `saturn_stage_audio` runs `tools/saturn/saturn_audio.py`. It writes:
+
+| File | What |
+|---|---|
+| `data/ST/STAGE15/sfx/<id>.wav` | 16 Garden sounds (`8F7.wav` ... `913.wav`) |
+| `data/ST/STAGE16/sfx/<id>.wav` | 5 Prison sounds (`8FE.wav` ... `903.wav`) |
+| `data/ST/STAGE15/music/535.wav`, `loops.txt` | The boss track and its loop point |
+
+The step reads `0.BIN`, `STAGE_15.PRG`, `STAGE_16.PRG`, the `SD_*.CRT` sound packages and `SD2B.PCM`
+from `disks/saturn/`. A missing file or a missing sound player gives a `[saturn-audio]` line in the
+build log, and the build goes on. A file that is already there is not made again.
+You can also run the script by hand: `tools/saturn/saturn_audio.py --help`.
+
+The game log shows which file played:
+`[satsfx] STAGE16 901: file ST/STAGE16/sfx/901.wav ...`, or `... no file ..., PS1 stand-in ...`,
+and `[music] 535: file ...` at the boss.
+
 ## Ukrainian language
 
 The text, fonts and drawn labels are in `tools/lang/uk/` (see `tools/lang/FORMAT.md`).
