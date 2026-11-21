@@ -228,6 +228,9 @@ int Main(int argc, char* argv[]) {
         if (g_HdTextures) {
             Psyz_HdTexAddDir(g_Lang ? "data/textures/uk" : "data/textures/en");
             Psyz_HdTexAddDir("data/textures/common");
+            // gameplay backgrounds, an experiment (owner, 2026-11-21): only
+            // when this folder is there; they draw in play too
+            Psyz_HdTexAddPlayDir("data/textures/play");
             // the two dialogue portrait slots (48x72, 8 bpp): HD in play too
             Psyz_HdTexAllow(0, 256, 24, 72, 8);
             Psyz_HdTexAllow(32, 256, 24, 72, 8);
