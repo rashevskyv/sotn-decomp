@@ -123,6 +123,9 @@ PRISON = dict(
     PRIM_PARTS={},
 )
 STAGES = {"STAGE_15": GARDEN, "STAGE_16": PRISON}
+# Reverse Garden (RSTAGE15): its own table, rstage15_entities.py
+from rstage15_entities import RGARDEN  # noqa: E402
+STAGES["RSTAGE15"] = RGARDEN
 QUADRANTS = [(t, q) for t in range(18, 24) for q in range(4)]
 CLUT_BASE = 0x210
 GAME_BASE, ENEMY_DEFS, FIRST, COUNT = 0x06066000, 0x06080288, 400, 26
@@ -206,6 +209,7 @@ def main(disc, out_path, stage="STAGE_15"):
             for n, f in SPRITE_SETS]
     saturn_sprites.BLEED_BANKS.update(BLEED_BANKS)
     saturn_sprites.STP_BANKS.update(STP_BANKS)
+    saturn_sprites.TRIM_BANKS.update(STAGES[stage].get("TRIM_BANKS", {}))
 
     def fill(sheets):
         for g, bank in PALETTE_BLOCKS.values():
