@@ -125,6 +125,9 @@ Loader name: `<free text>__<x>_<y>_<w>x<h>_<bpp>_<hash8>[_c<clut8>].png` (see `t
 Search order: `data/textures/uk/` or `data/textures/en/` first, then `data/textures/common/`.
 Rule: a picture with words goes to `uk/` and `en/`. A picture without words goes to `common/`.
 All HD pictures are made from or after stock art: local, never in git, never in a release.
+Packed form: `python3 tools/hdtex_pack.py <png folder> <out folder>` writes a `.hdt` next to each name.
+A `.hdt` holds BC1 or BC3 blocks with mipmaps (LZ4). The GPU takes it as is: no decode, about 1/4 of the memory.
+The loader takes the `.hdt` before the `.png` of the same name. The `.png` stays the source and the fallback (no S3TC).
 
 | Pack | Files | Made by | Source run |
 |---|---|---|---|

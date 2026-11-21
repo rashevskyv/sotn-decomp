@@ -221,8 +221,9 @@ int Main(int argc, char* argv[]) {
     }
     Lang_Init();
     {
-        // HD pictures: loose PNG files, the language folder before common
-        extern int g_Lang, g_HdTextures, g_HdDump;
+        // HD pictures: loose PNG files (or their .hdt, tools/hdtex_pack.py),
+        // the language folder before common
+        extern int g_Lang, g_HdTextures, g_HdDump, g_HdStats;
         fprintf(stderr, "[hd] settings: hd_textures %d hd_dump %d\n",
                 g_HdTextures, g_HdDump);
         if (g_HdTextures) {
@@ -240,6 +241,7 @@ int Main(int argc, char* argv[]) {
         if (g_HdDump) {
             Psyz_HdTexDump("data/textures/dump");
         }
+        Psyz_HdTexStats(g_HdStats);
     }
     Buttons_Update();
     MainGame();
