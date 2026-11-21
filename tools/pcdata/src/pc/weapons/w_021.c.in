@@ -5,7 +5,7 @@
 // matches the weapon code on both 32-bit and 64-bit hosts.
 #include <common.h>
 
-typedef u8 T_D_97000_8017A564[544];
+typedef u8 T_D_97000_8017A564[768];
 typedef struct {
     void* p0;
     void* p1;

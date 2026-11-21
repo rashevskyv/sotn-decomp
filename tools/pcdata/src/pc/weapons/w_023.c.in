@@ -8,7 +8,7 @@
 // .bss buffer referenced by raw pointers in the data
 static u8 w_023_bss_8017C978[0x118] __attribute__((aligned(8)));
 
-typedef u8 T_D_A5000_8017A8A4[128];
+typedef u8 T_D_A5000_8017A8A4[768];
 typedef u8 T_D_A5000_8017A924[8];
 typedef u8 T_D_A5000_8017A92C[8];
 typedef u8 T_D_A5000_8017A934[44];
