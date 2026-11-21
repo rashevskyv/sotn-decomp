@@ -498,6 +498,10 @@ void EntityNovaLaserPulse(Entity* self) {
         self->hitboxState = 0;
         self->animCurFrame = 0x24;
         self->drawFlags |= ENTITY_SCALEY | ENTITY_SCALEX;
+#ifdef NOVA_LASER_PARTS
+        // the Saturn's frame has no PS1 blend flag: additive, as the PS1's
+        self->blendMode = BLEND_TRANSP | BLEND_ADD;
+#endif
         self->scaleX = self->scaleY = 0x10;
         if (self->facingLeft) {
             self->velocityX = FIX(8.0);
