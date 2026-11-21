@@ -1334,16 +1334,15 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
             Line(x + BORDER, y + BORDER + i * LINE_H, lines[i], 128, 200, 255);
             continue;
         }
-        Line(x + BORDER, y + BORDER + i * LINE_H, lines[i], c, c,
-             lit ? 64 : c);
+        Line(x + BORDER, y + BORDER + i * LINE_H, lines[i], c, c, lit ? 64 : c);
     }
     // the button hint under the box; beside the mini map the box lets the
     // rooms under it show through, so its frame is four lines
     Line(x + BORDER, y + h + 4, hint, 255, 255, 64);
     for (i = 0; box_left && i < count; i++) { // under the text, on the box
         if (i == hi || i == box_mark) {
-            Rect(x + 2, y + BORDER + i * LINE_H - 2, w - 4, LINE_H, 150, 24,
-                 24);
+            Rect(
+                x + 2, y + BORDER + i * LINE_H - 2, w - 4, LINE_H, 150, 24, 24);
         }
     }
     semi = box_left;
@@ -1881,10 +1880,9 @@ static void ItemLine(char* line, int id) {
     }
 }
 
-// The widest line a list page can show: its lines, and the header with the
-// names of the other list (the boss names on the place list, the area names
-// on the boss list). So the box keeps one width while the list scrolls and
-// the pointer moves, and the mini map beside it stays put under the pointer.
+// The widest line of the list page, on screen or not: the box keeps that
+// width while the list scrolls, so the mini map beside it stays put under
+// the pointer.
 static int ListWidth(void) {
     static int w[2], w_uk[2] = {-1, -1};
     char line[LINE_MAX];
@@ -1894,19 +1892,20 @@ static int ListWidth(void) {
     }
     w_uk[list_boss] = uk;
     *pw = 0;
-    for (i = 0; i < n_items + MAX(g_CastleStageCount, g_CheatBossCount);
-         i++) {
+    for (i = 0; i < n_items; i++) {
         Clear(line);
-        if (i < n_items) {
-            ItemLine(line, items[i]);
-        } else if (list_boss && i - n_items < g_CastleStageCount) {
-            AddZone(line, g_CastleStages[i - n_items].id);
-        } else if (!list_boss && i - n_items < g_CheatBossCount) {
-            AddNames(line, &g_CheatBosses[i - n_items]);
-        }
+        ItemLine(line, items[i]);
         *pw = MAX(*pw, Width(line));
     }
     return *pw;
+}
+
+// a line cut to w pixels (lines of plain cells, no button marks)
+static void ClipTo(char* line, int w) {
+    int n = Len(line);
+    while (n > 0 && Width(line) > w) {
+        line[--n] = uk ? (char)0xFF : 0;
+    }
 }
 
 // "NO0  MARBLE GALLERY" lines, or the boss list with the boss picture
@@ -1924,6 +1923,10 @@ static void DrawList(void) {
     } else if (mark_cx >= 0) {
         b = BossAt(mark_cx, mark_cy, mark_c);
     }
+    // the box keeps the width of its widest line, but not so wide that the
+    // mini map (150 px from the box, DrawMini) must go behind it
+    ViewRect(&vx0, &vy0, &vx1, &vy1);
+    box_min_w = MIN(ListWidth(), vx1 - vx0 - 164 - BORDER * 2);
     Clear(lines[0]);
     if (msg_timer > 0) {
         msg_timer--;
@@ -1932,9 +1935,11 @@ static void DrawList(void) {
         Add(lines[0], tmp);
     } else if (rm) { // the place of the room under the pointer
         AddZone(lines[0], rm->stage);
+        ClipTo(lines[0], box_min_w); // the header never widens the box
         box_mark = 0;
     } else if (b >= 0) { // the boss of the room under the pointer
         AddNames(lines[0], &g_CheatBosses[b]);
+        ClipTo(lines[0], box_min_w);
         box_mark = 0;
     } else if (list_boss) {
         AddW(lines[0], P_BOSS, "BOSS");
@@ -1945,11 +1950,9 @@ static void DrawList(void) {
         Clear(lines[i]);
         ItemLine(lines[i], items[list_top + i - 1]);
     }
-    ViewRect(&vx0, &vy0, &vx1, &vy1);
     box_left = 1;
     box_x = vx0 + 4;
     box_y = vy0 + 4;
-    box_min_w = ListWidth();
     Box(lines, n + 1, sel - list_top + 1, 0);
     box_left = box_min_w = 0;
     box_mark = -1;
