@@ -27,8 +27,10 @@ RGARDEN = dict(
         (8, [("bitterfly", 0x060F2894, 0x060F2B4C, f) for f in range(1, 34)]),
         # Saturn 0x34-0x37 (RNZ1 code)
         (9, [("knight", 0x060F2C38, 0x060F2D68, f) for f in range(1, 9)]),
-        # Saturn 0x38-0x3B, Skeleton Guardian (e_mod_guardian.c)
-        (10, [("guardian", 0x060F2E08, 0x060F33B4, f) for f in range(1, 27)]),
+        # Saturn 0x38-0x3B, Skeleton Guardian (e_mod_guardian.c): the
+        # Saturn draws the body (frames 1-18) at the entity + (0, 32)
+        (10, [("guardian", 0x060F2E08, 0x060F33B4, f, 32 if f <= 18 else 0)
+              for f in range(1, 27)]),
     ],
     # Saturn 0x11 (func_060DC434): 6 records of 28 bytes
     DECORATIONS=(0x060EE478, 6),
