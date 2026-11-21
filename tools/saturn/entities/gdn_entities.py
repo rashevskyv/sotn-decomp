@@ -138,12 +138,15 @@ RPRISON = dict(
         (9, [("jack", 0x060EF2C8, 0x060EF510, f) for f in range(1, 22)]),
         (10, [("nova", 0x060EF730, 0x060EFB84, f) for f in range(1, 39)]),
         # the Saturn-only Wight and Wraith (e_mod_wight.c, e_mod_wraith.c)
-        (11, [("wight", 0x060EA3BC, 0x060ECA7C, f) for f in range(1, 101)]),
+        # (the Saturn draws the Wight at the entity + (0, 32): converted down)
+        (11, [("wight", 0x060EA3BC, 0x060ECA7C, f, 32) for f in range(1, 101)]),
         (12, [("wraith", 0x060ECFA0, 0x060ED788, f) for f in range(1, 46)]),
     ],
     DECORATIONS=(0x060E9A30, 6),
     DECORATION_GROUPS=["candles"] * 6,
-    PALETTE_BLOCKS={"GARGOYLE": ("gargoyles", 0x060EDE90)},
+    PALETTE_BLOCKS={"GARGOYLE": ("gargoyles", 0x060EDE90),
+                    # the Wight's palette shimmer (e_mod_wight.c)
+                    "WIGHT": ("wight", 0x060EA3BC)},
     BLEED_BANKS=(),
     STP_BANKS=(),
     GROUP_ROOMS={"candles": (0, 1), "gargoyles": (0,), "zombie": (0,),
