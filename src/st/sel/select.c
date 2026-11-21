@@ -497,7 +497,10 @@ static void SelBackdropWings(void) {
     Primitive* prim;
     s32 i, x0, u, tw, th;
 
-    if (g_GameEngineStep <= Upd_Eng_Init) { // the prims are not made yet
+    // the prims are not made yet, or the menu left (Upd_Eng_18 frees all
+    // prims before this frame ends: a stale index has a NULL next)
+    if (g_GameEngineStep <= Upd_Eng_Init ||
+        (sel_wings >= 0 && g_PrimBuf[sel_wings].type != PRIM_GT4)) {
         sel_wings = -1;
     }
     if (sel_wings < 0) {
