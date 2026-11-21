@@ -278,7 +278,11 @@ static void TitleFillCanvas(void) {
     }
     // whole rows: every texel row gets the same height
     sy = MAX(1, (a.ey - a.sy + DISP_TITLE_H / 2) / DISP_TITLE_H);
-    sx8 = MAX(8, sy * 5); // 5/8 of the height, never narrower than square
+    // 5/8 of the height, also at sy 1 (a canvas under 360 rows: 1440p, 4K,
+    // 21:9), where square texels drew the text 1.6 times too wide
+    // ponytail: at internal scale 1 and sy 1 (a window under 360 rows) the
+    // nearest present drops columns; a linear present would fix that
+    sx8 = sy * 5;
     // KONAMI line (prims 3..6): the stock gap to the bottom
     ky = a.ey - (DISP_TITLE_H - title_text[3].y - title_text[3].h) -
          title_text[3].h * sy;
