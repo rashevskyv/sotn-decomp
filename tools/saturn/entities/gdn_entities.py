@@ -18,7 +18,7 @@ The Prison's Spear Guard, Bone Archer and Slinger run the PS1 code (NO4,
 NO0): the Saturn frames keep the PS1 frame numbers, so frame n of a Saturn
 bank becomes frame n of its ANIMSET_OVL bank.
 
-usage: gdn_entities.py <saturn disc dir> <output header> [STAGE_15|STAGE_16]
+usage: gdn_entities.py <saturn disc dir> <output header> [STAGE_15|STAGE_16|RSTAGE16]
 """
 import os
 import struct
@@ -122,7 +122,42 @@ PRISON = dict(
     ROOMS=2,
     PRIM_PARTS={},
 )
-STAGES = {"STAGE_15": GARDEN, "STAGE_16": PRISON}
+# Anti-Chapel's mirror, the inverted Cursed Prison (RSTAGE16): banks and
+# frame tables from the entity updates of RSTAGE16.PRG (the Saturn enemy
+# table: 0x15 Wight, 0x18 Wraith, 0x1C Flying Zombie, 0x20 Gargoyle, 0x23
+# Jack O'Bones, 0x26 Nova Skeleton)
+R_BANK16 = (0x060E88F0, 0x060E8898)
+RPRISON = dict(
+    SPRITE_SETS=[
+        # the Prison's candles, byte for byte (the breakables' frames)
+        (2, [("candles",) + R_BANK16 + (f,) for f in range(1, 13)]),
+        (3, "decorations"),
+        (7, [("gargoyles", 0x060EDE90, 0x060EEFD0, f) for f in range(1, 60)]),
+        # the PS1 enemies (RNO2, RNO4 code): their frames keep the PS1 numbers
+        (8, [("zombie", 0x060EDA00, 0x060EDDE4, f) for f in range(1, 26)]),
+        (9, [("jack", 0x060EF2C8, 0x060EF510, f) for f in range(1, 22)]),
+        (10, [("nova", 0x060EF730, 0x060EFB84, f) for f in range(1, 39)]),
+        # the Saturn-only Wight and Wraith (e_mod_wight.c, e_mod_wraith.c)
+        (11, [("wight", 0x060EA3BC, 0x060ECA7C, f) for f in range(1, 101)]),
+        (12, [("wraith", 0x060ECFA0, 0x060ED788, f) for f in range(1, 46)]),
+    ],
+    DECORATIONS=(0x060E9A30, 6),
+    DECORATION_GROUPS=["candles"] * 6,
+    PALETTE_BLOCKS={"GARGOYLE": ("gargoyles", 0x060EDE90)},
+    BLEED_BANKS=(),
+    STP_BANKS=(),
+    GROUP_ROOMS={"candles": (0, 1), "gargoyles": (0,), "zombie": (0,),
+                 "jack": (0,), "nova": (0,), "wight": (0, 1),
+                 "wraith": (1,)},
+    BANNER=None,
+    ROOMS=2,
+    # the Nova Skeleton's charge ring (frame 35, palette A; 38, palette B)
+    # and its laser (frame 37: the near end, the beam, the far end)
+    PRIM_PARTS={"NOVA_RING": (10, 35), "NOVA_RING_B": (10, 38),
+                "NOVA_LASER0": (10, 37, 0), "NOVA_LASER1": (10, 37, 1),
+                "NOVA_LASER2": (10, 37, 2)},
+)
+STAGES = {"STAGE_15": GARDEN, "STAGE_16": PRISON, "RSTAGE16": RPRISON}
 QUADRANTS = [(t, q) for t in range(18, 24) for q in range(4)]
 CLUT_BASE = 0x210
 GAME_BASE, ENEMY_DEFS, FIRST, COUNT = 0x06066000, 0x06080288, 400, 26
@@ -353,8 +388,10 @@ def main(disc, out_path, stage="STAGE_15"):
                 (sheets[BANNER[2]].quadrants[q][1] >> 1) * 128 + v, w, h)
             for q, u, v, w, h, clut in parts))
     # the primitives' textures: tpage, clut and u, v, width, height in it
-    for name, (n, f) in PRIM_PARTS.items():
-        p, = dict(banks)[n][f - 1]
+    # (n, frame): a one-part frame; (n, frame, k): part k of the frame
+    for name, (n, f, *k) in PRIM_PARTS.items():
+        parts = dict(banks)[n][f - 1]
+        p, = [parts[k[0]]] if k else parts
         quad = p["tileset"] & 3
         for k, val in (("TPAGE", p["tileset"] >> 2), ("CLUT", p["clut"]),
                        ("U", (quad & 1) * 128 + p["left"]),
