@@ -38,8 +38,24 @@ typedef enum EntityID {
     // the PC stage module's own (stage_saturn.c)
     E_SATURN_MASONRY,
     E_SATURN_CONTROLLER,
+    // Saturn 0x1E-0x20: the Cave Troll (RNO4's func_us_801D5E90,
+    // func_us_801D68E0, func_us_801D6B8C)
+    E_CAVE_TROLL,
+    E_CAVE_TROLL_PART,
+    E_CAVE_TROLL_BLAST,
+    // Saturn 0x33 (RNZ0)
+    E_BITTERFLY,
+    // Saturn 0x34-0x37 (RNZ1)
+    E_CLOAKED_KNIGHT,
+    E_CLOAKED_KNIGHT_CLOAK,
+    E_CLOAKED_KNIGHT_SWORD,
+    E_CLOAKED_KNIGHT_AURA,
     NUM_RGDN_ENTITIES,
 } EntityID;
+// the names RNO4's Cave Troll code uses
+#define E_UNK_40 E_CAVE_TROLL
+#define E_UNK_41 E_CAVE_TROLL_PART
+#define E_UNK_42 E_CAVE_TROLL_BLAST
 
 // the converted Saturn sprite banks (rstage15_entities.py)
 #define MOD_CANDLE_ANIMSET ANIMSET_OVL(2)
@@ -60,3 +76,10 @@ extern EInit g_EInitObtainable;
 extern EInit g_EInitParticle;
 extern EInit g_EInitInteractable;
 extern EInit g_EInitCommon;
+extern EInit g_EInitCaveTroll;
+extern EInit D_us_80180B6C;
+extern EInit D_us_80180B78;
+extern EInit g_EInitBitterfly;
+extern EInit g_EInitCloakedKnight;
+extern EInit g_EInitCloakedKnightAura;
+extern EInit g_EInitCloakedKnightSword;

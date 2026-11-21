@@ -33,7 +33,9 @@ RGARDEN = dict(
     # Saturn 0x11 (func_060DC434): 6 records of 28 bytes
     DECORATIONS=(0x060EE478, 6),
     DECORATION_GROUPS=["candles", "candles", "scene", "scene", "scene", "scene"],
-    PALETTE_BLOCKS={},
+    # the Cloaked Knight's aura draws in the palette after the knight's
+    # (palette + 1, e_cloaked_knight.h)
+    PALETTE_BLOCKS={"KNIGHT": ("knight", 0x060F2C38)},
     BLEED_BANKS=(),
     STP_BANKS=(),
     TRIM_BANKS={},

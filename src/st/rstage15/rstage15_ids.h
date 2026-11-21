@@ -15,6 +15,12 @@ static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
         return E_SATURN_CONTROLLER;
     case 0x11:
         return E_ID_11;
+    case 0x1E:
+        return E_CAVE_TROLL;
+    case 0x33:
+        return E_BITTERFLY;
+    case 0x34:
+        return E_CLOAKED_KNIGHT;
     default:
         return E_DUMMY_0F;
     }
