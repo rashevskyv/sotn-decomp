@@ -1473,6 +1473,9 @@ void EntityLevelUpAnimation(Entity* self) {
                 DRAW_TPAGE2 | DRAW_TPAGE | DRAW_COLORS | DRAW_TRANSP;
             prim = prim->next;
         }
+#ifdef PLATFORM_PSYZ
+        Lang_Banner(upperParams); // uk: the serif line over the stock picture
+#endif
         self->ext.timer.t = 0;
         self->ext.factory.unk80 = 0x100;
         self->ext.factory.unk82 = 0x100;

@@ -762,6 +762,59 @@ void Lang_ActorName(const char* s, Primitive* prim) {
     prim->v1 = 12;
 }
 
+// The banners of EntityLevelUpAnimation (src/dra/7E4BC.c): 112x24 pictures of
+// 4 bits at VRAM x 800, y 256 + 0x30, 0x18, 0, 0x48 (Level up, Heart max up,
+// Life max up, Got an item), read through the CLUT 0x19F (black to white).
+// Under uk the picture is the serif line of ua_port.json 228 + which, 8 px a
+// cell, centred, ink 15 at the top to 12 at the foot, a shadow 1 px right and
+// down in ink 5.
+#define BANNER_W 112
+#define BANNER_H 24
+int Lang_Banner(int which) {
+    static const u8 v[4] = {0x30, 0x18, 0x00, 0x48};
+    u8 tx[BANNER_H][BANNER_W + 1];
+    u16 pic[BANNER_H * BANNER_W / 4];
+    RECT r = {800, 256, BANNER_W / 4, BANNER_H};
+    const char* s = Lang_Port(228 + which);
+    int n, x, y, i;
+    if (!s || which < 0 || which > 3) {
+        return 0;
+    }
+    for (n = 0; (u8)s[n] != 0xFF; n++) {
+    }
+    r.y += v[which];
+    memset(tx, 0, sizeof(tx));
+    x = (BANNER_W - n * 8) / 2;
+    for (i = 0; i < n; i++, x += 8) {
+        const u8* cell = Lang_MenuCell((u8)s[i]);
+        for (y = 0; cell && y < 11; y++) {
+            int c;
+            for (c = 0; c < 8; c++) {
+                if (x + c >= 0 && x + c < BANNER_W &&
+                    cell[y * 4 + c / 2] >> (c & 1) * 4 & 15) {
+                    tx[6 + y][x + c] = 15 - y / 4;
+                }
+            }
+        }
+    }
+    for (y = BANNER_H - 1; y > 0; y--) { // only ink casts a shadow
+        for (x = BANNER_W - 1; x > 0; x--) {
+            if (!tx[y][x] && tx[y - 1][x - 1] > 8) {
+                tx[y][x] = 5;
+            }
+        }
+    }
+    for (y = 0; y < BANNER_H; y++) {
+        for (x = 0; x < BANNER_W / 4; x++) {
+            const u8* t = &tx[y][x * 4];
+            pic[y * (BANNER_W / 4) + x] = t[0] | t[1] << 4 | t[2] << 8 | t[3] << 12;
+        }
+    }
+    LoadImage(&r, (u_long*)pic);
+    DrawSync(0);
+    return 1;
+}
+
 // the Shift-JIS marks with an ASCII cell (― ‐ ‘ ’ “ ” × as the nearest)
 static const u16 jis_marks[][2] = {
     {0x8140, ' '}, {0x8143, ','}, {0x8144, '.'},  {0x8146, ':'},

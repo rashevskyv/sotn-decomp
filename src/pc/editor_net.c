@@ -481,6 +481,29 @@ static void Handle(int fd) {
         }
         State();
         ReplyOut(fd, 200, "application/json");
+    } else if (!strcmp(path, "/gain") && !strcmp(method, "POST")) {
+        // tests: a pick-up as the game does it: t 0x8000 life max up, 0x4000
+        // heart max up, 0x2000 relic; or exp=N: set the experience (level up)
+        extern s32 func_800FE044(s32 amount, s32 type);
+        int e = Arg(query, "exp", -1);
+        if (e >= 0) {
+            g_Status.exp = e;
+        } else {
+            func_800FE044(Arg(query, "a", 1), Arg(query, "t", 0x8000));
+        }
+        State();
+        ReplyOut(fd, 200, "application/json");
+    } else if (!strcmp(path, "/vram") && !strcmp(method, "GET")) {
+        // tests: the 16 bit words of a VRAM rect (x, y, w, h in words)
+        static u16 buf[1024 * 512];
+        RECT r = {Arg(query, "x", 0), Arg(query, "y", 0), Arg(query, "w", 1),
+                  Arg(query, "h", 1)};
+        if (r.w > 0 && r.h > 0 && r.w * r.h <= LEN(buf)) {
+            StoreImage(&r, (u_long*)buf);
+            DrawSync(0);
+            Put(buf, r.w * r.h * 2);
+        }
+        ReplyOut(fd, 200, "application/octet-stream");
     } else if (!strcmp(path, "/c40") && !strcmp(method, "POST")) {
         // tests: set D_80097C40 (Alucard's Muramasa counter, Maria's slot)
         g_Status.D_80097C40 = Arg(query, "v", 0);
