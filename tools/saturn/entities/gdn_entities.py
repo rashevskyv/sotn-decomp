@@ -171,6 +171,17 @@ STAGES["RSTAGE15"] = RGARDEN
 QUADRANTS = [(t, q) for t in range(18, 24) for q in range(4)]
 CLUT_BASE = 0x210
 GAME_BASE, ENEMY_DEFS, FIRST, COUNT = 0x06066000, 0x06080288, 400, 26
+# The names of the Saturn-only records (the Japanese names of GAME.PRG,
+# src/saturn/game/cfgjp.c g_EnemyDefs[400..425]). The other records are
+# projectiles and hazards with no name. Ukrainian: tools/lang/uk/ua_items.json
+ENEMY_NAMES = {
+    400: "Gargoyle", 401: "Copper Armor", 402: "Efreet",
+    404: "Skeleton Leader", 405: "Gardener", 406: "Human Face Tree",
+    408: "Maria Renard", 413: "Water Leaper", 414: "Man Eater",
+    415: "Gargoyle", 416: "Gargoyle", 417: "Spectre", 418: "Will O' Wisp",
+    420: "Skeleton Breeder", 421: "Skeleton Beast", 423: "Wight",
+    424: "Wraith", 425: "Skeleton Guardian",
+}
 
 
 # Saturn-only hand items that enemies drop -> the drop id of the port's own
@@ -362,6 +373,7 @@ def main(disc, out_path, stage="STAGE_15"):
           ".flags = 0, .animFrames = g_GdnBgBlockAnim%d}," % (z, v))
     w("};")
     w("#define GDN_ENEMY_FIRST %d" % FIRST)
+    w("#define GDN_ENEMY_COUNT %d" % COUNT)
     w("static EnemyDef s_GdnEnemyDefs[%d] = {" % COUNT)
     for i in range(FIRST, FIRST + COUNT):
         r = struct.unpack_from(">IhhHhHHHHHHHHHHHBBI", game,
@@ -373,9 +385,9 @@ def main(disc, out_path, stage="STAGE_15"):
         rare, unc = ps1_drop(rare), ps1_drop(unc)
         rr, ur = rr if rare else 0, ur if unc else 0
         # _S(): sotn_str ends the name with the 0xFF 0x00 the popup reads
-        w("    {_S(\"\"), %d, %d, 0x%X, %d, %d, 0x%X, 0x%X, 0x%X, 0x%X, %d, %d, "
+        w("    {_S(\"%s\"), %d, %d, 0x%X, %d, %d, 0x%X, 0x%X, 0x%X, 0x%X, %d, %d, "
           "0x%X, 0x%X, %d, %d, %d, %d, 0x%X}," % (
-              hp, atk, elem, dfn, hbs, weak, strong, imm, absorb, level, exp,
+              ENEMY_NAMES.get(i, ""), hp, atk, elem, dfn, hbs, weak, strong, imm, absorb, level, exp,
               rare, unc, rr, ur, bw, bh, flags))
     w("};")
     w("// clang-format on")

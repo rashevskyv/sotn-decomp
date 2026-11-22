@@ -1740,11 +1740,11 @@ def cmd_pack(_args):
         entries[key] = (FONT["cell"], 0, data)
         extra.add(key)
     # ua_items.json: the Saturn's own items of the port (src/config_us.h, PLATFORM_PSYZ), keyed by
-    # our English text: {"EQUIP_NAME": {en: uk}, "EQUIP_DESC": {en: uk}}
+    # our English text: {"EQUIP_NAME": {en: uk}, "EQUIP_DESC": {en: uk}, "ENEMY": {en: uk}} (ENEMY: the Saturn-only enemies, gdn_entities.py)
     for table, rows in load_json(os.path.join(UK, "ua_items.json")).items():
-        font = "cell" if table == "EQUIP_NAME" else "sjis"
+        font = "cell" if table in ("EQUIP_NAME", "ENEMY") else "sjis"
         for en, text in rows.items():
-            data, bad = enc_cells(text, menu=True) if font == "cell" else enc_bios(text)
+            data, bad = enc_cells(text, menu=table == "EQUIP_NAME") if font == "cell" else enc_bios(text)
             assert not bad, f"ua_items.json {en}: {bad}"
             entries[(TABLES.index(table), fnv(stock_bytes(font, en)), NO_INDEX)] = (FONT[font], 0, data)
     # The status page words in sentence case (Label in src/dra/menu.c): PORT 100 + the g_MenuStr row,

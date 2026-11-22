@@ -10,5 +10,23 @@
     "Smelly prison meal ［use］": "Смердюча баланда ［вжити］",
     "Wooden shield － low DEF": "Дерев’яний щит － слабкий ЗАХ",
     "Two－bladed battle axe": "Бойова сокира з двома лезами"
+  },
+  "ENEMY": {
+    "Gargoyle": "Гаргулья",
+    "Copper Armor": "Мідні лати",
+    "Efreet": "Іфріт",
+    "Skeleton Leader": "Ватажок скелетів",
+    "Gardener": "Садівник",
+    "Human Face Tree": "Дерево з лицем",
+    "Maria Renard": "Марія Ренард",
+    "Water Leaper": "Водяний стрибун",
+    "Man Eater": "Людожер",
+    "Spectre": "Спектр",
+    "Will O' Wisp": "Блудний вогник",
+    "Skeleton Breeder": "Розплідник скелетів",
+    "Skeleton Beast": "Скелет-звір",
+    "Wight": "Мрець",
+    "Wraith": "Примара",
+    "Skeleton Guardian": "Скелет-вартовий"
   }
 }

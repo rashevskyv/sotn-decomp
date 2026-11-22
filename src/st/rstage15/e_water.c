@@ -42,14 +42,14 @@ void EntityWaterTint(Entity* self) {
     l = r - row[1];
     b = g_Tilemap.height - row[3] - g_Tilemap.scrollY.i.hi;
     t = g_Tilemap.height - row[4] - g_Tilemap.scrollY.i.hi;
-    if (r < -WIDE_X || l > DISP_STAGE_W + WIDE_X || t > DISP_STAGE_H || b < 0) {
+    if (r < -WIDE_X || l > DISP_STAGE_W + WIDE_X || t > DISP_STAGE_H + WIDE_Y || b < -WIDE_Y) {
         prim->drawMode = DRAW_HIDE;
         return;
     }
     l = MAX(l, -WIDE_X);
     r = MIN(r, DISP_STAGE_W + WIDE_X);
-    t = MAX(t, 0);
-    b = MIN(b, DISP_STAGE_H);
+    t = MAX(t, -WIDE_Y); // the wide view's rows above and below the 240
+    b = MIN(b, DISP_STAGE_H + WIDE_Y);
     prim->x0 = prim->x2 = l;
     prim->x1 = prim->x3 = r - 1;
     prim->y0 = prim->y1 = t;

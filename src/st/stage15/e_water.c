@@ -63,13 +63,16 @@ void EntityModWaterTint(Entity* self) {
     x = r[0] - g_Tilemap.scrollX.i.hi;
     y0 = r[3] - g_Tilemap.scrollY.i.hi;
     y1 = r[4] - g_Tilemap.scrollY.i.hi;
-    if (x + r[1] <= -0x80 || x >= 0x180 || y1 <= 0 || y0 >= 0xF0) {
+    // the wide view shows WIDE_Y more rows above and below the 240 of the PS1
+    // screen: the water reaches the bottom edge of the view, no black strip
+    if (x + r[1] <= -0x80 || x >= 0x180 || y1 <= -WIDE_Y ||
+        y0 >= 0xF0 + WIDE_Y) {
         prim->drawMode = DRAW_HIDE;
         return;
     }
     prim->x0 = prim->x2 = x;
     prim->x1 = prim->x3 = x + r[1];
-    prim->y0 = prim->y1 = y0 < 0 ? 0 : y0;
-    prim->y2 = prim->y3 = y1 > 0xF0 ? 0xF0 : y1;
+    prim->y0 = prim->y1 = MAX(y0, -WIDE_Y);
+    prim->y2 = prim->y3 = MIN(y1, 0xF0 + WIDE_Y);
     prim->drawMode = DRAW_TRANSP;
 }

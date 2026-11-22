@@ -1049,6 +1049,11 @@ static void SaturnGdnStart(void) {
     // the Saturn-only enemy records 400-425 (GAME.PRG, gdn_entities.py)
     memcpy(&g_api.enemyDefs[GDN_ENEMY_FIRST], s_GdnEnemyDefs,
            sizeof(s_GdnEnemyDefs));
+    // their names: the Ukrainian ones under uk (ENEMY table, hash of the text)
+    for (i = 0; i < GDN_ENEMY_COUNT; i++) {
+        g_api.enemyDefs[GDN_ENEMY_FIRST + i].name =
+            LANG_ROW(5 /* T_ENEMY */, 0xFFFF, s_GdnEnemyDefs[i].name);
+    }
     // each ordinary room loads its sprite pages (gfxBanks[room]); the pause
     // menu reloads the same bank (D_80097904)
     for (i = 0; i < LEN(s_SaturnStageRooms); i++) {
