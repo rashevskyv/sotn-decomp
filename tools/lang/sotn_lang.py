@@ -1746,7 +1746,9 @@ def cmd_pack(_args):
         for en, text in rows.items():
             data, bad = enc_cells(text, menu=table == "EQUIP_NAME") if font == "cell" else enc_bios(text)
             assert not bad, f"ua_items.json {en}: {bad}"
-            entries[(TABLES.index(table), fnv(stock_bytes(font, en)), NO_INDEX)] = (FONT[font], 0, data)
+            key = (TABLES.index(table), fnv(stock_bytes(font, en)), NO_INDEX)
+            assert table != "ENEMY" or key not in entries, f"ua_items.json ENEMY {en}: name already in the table"
+            entries[key] = (FONT[font], 0, data)
     # The status page words in sentence case (Label in src/dra/menu.c): PORT 100 + the g_MenuStr row,
     # from the same text as the MENU row (ua_menu.json wins)
     menu_uk = {l["index"]: ua[l["id"]] for l in lines if l.get("table") == "MENU" and l.get("index", NO_INDEX) != NO_INDEX}
