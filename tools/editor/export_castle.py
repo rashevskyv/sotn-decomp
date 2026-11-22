@@ -189,7 +189,12 @@ def main():
             sat = bytearray()
             for b in sat_bytes[:320 * 240 // 2]:
                 sat += bytes((b >> 4, b & 15))
-            rows = [r if r[0] in SATURN_IDS else r[:6] + (room_src(sat, fmap, r),) for r in rows]
+            # a PSX row (assets/st) is never Saturn-only: a map cell of the
+            # Saturn's map over its rooms (NO3 18, 19 on the Garden) says
+            # nothing about the PSX room, so it is PSX or both
+            rows = [r if r[0] in SATURN_IDS else
+                    r[:6] + (ROOM_PSX if room_src(sat, fmap, r) == ROOM_PSX else ROOM_BOTH,)
+                    for r in rows]
             sat_cells = saturn_map_cells(sat_bytes, fmap)
             for cx, cy, tex in sat_cells:  # the marks of the new cells too
                 for j in range(4):
