@@ -259,7 +259,7 @@ static const struct {
     {"cheat_character", &g_Cheat.character},
     {"editor", &g_EditorOn},
     {"overlay", &g_OverlayOn},
-    {"background_input", &g_BackgroundInput},
+    {"controller_background", &g_BackgroundInput},
     {"warp_map", &g_WarpMapPick},
     {"fps", &g_FpsOn},
     {"fullscreen", &g_Fullscreen},
@@ -289,8 +289,8 @@ static const char ini_overlay[] =
     "\n"
     "; overlay: 1 = a corner shows the stage, room, map cell and the cheats.\n"
     "; fps: 1 = a corner shows the frames per second.\n"
-    "; background_input: 0 = no controller input while the window has no\n"
-    "; focus; 1 = the game reads them always.\n"
+    "; controller_background: 1 = the controller works while the window has no\n"
+    "; focus (the keyboard never does); 0 = no controller then.\n"
     "; warp_map: 1 = the warp portal shows the map and you pick the room;\n"
     "; 0 = the portal cycles through the open rooms, as on the PS1.\n";
 
@@ -345,7 +345,7 @@ void Wide_SaveIni(void) {
             fprintf(f, "%s = %d\n", ini_flags[i].key, *ini_flags[i].value);
         }
     }
-    fprintf(f, "background_input = %d\nwarp_map = %d\n", g_BackgroundInput,
+    fprintf(f, "controller_background = %d\nwarp_map = %d\n", g_BackgroundInput,
             g_WarpMapPick);
     fputs(ini_editor, f);
     fprintf(f, "editor = %d\n", g_EditorOn);
