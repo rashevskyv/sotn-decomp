@@ -544,17 +544,20 @@ static void OpenList(int boss) {
     }
     items[n_items++] = ITEM_MAP;
     items[n_items++] = ITEM_BOSSES;
-    for (castle_bit = 0; castle_bit <= 0x20; castle_bit += 0x20) {
-        for (i = 0; i < g_CastleStageCount && n_items < LEN(items); i++) {
-            id = g_CastleStages[i].id;
-            for (j = 0; j < g_CastleRoomCount && g_CastleRooms[j].stage != id;
-                 j++) {
-            }
-            // BO4 has rooms but no area: it is in the boss list
-            if ((id & 0x20) == castle_bit && j < g_CastleRoomCount &&
-                *Castle_ZoneName(id)) {
-                items[n_items++] = id;
-            }
+    if (!map_ready) { // the castle of the stage we are in
+        castle = g_StageId & 0x20;
+    }
+    // only the stages of the castle in use (normal or inverted, never both)
+    castle_bit = castle;
+    for (i = 0; i < g_CastleStageCount && n_items < LEN(items); i++) {
+        id = g_CastleStages[i].id;
+        for (j = 0; j < g_CastleRoomCount && g_CastleRooms[j].stage != id;
+             j++) {
+        }
+        // BO4 has rooms but no area: it is in the boss list
+        if ((id & 0x20) == castle_bit && j < g_CastleRoomCount &&
+            *Castle_ZoneName(id)) {
+            items[n_items++] = id;
         }
     }
     sel = place_sel < n_items ? place_sel : 0;
