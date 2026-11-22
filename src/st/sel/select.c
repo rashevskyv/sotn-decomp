@@ -508,7 +508,8 @@ static void SelBackdropWings(void) {
     static const s16 col[] = {576, 767};
     Primitive* bg = &g_PrimBuf[D_801BAFC0];
     Primitive* prim;
-    s32 i, x0, u, tw, th, w, cx0, cy0, cx1, cy1;
+    s32 i, x0, u, tw, th, w, cx0, cy0, cx1, cy1, H;
+    s32 hd;
 
     // not made yet, or gone: the new game start (Upd_Eng_18) clears the whole
     // prim buffer (func_801B2D1C), so the second prim has no next
@@ -517,24 +518,39 @@ static void SelBackdropWings(void) {
         sel_wings = -1;
         return;
     }
+    // The HD backdrop fills the whole canvas, no black bars: it is scaled so
+    // its 240 rows fill the canvas rows, centred; a canvas wider than the
+    // 384 frame shows the wings at the sides, a narrower one (4:3) crops the
+    // sides. The stock art is not scaled.
+    hd = Psyz_HdTexSize(col[0], 0, 1, 0xF0, 16, &tw, &th);
+    if (!hd || !Wide_Canvas(&cx0, &cy0, &cx1, &cy1) || cy1 - cy0 < 240) {
+        cx0 = 0, cy0 = 0, cx1 = DISP_MENU_W, cy1 = 0xF0;
+    }
+    H = cy1 - cy0;
+#define BGX(t) (((cx0 + cx1) * 120 + ((t) - DISP_MENU_W / 2) * H) / 240)
+    prim = bg;
+    for (i = 0; i < 3 && prim; i++, prim = prim->next) {
+        prim->x0 = prim->x2 = BGX(i * 0x80);
+        prim->x1 = prim->x3 = BGX(i * 0x80 + 0x80);
+        prim->y0 = prim->y1 = cy0;
+        prim->y2 = prim->y3 = cy1;
+    }
     prim = &g_PrimBuf[sel_wings];
     for (i = 0; i < 2 && prim; i++, prim = prim->next) {
         prim->drawMode = DRAW_HIDE;
-        if ((bg->drawMode & DRAW_HIDE) ||
+        if ((bg->drawMode & DRAW_HIDE) || !hd ||
             !Psyz_HdTexSize(col[i], 0, 1, 0xF0, 16, &tw, &th)) {
             continue;
         }
-        w = 0xF0;
-        if (Wide_Canvas(&cx0, &cy0, &cx1, &cy1)) {
-            w = MIN(MAX(w, i ? cx1 - DISP_MENU_W : -cx0), 512);
-        }
-        x0 = i ? DISP_MENU_W : -w;
+        w = H; // the 240 art rows of a wing are 240 wide
+        w = MIN(MAX(w, i ? cx1 - BGX(DISP_MENU_W) : BGX(0) - cx0), 512);
+        x0 = i ? BGX(DISP_MENU_W) : BGX(0) - w;
         u = col[i] & 0x3F;
         prim->tpage = 0x100 | (col[i] >> 6); // 16-bit texels
         prim->x0 = prim->x2 = x0;
         prim->x1 = prim->x3 = x0 + w;
-        prim->y0 = prim->y1 = 0;
-        prim->y2 = prim->y3 = 0xF0;
+        prim->y0 = prim->y1 = cy0;
+        prim->y2 = prim->y3 = cy1;
         prim->u0 = prim->u2 = u;
         prim->u1 = prim->u3 = u + 1;
         prim->v0 = prim->v1 = 0;
@@ -545,6 +561,7 @@ static void SelBackdropWings(void) {
         prim->priority = bg->priority;
         prim->drawMode = bg->drawMode;
     }
+#undef BGX
 }
 #endif
 

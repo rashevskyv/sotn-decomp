@@ -250,6 +250,34 @@ static void TitleTextLine(Primitive** p, s32 first, s32 n, s32 cx2, s32 cw,
 #undef TX
 }
 
+// The HD background covers the whole canvas without distortion: the picture
+// is scaled to fill it and the overflow is cropped about the centre (a canvas
+// wider than the art loses rows, a narrower one columns). The stock art, or
+// no pack, is stretched. The four strips are 128 texels of the 512 each.
+static void TitleBgStrip(Primitive* prim, s32 k, PsyzRect* a) {
+    s32 aw = a->ex - a->sx, ah = a->ey - a->sy, tw, th, t0 = 0, t1 = 512;
+    s32 v0 = 0, v1 = 0xF0, s0, s1;
+
+    if (Psyz_HdTexSize(512, 0, 256, 0xF0, 8, &tw, &th) && tw > 0 && th > 0) {
+        if (aw * th > ah * tw) { // wider than the art: crop rows
+            v0 = 120 - 120 * ah * tw / (aw * th);
+            v1 = 240 - v0;
+        } else { // narrower: crop columns
+            t0 = 256 - 256 * aw * th / (ah * tw);
+            t1 = 512 - t0;
+        }
+    }
+    s0 = MAX(128 * k, t0);
+    s1 = MIN(128 * k + 128, t1);
+    if (s1 <= s0) { // the strip is cropped away
+        TitleQuad(prim, a->sx, a->sy, a->sx, a->ey, 0, 0, 1, 0xF0);
+        return;
+    }
+    TitleQuad(prim, a->sx + (s0 - t0) * aw / (t1 - t0), a->sy,
+              a->sx + (s1 - t0) * aw / (t1 - t0), a->ey, s0 - 128 * k, v0,
+              s1 - 128 * k, v1);
+}
+
 // The wide view gives the title a canvas larger than 512x240 (src/pc/wide.c).
 // The background stretches to the whole canvas, the logo keeps its place in
 // the PS1 shape (5:8 texels, like the text), the KONAMI line keeps its gap to the bottom and PRESS START sits midway between
@@ -333,8 +361,7 @@ static void TitleFillCanvas(void) {
     for (i = 7; i < TITLE_PRIMS; i++) {
         prim = p[i];
         if (i < 11) { // background: four strips over the whole canvas
-            TitleQuad(prim, a.sx + (i - 7) * w / 4, a.sy,
-                      a.sx + (i - 6) * w / 4, a.ey, 0, 0, 0x80, 0xF0);
+            TitleBgStrip(prim, i - 7, &a);
         } else if (i == 15) { // leaf shadow, bottom right corner
             prim->x0 = a.ex - 0xFF;
             prim->y0 = a.ey - 0x90;
