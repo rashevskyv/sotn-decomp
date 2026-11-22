@@ -1172,8 +1172,12 @@ extern struct WarpTarget g_LastRoom;
 RoomHeader* Cheat_WarpRoom(void);
 // Castle rooms in map cells, built from assets/st/*/rooms.json into the
 // build directory (tools/editor/export_castle.py). Ends with stage 0xFF.
+// src: which game has the room, from the two castle maps (export_castle.py):
+// its cells are drawn in both, only in the Saturn's (SUB_DISP.MAP), or only in
+// the PlayStation's (F_MAP.BIN). A room with no cell in either counts as both.
+enum { ROOM_BOTH, ROOM_SATURN, ROOM_PSX };
 struct CastleRoom {
-    u8 stage, room, left, top, right, bottom;
+    u8 stage, room, left, top, right, bottom, src;
 };
 extern const struct CastleRoom g_CastleRooms[];
 extern const int g_CastleRoomCount;

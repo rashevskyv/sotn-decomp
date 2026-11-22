@@ -1456,6 +1456,8 @@ static const struct {
     {'/', G("....#", "...#.", "...#.", "..#..", ".#...", ".#...", "#....")},
     {'(', G("..#..", ".#...", "#....", "#....", "#....", ".#...", "..#..")},
     {')', G("..#..", "...#.", "....#", "....#", "....#", "...#.", "..#..")},
+    {'[', G(".###.", ".#...", ".#...", ".#...", ".#...", ".#...", ".###.")},
+    {']', G(".###.", "...#.", "...#.", "...#.", "...#.", "...#.", ".###.")},
     {'%', G("##..#", "##..#", "...#.", "..#..", ".#...", "#..##", "#..##")},
     {'\'', G("..#..", "..#..", ".#...", ".....", ".....", ".....", ".....")},
 };
@@ -1617,6 +1619,7 @@ enum {
     P_DRAG,
     P_PAN,
     P_MOVE,
+    P_SATURN, // the SS tag of the teleport lists (the legend)
 };
 #define LINE_MAX 64
 #define MARK_ESC 0xFE
@@ -2131,6 +2134,51 @@ static void DrawCheats(void) {
     Box(lines, N_CHEATS, sel, -1);
 }
 
+// Which game has a place (CastleRoom.src): the Saturn only, the PlayStation
+// only, or both. A stage is one if every room of it is; a boss fight takes
+// the src of the room it is in.
+static int StageSrc(int stage) {
+    int i, src = -1;
+    for (i = 0; i < g_CastleRoomCount; i++) {
+        if (g_CastleRooms[i].stage == stage) {
+            src = src < 0 || src == g_CastleRooms[i].src ? g_CastleRooms[i].src
+                                                          : ROOM_BOTH;
+        }
+    }
+    return src < 0 ? ROOM_BOTH : src;
+}
+
+static int ItemSrc(int id) {
+    int i;
+    if (id < 0) {
+        return ROOM_BOTH;
+    }
+    if (id < ITEM_BOSS) {
+        return StageSrc(id);
+    }
+    for (i = 0; i < g_CastleRoomCount; i++) {
+        if (ItemHas(id, &g_CastleRooms[i])) {
+            return g_CastleRooms[i].src;
+        }
+    }
+    return StageSrc(g_CheatBosses[id - ITEM_BOSS].stage);
+}
+
+// "[SS] " (Saturn only), "[PS] " (PlayStation only); both: blanks (pad) or
+// nothing
+static void AddTag(char* line, int src, int pad) {
+    Add(line, src == ROOM_SATURN ? "[SS] " : src == ROOM_PSX ? "[PS] "
+                                         : pad               ? "     "
+                                                             : "");
+}
+
+// "[SS] SATURN  [PS] PSX": what the tags mean (no tag: in both games)
+static void AddLegend(char* line) {
+    Add(line, "[SS] ");
+    AddW(line, P_SATURN, "SATURN");
+    Add(line, "  [PS] PSX");
+}
+
 // "NO0   ROOM 3" onto a line
 static void AddRoom(char* line, const struct CastleRoom* rm) {
     char tmp[16];
@@ -2186,6 +2234,7 @@ static void AddBoss(char* line, const struct CheatBoss* b) {
     sprintf(
         tmp, "%-4s ", Castle_StageName(b->host != 0xFF ? b->host : b->stage));
     Add(line, tmp);
+    AddTag(line, ItemSrc(ITEM_BOSS + (int)(b - g_CheatBosses)), 1);
     AddNames(line, b);
 }
 
@@ -2379,6 +2428,7 @@ static void ItemLine(char* line, int id) {
     } else {
         sprintf(tmp, "%-4s ", Castle_StageName(id));
         Add(line, tmp);
+        AddTag(line, StageSrc(id), 1);
         AddZone(line, id);
     }
 }
@@ -2437,17 +2487,20 @@ static void DrawList(void) {
         snprintf(tmp, sizeof(tmp), uk ? " %.24s" : " %.27s", msg);
         Add(lines[0], tmp);
     } else if (rm) { // the place of the room under the pointer
+        AddTag(lines[0], rm->src, 0);
         AddZone(lines[0], rm->stage);
         ClipTo(lines[0], box_min_w); // the header never widens the box
         box_mark = 0;
     } else if (b >= 0) { // the boss of the room under the pointer
+        AddTag(lines[0], ItemSrc(ITEM_BOSS + b), 0);
         AddNames(lines[0], &g_CheatBosses[b]);
         ClipTo(lines[0], box_min_w);
         box_mark = 0;
-    } else if (list_boss) {
-        AddW(lines[0], P_BOSS, "BOSS");
     } else {
-        AddW(lines[0], P_TELEPORT, "TELEPORT");
+        AddW(lines[0], list_boss ? P_BOSS : P_TELEPORT,
+             list_boss ? "BOSS" : "TELEPORT");
+        Add(lines[0], "  ");
+        AddLegend(lines[0]);
     }
     for (i = 1; i <= n; i++) {
         Clear(lines[i]);
@@ -2591,6 +2644,12 @@ static void DrawMap(void) {
         Add(line, "-");
     }
     Line(x0 + 4, y0 + 3, line, 255, 255, 255);
+    Clear(legend[0]);
+    AddLegend(legend[0]);
+    x = x1 - 4 - Width(legend[0]);
+    if (x >= x0 + 4 + Width(line) + 2 * SERIF_W) { // where it fits
+        Line(x, y0 + 3, legend[0], 128, 200, 255);
+    }
     DrawMapHints(x0, x1, y1);
     if (map_fit) {
         map_fit = 0;
@@ -2606,8 +2665,10 @@ static void DrawMap(void) {
     } else if (n_owners) {
         i = BossAt(cur_x, cur_y, castle);
         if (i >= 0) {
+            AddTag(line, ItemSrc(ITEM_BOSS + i), 0);
             AddNames(line, &g_CheatBosses[i]);
         } else if (*Castle_ZoneName(owners[0]->stage)) {
+            AddTag(line, owners[0]->src, 0);
             AddZone(line, owners[0]->stage);
         } else {
             Add(line, Castle_StageName(owners[0]->stage));

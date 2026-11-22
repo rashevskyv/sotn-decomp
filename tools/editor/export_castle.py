@@ -36,6 +36,7 @@ BOSSES = {"bo4": 0x1A}
 # the folder. Room records: 6 bytes from the pointer at 0x10, end 0x40.
 SATURN = {"STAGE_15.PRG": (0x4C, "ST15"), "STAGE_16.PRG": (0x4D, "ST16"),
           "RSTAGE15.PRG": (0x6C, "RS15"), "RSTAGE16.PRG": (0x6D, "RS16")}
+SATURN_IDS = {sid for sid, _ in SATURN.values()}
 SATURN_LOAD_ADDRESS = 0x060DC000
 # stages with no place on the castle map: a name only, for the apron patch
 # file (apron/<NAME>.txt) and the editor page. Written with or without assets.
@@ -112,6 +113,24 @@ def saturn_map_cells(sub_disp, fmap):
     return cells
 
 
+ROOM_BOTH, ROOM_SATURN, ROOM_PSX = 0, 1, 2
+
+
+def room_src(sat, fmap, row):
+    """Which game has a room: its map cells inked only in the Saturn's map
+    (sat: 320x240 texels, one a byte) or only in F_MAP.BIN. Both, or no cell
+    at all in either: ROOM_BOTH. The inverted castle is turned by 180 degrees."""
+    stage, _, left, top, right, bottom = row[:6]
+    ps = sa = 0
+    for y in range(top, bottom + 1):
+        for x in range(left, right + 1):
+            cx, cy = (63 - x, 63 - y) if stage & 0x20 else (x, y)
+            ps += any(fmap[(cy * 4 + j) * 128 + cx * 2 + i // 2] >> (4 * (i % 2)) & 15
+                      for j in range(4) for i in range(4))
+            sa += any(sat[(cy * 4 + j) * 320 + cx * 5 + c] for j in range(4) for c in range(5))
+    return ROOM_SATURN if sa and not ps else ROOM_PSX if ps and not sa else ROOM_BOTH
+
+
 def boss_marks(assets):
     """The rooms of the boss overlays (BO0..BO7, RBO0..RBO8); MAR is the
     Maria scene, not a boss. Bosses fought inside a castle stage have no
@@ -142,13 +161,13 @@ def main():
         for i, r in enumerate(json.load(open(path))):
             if r["tileDefId"] < 0 or r["left"] >= 0x40:
                 continue
-            rows.append((sid, i, r["left"], r["top"], r["right"], r["bottom"]))
+            rows.append((sid, i, r["left"], r["top"], r["right"], r["bottom"], ROOM_BOTH))
     for prg_name, (sid, name) in sorted(SATURN.items(), key=lambda kv: kv[1]):
         path = os.path.join(saturn_dir or "", prg_name)
         if not saturn_dir or not os.path.exists(path):
             continue
         names.append((sid, name))
-        rows += [(sid,) + r for r in saturn_rooms(open(path, "rb").read())]
+        rows += [(sid,) + r + (ROOM_SATURN,) for r in saturn_rooms(open(path, "rb").read())]
     named = {sid for sid, _ in names}
     names += [(sid, n) for n, sid in sorted(NAME_ONLY.items(), key=lambda kv: kv[1])
               if sid not in named]
@@ -160,7 +179,12 @@ def main():
         marks += map_marks(fmap)
         sub_disp = os.path.join(saturn_dir or "", "SUB_DISP.MAP")
         if saturn_dir and os.path.exists(sub_disp):
-            sat_cells = saturn_map_cells(open(sub_disp, "rb").read(), fmap)
+            sat_bytes = open(sub_disp, "rb").read()
+            sat = bytearray()
+            for b in sat_bytes[:320 * 240 // 2]:
+                sat += bytes((b >> 4, b & 15))
+            rows = [r if r[0] in SATURN_IDS else r[:6] + (room_src(sat, fmap, r),) for r in rows]
+            sat_cells = saturn_map_cells(sat_bytes, fmap)
             for cx, cy, tex in sat_cells:  # the marks of the new cells too
                 for j in range(4):
                     fmap[(cy * 4 + j) * 128 + cx * 2:][:2] = tex[j * 2:j * 2 + 2]
@@ -179,8 +203,8 @@ def main():
                 "#include <game.h>\n\n")
         f.write("const struct CastleRoom g_CastleRooms[] = {\n")
         for row in rows:
-            f.write("    {0x%02X, %d, %d, %d, %d, %d},\n" % row)
-        f.write("    {0xFF, 0, 0, 0, 0, 0},\n};\n")
+            f.write("    {0x%02X, %d, %d, %d, %d, %d, %d},\n" % row)
+        f.write("    {0xFF, 0, 0, 0, 0, 0, 0},\n};\n")
         f.write("const int g_CastleRoomCount = %d;\n\n" % len(rows))
         f.write("const struct CastleStage g_CastleStages[] = {\n")
         for sid, name in names:
