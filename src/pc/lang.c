@@ -776,7 +776,7 @@ int Lang_Banner(int which) {
     u16 pic[BANNER_H * BANNER_W / 4];
     RECT r = {800, 256, BANNER_W / 4, BANNER_H};
     static const char* const en[4] = {"Level Up", "Heart Max Up", "Life Max Up",
-                                      "Got an Item"};
+                                      "New Relic"};
     u8 code[16];
     const char* s;
     int n, x, y, i;
