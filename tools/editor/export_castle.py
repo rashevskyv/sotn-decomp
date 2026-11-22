@@ -35,7 +35,10 @@ BOSSES = {"bo4": 0x1A}
 # Saturn stage PRGs (disks/saturn), src/pc/pc.h ids. Only Saturn builds pass
 # the folder. Room records: 6 bytes from the pointer at 0x10, end 0x40.
 SATURN = {"STAGE_15.PRG": (0x4C, "ST15"), "STAGE_16.PRG": (0x4D, "ST16"),
-          "RSTAGE15.PRG": (0x6C, "RS15"), "RSTAGE16.PRG": (0x6D, "RS16")}
+          "RSTAGE15.PRG": (0x6C, "RS15"), "RSTAGE16.PRG": (0x6D, "RS16"),
+          "WARP.PRG": (0x4E, "WARP")}
+# WARP.PRG holds all six warp rooms; only the sixth is the Saturn's own
+SATURN_ONLY_ROOMS = {"WARP.PRG": {5}}
 SATURN_IDS = {sid for sid, _ in SATURN.values()}
 SATURN_LOAD_ADDRESS = 0x060DC000
 # stages with no place on the castle map: a name only, for the apron patch
@@ -169,7 +172,9 @@ def main():
         if not saturn_dir or not os.path.exists(path):
             continue
         names.append((sid, name))
-        rows += [(sid,) + r + (ROOM_SATURN,) for r in saturn_rooms(open(path, "rb").read())]
+        keep = SATURN_ONLY_ROOMS.get(prg_name)
+        rows += [(sid,) + r + (ROOM_SATURN,) for r in saturn_rooms(open(path, "rb").read())
+                 if keep is None or r[0] in keep]
     named = {sid for sid, _ in names}
     names += [(sid, n) for n, sid in sorted(NAME_ONLY.items(), key=lambda kv: kv[1])
               if sid not in named]

@@ -510,6 +510,8 @@ const char* SaturnStageOverlay(int stageId) {
         return "stage15";
     case STAGE_ID_SATURN_16:
         return "stage16";
+    case STAGE_ID_SATURN_WARP:
+        return "stagewarp";
     case STAGE_ID_REVERSE_SATURN_15:
         return "rstage15";
     case STAGE_ID_REVERSE_SATURN_16:

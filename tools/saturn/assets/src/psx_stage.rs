@@ -423,14 +423,17 @@ fn render_decoded_layer(
     Ok(output)
 }
 
-fn pc_teleport(destination: u8) -> Option<u16> {
+fn pc_teleport(destination: u8, reverse: bool) -> Option<u16> {
     match destination {
         // STAGE_15 has two exits, 70 at (2,44) and 69 at (2,45), one per CD
-        // room. The Saturn target of 69 is not decoded. The Entrance
-        // (STAGE_01) has one garden door (72 at 4,44), so 69 uses the same
-        // way back as a fallback. Without it the CD room at (3,45) is a dead
-        // end.
+        // room. 70 goes to the Entrance (STAGE_01, 72 at 4,44). 69 goes to
+        // the sixth warp room of WARP.PRG (room 0x1E, port teleport 140) and
+        // 71, the exit of that room, back to STAGE_15 room 0 (141). The
+        // inverted Garden has no RWARP room in the port: its 69 keeps the
+        // way to the Entrance, or its CD room would be a dead end.
+        69 if !reverse => Some(140),
         69 => Some(137),
+        71 if !reverse => Some(141),
         70 => Some(137),
         74 => Some(138),
         73 => Some(139),
@@ -1207,7 +1210,7 @@ fn write_c_tables(
             + special_rooms
                 .iter()
                 .position(|room| room.1)
-                .ok_or_else(|| Error::Format("stage has no save room".to_string()))?
+                .unwrap_or(0) // stages without a save room (WARP) never use it
     )
     .ok();
     out.push_str("static const u8 s_SaturnStageRoomBounds[][4] = {\n");
@@ -1425,7 +1428,7 @@ pub fn convert(
                 let RoomKind::Loading { destination } = other.kind else {
                     return None;
                 };
-                let id = pc_teleport(destination)?;
+                let id = pc_teleport(destination, reverse)?;
                 (other.bounds.top == record.bounds.top
                     && (other.bounds.left + 1 == record.bounds.left
                         || other.bounds.left == record.bounds.left + 1))
@@ -1761,7 +1764,7 @@ pub fn convert(
             "left": room.left, "top": room.top,
             "right": room.right, "bottom": room.bottom,
             "tileLayoutId": id, "tilesetId": 0,
-            "objGfxId": 0, "objLayoutId": 48 + index
+            "objGfxId": 0, "objLayoutId": 48 + index.min(4)
         }));
     }
     for (room, id) in &trigger_rooms {
@@ -1795,7 +1798,9 @@ pub fn convert(
     write_json(&output.join("rooms.roomdef.json"), &room_json)?;
     let mut entity_layouts = Vec::new();
     let layout_table = read_layout_table(&prg)?;
-    let layout_ids = (1..=bounds.len()).chain(48..48 + special_rooms.len());
+    // special room n takes layout 48 + n; WARP.PRG has six and 48..=52 only:
+    // the rooms past the table end share its last layout (a stage name entity)
+    let layout_ids = (1..=bounds.len()).chain(48..48 + special_rooms.len().min(5));
     for layout_id in layout_ids {
         let address = *layout_table.get(layout_id).ok_or_else(|| {
             Error::Format(format!("entity layout {layout_id} is outside the table"))

@@ -29,7 +29,17 @@ static Point16 WarpRoomCoords[] = {
     {0x3B, 0x11}, // Outer Wall
     {0x28, 0x0C}, // Castle Keep
     {0x25, 0x15}, // Olrox's Quarters
+#ifdef ENABLE_SATURN_STAGES
+    {0x02, 0x2D}, // the sixth room of the Saturn (src/pc/stages/stage_saturn.c)
+#endif
 };
+
+#ifdef ENABLE_SATURN_STAGES
+// The sixth room is another stage in the port: its pad (and the way back) is
+// a teleport row of src/pc/room_teleport.c.
+#define SATURN_SIXTH_ROOM 5
+#define SATURN_SIXTH_ROOM_TELEPORT 143
+#endif
 
 // Mask for all of the statuses where the UP button will
 // be ignored when in warp position or on the warp platform
@@ -221,6 +231,15 @@ void EntityWarpRoom(Entity* self) {
             }
         }
         DestinationWarpRoom = move_room;
+#ifdef ENABLE_SATURN_STAGES
+        if (move_room == SATURN_SIXTH_ROOM) {
+            // an ordinary stage change: the next frame loads the stage
+            D_8006C374 = SATURN_SIXTH_ROOM_TELEPORT;
+            g_GameStep = Play_PrepareNextStage;
+            self->step = 0x80;
+            break;
+        }
+#endif
         warpCoords = &WarpRoomCoords[move_room];
         moveX = warpCoords->x - g_Tilemap.left;
         moveY = warpCoords->y - g_Tilemap.top;

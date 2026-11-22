@@ -9,6 +9,7 @@ const char* SaturnStageOverlay(int stageId);
 enum CustomStageId {
     STAGE_ID_SATURN_15 = 0x4C,
     STAGE_ID_SATURN_16 = 0x4D,
+    STAGE_ID_SATURN_WARP = 0x4E, // the sixth warp room (Saturn WARP.PRG)
     STAGE_ID_REVERSE_SATURN_15 = 0x6C,
     STAGE_ID_REVERSE_SATURN_16 = 0x6D,
     STAGE_ID_USER_MOD_FIRST = 0x51,

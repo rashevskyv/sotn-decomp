@@ -8,7 +8,9 @@
 #include <psyz/gpu.h>
 #include <psyz/module.h>
 #include "pc.h"
+#ifndef SATURN_STAGE_WARP // the sixth warp room has no track
 #include "music/xa_config.h"
+#endif
 #endif
 #include "overlay.h"
 #include "../spawn_point.h"
@@ -24,7 +26,15 @@
 #endif
 
 static SpriteParts* s_SpriteBanks[0x14];
-#ifdef SATURN_STAGE_GDN
+#if defined(SATURN_STAGE_GDN) && defined(SATURN_STAGE_WARP)
+// the sixth warp room: the PS1 Warp Room framework (src/st/wrp) with no
+// Saturn enemies and no sprite banks (the pad is untextured primitives)
+#include "../../st/wrp/wrp.h"
+static u_long s_EmptyClut[] = {(u_long)-1};
+static u_long* s_Cluts[] = {s_EmptyClut};
+static GfxBank s_EmptyGfxBank = {.kind = GFX_BANK_NONE};
+static GfxBank* s_GfxBanks[] = {&s_EmptyGfxBank};
+#elif defined(SATURN_STAGE_GDN)
 // stage15 and stage16: the PS1 stage framework (src/st/stage15, stage16) runs
 // the layout entities, with the Saturn enemies and their converted sprites
 // (gdn_entities.py)
@@ -93,7 +103,7 @@ static bool SaturnStageLoadMasonry(void) {
     return length == sizeof(s_SaturnStageMasonryPalette);
 }
 
-#ifndef SATURN_STAGE_ROOM_TEST
+#if !defined(SATURN_STAGE_ROOM_TEST) && !defined(SATURN_STAGE_WARP)
 extern s32 g_CurCdPos;
 extern XaMusicConfig g_XaMusicConfigs[];
 
@@ -811,6 +821,232 @@ SATURN_STAGE_ENTITY_FN void EntitySaturnStageSpecialController(Entity* self) {
     self->step = 1;
 }
 
+#ifdef SATURN_STAGE_WARP
+// The pad of the sixth warp room (Saturn entity 22, params 5). It is the PS1
+// pad of src/st/wrp/warp.c (the same steps, timings and colour cycle) with
+// its disc drawn as untextured gouraud quads: the PS1 texture is a page of
+// the WRP graphics, which this stage does not load. The small rocks the PS1
+// pad throws are left out. The next room is another stage: the pad of the
+// Olrox room warps on to this stage and this pad goes back to the Entrance
+// (rows 143 and 142 of src/pc/room_teleport.c).
+#define SATURN_WARP_PAD_TELEPORT 142
+#define SATURN_WARP_PAD_SECTORS 16
+#define SATURN_WARP_PAD_RADIUS 0x40
+// the flags of the player statuses that ignore UP (src/st/wrp/warp.c)
+#define SATURN_WARP_READY_MASK                                                 \
+    (PLAYER_STATUS_UNK80000000 | PLAYER_STATUS_UNK40000000 |                   \
+     PLAYER_STATUS_UNK4000000 | PLAYER_STATUS_AXEARMOR |                       \
+     PLAYER_STATUS_UNK800000 | PLAYER_STATUS_UNK400000 |                       \
+     PLAYER_STATUS_UNK80000 | PLAYER_STATUS_DEAD | PLAYER_STATUS_UNK20000 |    \
+     PLAYER_STATUS_UNK10000 | PLAYER_STATUS_UNK2000 |                          \
+     PLAYER_STATUS_SPELLCAST | PLAYER_STATUS_SUBWPN | PLAYER_STATUS_UNK400 |   \
+     PLAYER_STATUS_UNK200 | PLAYER_STATUS_STONE | PLAYER_STATUS_UNK40 |        \
+     PLAYER_STATUS_CROUCH | PLAYER_STATUS_UNK10 | PLAYER_STATUS_TRANSFORM)
+
+static u32 s_WarpAngles[SATURN_WARP_PAD_SECTORS] = {
+    ROT(0),   ROT(45),  ROT(90),  ROT(135), ROT(180), ROT(225),
+    ROT(270), ROT(315), ROT(360), ROT(405), ROT(450), ROT(495),
+    ROT(540), ROT(585), ROT(630), ROT(675),
+};
+static s32 s_WarpPhase;
+
+static void SaturnWarpSetFade(Primitive* fade, s32 level) {
+    fade->r0 = fade->g0 = fade->b0 = level;
+    LOW(fade->r1) = LOW(fade->r0);
+    LOW(fade->r2) = LOW(fade->r0);
+    LOW(fade->r3) = LOW(fade->r0);
+}
+
+void EntityWarpRoom(Entity* self) {
+    Primitive* prim;
+    Primitive* fade;
+    s32 angle;
+    s32 brightness;
+    s32 amplitude;
+    s32 level;
+    s32 primIndex;
+    s32 i;
+
+    switch (self->step) {
+    case 0:
+        InitializeEntity(g_EInitInteractable);
+        primIndex = g_api.AllocPrimitives(PRIM_G4, SATURN_WARP_PAD_SECTORS + 2);
+        if (primIndex == -1) {
+            self->step = 0;
+            return;
+        }
+        self->flags |= FLAG_HAS_PRIMS;
+        self->primIndex = primIndex;
+        prim = &g_PrimBuf[primIndex];
+        self->ext.warpRoom.primBg = prim;
+        for (i = 0; i < SATURN_WARP_PAD_SECTORS; i++) {
+            angle = i * 256;
+            prim->x0 = self->posX.i.hi +
+                       (((rcos(angle) >> 4) * SATURN_WARP_PAD_RADIUS) >> 8);
+            prim->y0 = self->posY.i.hi -
+                       (((rsin(angle) >> 4) * SATURN_WARP_PAD_RADIUS) >> 8);
+            angle = (i + 1) * 256;
+            prim->x1 = self->posX.i.hi +
+                       (((rcos(angle) >> 4) * SATURN_WARP_PAD_RADIUS) >> 8);
+            prim->y1 = self->posY.i.hi -
+                       (((rsin(angle) >> 4) * SATURN_WARP_PAD_RADIUS) >> 8);
+            prim->x2 = prim->x3 = self->posX.i.hi;
+            prim->y2 = prim->y3 = self->posY.i.hi;
+            prim->priority = 0x50;
+            prim->drawMode = DRAW_TRANSP;
+            prim = prim->next;
+        }
+        // the whitening of the player and the white of the whole screen
+        self->ext.warpRoom.primFade = prim;
+        prim->type = PRIM_TILE;
+        prim->u0 = 64;
+        prim->v0 = 80;
+        prim->x0 = 96;
+        prim->y0 = 112;
+        prim->r0 = prim->g0 = prim->b0 = 0;
+        prim->priority = 0x60;
+        prim->drawMode = DRAW_HIDE | DRAW_UNK02;
+        prim = prim->next;
+        prim->type = PRIM_G4;
+        prim->x0 = prim->x2 = 0;
+        prim->x1 = prim->x3 = 256;
+        prim->y0 = prim->y1 = 16;
+        prim->y2 = prim->y3 = 240;
+        SaturnWarpSetFade(prim, 0);
+        prim->priority = 0x1F0;
+        prim->drawMode = DRAW_HIDE;
+        self->hitboxState = 1;
+        self->hitboxOffY += 16;
+        self->hitboxWidth = 2;
+        self->hitboxHeight = 16;
+        g_CastleFlags[WRP_UNLOCKS] |= 1;
+        g_CastleFlags[WRP_UNLOCKS] |= 1 << self->params;
+        // the player came by the pad of the Olrox room: fade in from white
+        level = PLAYER.posX.i.hi + g_Tilemap.scrollX.i.hi;
+        if (level > 0x60 && level < 0xA0) {
+            g_Player.padSim = 0;
+            g_Player.demo_timer = 16;
+            g_PauseAllowed = false;
+            self->step = 5;
+            break;
+        }
+        // fall through
+    case 1:
+        // wait for UP
+        if (self->hitFlags && g_pads[0].pressed & PAD_UP &&
+            !(g_Player.status & SATURN_WARP_READY_MASK)) {
+            g_Player.padSim = 0;
+            g_Player.demo_timer = 128;
+            g_PauseAllowed = false;
+            PLAYER.velocityX = 0;
+            PLAYER.velocityY = 0;
+            self->step++;
+        }
+        break;
+    case 2:
+        // the player goes white
+        g_Player.padSim = 0;
+        g_Player.demo_timer = 128;
+        g_PauseAllowed = false;
+        g_unkGraphicsStruct.g_zEntityCenter = PLAYER.zPriority = 0x5C;
+        prim = self->ext.warpRoom.primFade;
+        prim->drawMode = DRAW_TRANSP | DRAW_TPAGE | DRAW_TPAGE2;
+        prim->g0 = prim->b0 = prim->r0 += 2;
+        if (prim->r0 > 96) {
+            g_api.PlaySfx(SFX_TELEPORT_BANG_B);
+            self->step++;
+        }
+        break;
+    case 3:
+        // the whole room goes white
+        g_Player.padSim = 0;
+        g_Player.demo_timer = 128;
+        g_PauseAllowed = false;
+        g_unkGraphicsStruct.g_zEntityCenter = PLAYER.zPriority = 0x5C;
+        prim = self->ext.warpRoom.primFade;
+        prim->drawMode = DRAW_TRANSP | DRAW_TPAGE | DRAW_TPAGE2;
+        if (prim->r0 < 0xF0) {
+            prim->g0 = prim->b0 = prim->r0 += 2;
+        }
+        prim = prim->next;
+        prim->drawMode = DRAW_TRANSP | DRAW_TPAGE | DRAW_TPAGE2;
+        if (prim->r0 < 0xF8) {
+            SaturnWarpSetFade(prim, prim->r0 + 2);
+        } else {
+            self->step++;
+        }
+        break;
+    case 4:
+        // the warp: the next unlocked room after the sixth is the Entrance
+        D_8006C374 = SATURN_WARP_PAD_TELEPORT;
+        g_GameStep = Play_PrepareNextStage;
+        self->step = 0x80;
+        break;
+    case 5:
+        g_Player.padSim = 0;
+        g_Player.demo_timer = 16;
+        g_PauseAllowed = false;
+        prim = self->ext.warpRoom.primFade;
+        prim->drawMode = DRAW_HIDE;
+        prim->g0 = prim->b0 = prim->r0 = 0;
+        prim = prim->next;
+        SaturnWarpSetFade(prim, 0xF8);
+        prim->drawMode = DRAW_TRANSP | DRAW_TPAGE | DRAW_TPAGE2;
+        self->step++;
+        // fall through
+    case 6:
+        // fade in from white
+        g_Player.padSim = 0;
+        g_Player.demo_timer = 16;
+        g_PauseAllowed = false;
+        fade = ((Primitive*)self->ext.warpRoom.primFade)->next;
+        level = fade->r0 - 4;
+        if (level < 0) {
+            level = 0;
+            fade->drawMode = DRAW_HIDE;
+            g_PauseAllowed = true;
+            self->step = 1;
+        }
+        SaturnWarpSetFade(fade, level);
+        break;
+    default:
+        break;
+    }
+    // the colour cycle of the disc
+    s_WarpPhase += 0x10;
+    brightness = (rsin(s_WarpPhase) >> 8) + 0xD0;
+    if (brightness < 0) {
+        brightness = 0;
+    }
+    if (brightness > 0xFF) {
+        brightness = 0xFF;
+    }
+    amplitude = (rcos(s_WarpPhase) >> 8) + 0xD0;
+    prim = self->ext.warpRoom.primBg;
+    for (i = 0; i < SATURN_WARP_PAD_SECTORS; i++) {
+        angle = s_WarpAngles[(i + 0) % 16];
+        prim->r0 = ((rsin(angle) + 0x1000) >> 6) * amplitude / 256;
+        angle = s_WarpAngles[(i + 5) % 16];
+        prim->g0 = ((rsin(angle) + 0x1000) >> 6) * amplitude / 256;
+        angle = s_WarpAngles[(i + 10) % 16];
+        prim->b0 = ((rsin(angle) + 0x1000) >> 6) * amplitude / 256;
+        angle = s_WarpAngles[(i + 1) % 16];
+        prim->r1 = ((rsin(angle) + 0x1000) >> 6) * amplitude / 256;
+        angle = s_WarpAngles[(i + 6) % 16];
+        prim->g1 = ((rsin(angle) + 0x1000) >> 6) * amplitude / 256;
+        angle = s_WarpAngles[(i + 11) % 16];
+        prim->b1 = ((rsin(angle) + 0x1000) >> 6) * amplitude / 256;
+        prim->r2 = prim->g2 = prim->b2 = prim->r3 = prim->g3 = prim->b3 =
+            brightness;
+        s_WarpAngles[i] += 0x20;
+        prim = prim->next;
+    }
+}
+
+// the rocks the PS1 pad throws: not made here, nothing in the layout asks
+void EntityWarpSmallRocks(Entity* self) { DestroyEntity(self); }
+#endif
+
 static void SaturnStageInitBackdrop(void) {
     Entity* backdrop = &g_Entities[SATURN_STAGE_BACKDROP_ENTITY];
 
@@ -852,7 +1088,23 @@ static LayoutEntity s_GdnLayoutY[GDN_LAYOUTS][GDN_LAYOUT_MAX];
 LayoutEntity* entityLayoutHorizontal[GDN_LAYOUTS];
 LayoutEntity* entityLayoutVertical[GDN_LAYOUTS];
 
-#ifdef SATURN_STAGE_PRISON
+#ifdef SATURN_STAGE_WARP
+// Saturn WARP entity id -> wrp.h EntityID. The Saturn table (warp/entupd.c)
+// keeps the PS1 order, so the layout id is the PS1 id: 5 is the red door and
+// 22 the pad. 8 (the area name), 15 and 16 stay idle: no banner art, no
+// save room, and the controller does nothing in a room of its own.
+static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
+    (void)saveRoom;
+    switch (saturnId) {
+    case 0x05:
+        return E_RED_DOOR;
+    case 0x16:
+        return E_WARP;
+    default:
+        return E_DUMMY_0F;
+    }
+}
+#elif defined(SATURN_STAGE_PRISON)
 // Saturn STAGE_16 entity id -> stage16.h EntityID. The ids without a port
 // stay idle.
 static u16 SaturnGdnEntityId(u16 saturnId, bool saveRoom) {
@@ -1036,6 +1288,12 @@ static void SaturnGdnBuildLayouts(void) {
     }
 }
 
+#ifdef SATURN_STAGE_WARP
+static void SaturnGdnStart(void) {
+    SaturnGdnBuildLayouts();
+    PfnEntityUpdates = EntityUpdates;
+}
+#else
 static void SaturnGdnStart(void) {
     TileDefinition* tileDef = &s_SaturnStageTileDef;
     s32 room;
@@ -1078,6 +1336,7 @@ static void SaturnGdnStart(void) {
         }
     }
 }
+#endif
 
 // [ent] log: the live stage entities and the enemies (slot:id
 // hp/step@screen x,y), the player's screen x,y, the breakables (id 1), and in
@@ -1291,10 +1550,15 @@ void Psyz_ModuleStart(void* param) {
     if (!PcLoadStageChr(SATURN_STAGE_ASSET_DIR "/F_STAGE.BIN")) {
         ERRORF("could not load Stage 15 graphics");
     }
+#ifdef SATURN_STAGE_WARP
+    // the Saturn warp room has no music, as the PS1 one
+    g_StageMusicId = MU_NO_AUDIO;
+#else
     SaturnStageConfigureMusic();
     // the engine starts it as stage music: at the stage start and when
     // the player leaves a save room (5087C.c), as on the PS1
     g_StageMusicId = SATURN_STAGE_MUSIC;
+#endif
     // 224 art rows in each 256-row screen: 16 empty rows at the room top
     // and bottom (native_room*_layer*.map.bin)
     g_WideBandTop = g_WideBandBottom = 16;

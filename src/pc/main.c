@@ -111,6 +111,7 @@ static bool parseArgs(
                 static const int saturnStages[] = {
                     STAGE_ID_SATURN_15,
                     STAGE_ID_SATURN_16,
+                    STAGE_ID_SATURN_WARP,
                     STAGE_ID_REVERSE_SATURN_15,
                     STAGE_ID_REVERSE_SATURN_16,
                 };

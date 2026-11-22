@@ -37,8 +37,9 @@ static const Transition s_Transitions[] = {
     {BOSS, GARDEN_2, EDGE_LEFT, 44},    {CD_TOP, LARGE, EDGE_RIGHT, 44},
     {CD_BOTTOM, LARGE, EDGE_RIGHT, 45}, {SAVE, LARGE, EDGE_LEFT, 45},
 };
-static const Exit s_Exits[] = {{CD_TOP, 0x40, 2, 44, 137}};
-static const u8 s_InertCdRoom = CD_BOTTOM;
+// the bottom CD room goes to the sixth warp room (teleport 140)
+static const Exit s_Exits[] = {{CD_TOP, 0x40, 2, 44, 137},
+                               {CD_BOTTOM, 0x40, 2, 45, 140}};
 #define SAVE_PARAMS 0x22
 #elif defined(TEST_STAGE16)
 enum { LARGE, CORRIDOR, CD_NO0, CD_NO4, SAVE, ROOM_COUNT };
@@ -63,8 +64,9 @@ static const Transition s_Transitions[] = {
     {BOSS, GARDEN_2, EDGE_RIGHT, 19},   {CD_TOP, LARGE, EDGE_LEFT, 18},
     {CD_BOTTOM, LARGE, EDGE_LEFT, 19},  {SAVE, LARGE, EDGE_RIGHT, 18},
 };
-static const Exit s_Exits[] = {{CD_BOTTOM, 0x41, 61, 19, 137}};
-static const u8 s_InertCdRoom = CD_TOP;
+// the inverted Garden has no sixth warp room: both CD rooms go to the Entrance
+static const Exit s_Exits[] = {{CD_BOTTOM, 0x41, 61, 19, 137},
+                               {CD_TOP, 0x41, 61, 18, 137}};
 #define SAVE_PARAMS 0x22
 #define REVERSE_SAVE_ROOM
 #elif defined(TEST_RSTAGE16)
@@ -175,14 +177,6 @@ int main(void) {
         assert(FindRoom(rooms, exit->triggerX + (exit->params & 1 ? -1 : 1),
                         exit->triggerY) == exit->room);
     }
-#ifdef TEST_STAGE15
-    assert(layers[s_InertCdRoom].fg->rect.params == 0x10);
-    assert(FindRoom(rooms, 2, 45) == -1);
-#endif
-#ifdef TEST_RSTAGE15
-    assert(layers[s_InertCdRoom].fg->rect.params == 0x10);
-    assert(FindRoom(rooms, 61, 18) == -1);
-#endif
 
     assert(layers[SAVE].fg->rect.params == SAVE_PARAMS);
     assert(layers[SAVE].fg->zPriority == 0xA0);

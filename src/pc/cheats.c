@@ -301,6 +301,7 @@ const char* Castle_ZoneName(int stage) {
         {STAGE_WRP | STAGE_INVERTEDCASTLE_FLAG, "Reverse Warp Room"},
         {STAGE_ID_SATURN_15, "Underground Garden"},
         {STAGE_ID_SATURN_16, "Cursed Prison"},
+        {STAGE_ID_SATURN_WARP, "Warp Room"},
         {STAGE_ID_REVERSE_SATURN_15, "Hell Garden"},
         {STAGE_ID_REVERSE_SATURN_16, "Soul Prison"},
     };

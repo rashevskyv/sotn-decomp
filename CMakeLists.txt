@@ -2805,7 +2805,7 @@ endif()
 add_subdirectory(tools/psyz/psyz)
 
 # the port version: the NACP and the boot line of the log
-set(SOTN_VERSION "0.8.82")
+set(SOTN_VERSION "0.8.86")
 set_source_files_properties(src/pc/main.c PROPERTIES
     COMPILE_DEFINITIONS "SOTN_VERSION=\"${SOTN_VERSION}\"")
 
@@ -3280,6 +3280,8 @@ if(ENABLE_SATURN_STAGES)
         "${CMAKE_SOURCE_DIR}/assets/st/rno4"
         "${CMAKE_SOURCE_DIR}/disks/us/ST/RNO4/F_RNO4.BIN"
         rooms layers entity_layouts)
+    # the Warp Room pad of the Olrox room goes on to the Saturn's sixth room
+    target_compile_definitions(wrp PRIVATE ENABLE_SATURN_STAGES)
 
     target_sources(${PROJECT_NAME} PRIVATE src/pc/room_teleport.c)
     target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_SATURN_STAGES)

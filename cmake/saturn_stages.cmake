@@ -12,7 +12,8 @@ option(SATURN_STAGE_ENTITY_LABELS
 
 enable_testing()
 
-# The other arguments are the stage's own sources (src/st/<name>/*.c)
+# The other arguments are the stage's own sources (src/st/<name>/*.c).
+# music "": a stage with no track (WARP); test_stage "": no room test.
 function(add_saturn_stage name source music test_stage)
     set(disc "${CMAKE_SOURCE_DIR}/disks/saturn")
     string(TOUPPER "${name}" upper)
@@ -24,34 +25,42 @@ function(add_saturn_stage name source music test_stage)
         "${asset_dir}/conversion-report.json"
         "${asset_dir}/saturn_stage_data.h"
         "${asset_dir}/masonry.chars.bin"
-        "${asset_dir}/masonry.pal.bin"
-        "${asset_dir}/music/audio.xa"
-        "${asset_dir}/music/audio.cue"
-        "${asset_dir}/music/xa_config.h"
-        "${asset_dir}/music/xa_manifest.json")
-    add_custom_command(
-        OUTPUT ${outputs}
+        "${asset_dir}/masonry.pal.bin")
+    set(convert_commands
         COMMAND ${SATURN_STAGE_CARGO_BIN} run --release
                 --manifest-path "${CMAKE_SOURCE_DIR}/tools/saturn/assets/Cargo.toml"
                 -- map convert-psx
                 "${disc}/${source}.PRG"
                 "${disc}/${source}.MAP"
                 "${asset_dir}"
-                --scale-model "${SATURN_STAGE_SCALE_MODEL}"
-        COMMAND ${SATURN_STAGE_CARGO_BIN} run --release
+                --scale-model "${SATURN_STAGE_SCALE_MODEL}")
+    set(music_deps)
+    if(music)
+        list(APPEND outputs
+            "${asset_dir}/music/audio.xa"
+            "${asset_dir}/music/audio.cue"
+            "${asset_dir}/music/xa_config.h"
+            "${asset_dir}/music/xa_manifest.json")
+        list(APPEND convert_commands
+            COMMAND ${SATURN_STAGE_CARGO_BIN} run --release
                 --manifest-path "${CMAKE_SOURCE_DIR}/tools/saturn/assets/Cargo.toml"
                 -- audio export-xa
                 "${disc}/SD/${music}.PCM"
                 "${asset_dir}/music"
                 --file-number 25
-                --channel 0
+                --channel 0)
+        set(music_deps "${disc}/SD/${music}.PCM")
+    endif()
+    add_custom_command(
+        OUTPUT ${outputs}
+        ${convert_commands}
         DEPENDS
             ${SATURN_STAGE_CONVERTER_SOURCES}
             "${CMAKE_SOURCE_DIR}/tools/saturn/assets/Cargo.toml"
             "${disc}/${source}.PRG"
             "${disc}/${source}.MAP"
             "${disc}/${source}.CHR"
-            "${disc}/SD/${music}.PCM"
+            ${music_deps}
             "${disc}/0.BIN"
             "${disc}/GAME.PRG"
             "${disc}/LOAD.MAP"
@@ -69,6 +78,9 @@ function(add_saturn_stage name source music test_stage)
         target_compile_definitions(${name} PRIVATE SATURN_STAGE_ENTITY_LABELS)
     endif()
 
+    if(NOT test_stage)
+        return()
+    endif()
     add_executable(${name}_room_test EXCLUDE_FROM_ALL
         src/pc/stages/stage_saturn_test.c
         src/pc/stages/stage_saturn.c)
@@ -217,6 +229,32 @@ set(SATURN_RPRISON_SOURCES
     src/st/rstage16/st_update.c)
 add_saturn_stage(rstage16 RSTAGE16 SD2C TEST_RSTAGE16 ${SATURN_RPRISON_SOURCES})
 add_saturn_gdn_entities(rstage16 RSTAGE16 SATURN_STAGE_RPRISON)
+# The sixth warp room (WARP.PRG room 0x1E): the PS1 Warp Room framework
+# (src/st/wrp) around the rooms the converter reads from the disc. The pad is
+# stage_saturn.c's own, with no texture. The Saturn plays no music here.
+set(SATURN_WARP_SOURCES
+    src/st/wrp/background_block_init.c
+    src/st/wrp/bss.c
+    src/st/wrp/collision.c
+    src/st/wrp/create_entity.c
+    src/st/wrp/d_prize_drops.c
+    src/st/wrp/e_breakable.c
+    src/st/wrp/e_collect.c
+    src/st/wrp/e_init.c
+    src/st/wrp/e_lock_camera.c
+    src/st/wrp/e_misc.c
+    src/st/wrp/e_particles.c
+    src/st/wrp/e_room_bg.c
+    src/st/wrp/e_room_fg.c
+    src/st/wrp/e_stage_name.c
+    src/st/wrp/popup.c
+    src/st/wrp/prim_helpers.c
+    src/st/wrp/st_common.c
+    src/st/wrp/st_update.c)
+add_saturn_stage(stagewarp WARP "" "" ${SATURN_WARP_SOURCES})
+target_compile_definitions(stagewarp PRIVATE SATURN_STAGE_GDN SATURN_STAGE_WARP
+    ENABLE_SATURN_STAGES)
+target_include_directories(stagewarp BEFORE PRIVATE src/st/wrp)
 
 # Saturn-only sounds and the boss track (tools/saturn/saturn_audio.py): WAVs
 # in data/ST/<STAGE>/sfx/ and data/ST/STAGE15/music/, played by
