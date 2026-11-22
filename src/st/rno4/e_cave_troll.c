@@ -454,14 +454,14 @@ void func_us_801D5E90(Entity* self) {
         // to cast a pointer to s32 first and then to Primitve* later
         // But seeing as genericInt is an all-purpose variable anyways,
         // it might just be true
-        genericInt = (long)prim->next;
-        if (!genericInt) {
+        // the port: 'long' is 32 bits on Windows and cut the pointer
+        if (!prim->next) {
             prim->x0 = 0;
             prim->y0 = 0;
             prim->drawMode =
                 DRAW_TPAGE2 | DRAW_TPAGE | DRAW_UNK02 | DRAW_TRANSP;
         }
-        prim = (Primitive*)genericInt;
+        prim = prim->next;
     }
 }
 
