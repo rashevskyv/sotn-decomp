@@ -450,11 +450,9 @@ void func_us_801D5E90(Entity* self) {
             func_us_801D5DC8(prim);
         }
 
-        // This might be a fake, at the very least it's very unconventional
-        // to cast a pointer to s32 first and then to Primitve* later
-        // But seeing as genericInt is an all-purpose variable anyways,
-        // it might just be true
-        // the port: 'long' is 32 bits on Windows and cut the pointer
+#ifdef PLATFORM_PSYZ
+        // 'long' is 32 bits on Windows (LLP64) and cut the pointer, so the
+        // original cast through genericInt crashed there
         if (!prim->next) {
             prim->x0 = 0;
             prim->y0 = 0;
@@ -462,6 +460,20 @@ void func_us_801D5E90(Entity* self) {
                 DRAW_TPAGE2 | DRAW_TPAGE | DRAW_UNK02 | DRAW_TRANSP;
         }
         prim = prim->next;
+#else
+        // This might be a fake, at the very least it's very unconventional
+        // to cast a pointer to s32 first and then to Primitve* later
+        // But seeing as genericInt is an all-purpose variable anyways,
+        // it might just be true
+        genericInt = (long)prim->next;
+        if (!genericInt) {
+            prim->x0 = 0;
+            prim->y0 = 0;
+            prim->drawMode =
+                DRAW_TPAGE2 | DRAW_TPAGE | DRAW_UNK02 | DRAW_TRANSP;
+        }
+        prim = (Primitive*)genericInt;
+#endif
     }
 }
 
