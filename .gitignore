@@ -51,5 +51,5 @@ recordings/
 /games/*
 !/games/README.txt
 # the owner's uk pictures made from stock art (tools/lang/FORMAT.md)
-/tools/lang/uk/local/
+/tools/lang/uk/local
 /out/
