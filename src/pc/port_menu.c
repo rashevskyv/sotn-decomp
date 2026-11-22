@@ -3082,8 +3082,29 @@ void PortMenu_Cell(int x, int y, int cell, u32 rgb) {
     }
 }
 
+// The window icon: a loose icon.png next to the program (never in git). Tried
+// once the window exists; no file, no change.
+static void WindowIcon(void) {
+    static int done;
+    int n = 0;
+    SDL_Window** w;
+    char path[1024];
+    SDL_Surface* ic;
+    if (done || !(w = SDL_GetWindows(&n)) || n < 1) {
+        return;
+    }
+    done = 1;
+    snprintf(path, sizeof(path), "%sicon.png", SDL_GetBasePath());
+    if ((ic = SDL_LoadPNG(path))) {
+        SDL_SetWindowIcon(w[0], ic);
+        SDL_DestroySurface(ic);
+    }
+    SDL_free(w);
+}
+
 void PortMenu_Draw(OT_TYPE* ot) {
     int i;
+    WindowIcon();
     drawn = 30;
     // Closed: the head of slot 0x1FF, as the game's own prims. Open: after
     // the last prim of that slot, so the menu covers the game's 0x1FF prims

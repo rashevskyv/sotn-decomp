@@ -238,6 +238,12 @@ int Main(int argc, char* argv[]) {
             Psyz_HdTexAllow(32, 256, 24, 72, 8);
             // the stage-name banners and the ST0 title card (128x128, 4 bpp)
             Psyz_HdTexAllow(64, 256, 32, 128, 4);
+            // the pick-up banners of EntityLevelUpAnimation: Life, Heart,
+            // Level, relic (26x24 words sampled of the 4 bpp picture)
+            Psyz_HdTexAllow(800, 256, 26, 24, 4);
+            Psyz_HdTexAllow(800, 280, 26, 24, 4);
+            Psyz_HdTexAllow(800, 304, 26, 24, 4);
+            Psyz_HdTexAllow(800, 328, 26, 24, 4);
         }
         if (g_HdDump) {
             Psyz_HdTexDump("data/textures/dump");

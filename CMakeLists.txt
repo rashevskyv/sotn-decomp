@@ -2805,7 +2805,7 @@ endif()
 add_subdirectory(tools/psyz/psyz)
 
 # the port version: the NACP and the boot line of the log
-set(SOTN_VERSION "0.8.96")
+set(SOTN_VERSION "0.8.97")
 set_source_files_properties(src/pc/main.c PROPERTIES
     COMPILE_DEFINITIONS "SOTN_VERSION=\"${SOTN_VERSION}\"")
 
@@ -2832,6 +2832,20 @@ endif()
 add_executable(${PROJECT_NAME}
     ${SOURCE_FILES_PC}
     ${SOURCE_FILES_CORE})
+
+# Optional Windows program icon: -DSOTN_ICON=<file.ico>. The icon is a local
+# file, never in git; without it (or without a resource compiler) nothing
+# changes and the build never fails.
+set(SOTN_ICON "" CACHE FILEPATH "Optional .ico for the Windows program")
+if(WIN32 AND SOTN_ICON AND EXISTS "${SOTN_ICON}")
+    include(CheckLanguage)
+    check_language(RC)
+    if(CMAKE_RC_COMPILER)
+        enable_language(RC)
+        file(WRITE "${CMAKE_BINARY_DIR}/sotn_icon.rc" "1 ICON \"${SOTN_ICON}\"\n")
+        target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/sotn_icon.rc")
+    endif()
+endif()
 add_dependencies(${PROJECT_NAME} sotn_runtime_data)
 
 target_include_directories(${PROJECT_NAME} PUBLIC

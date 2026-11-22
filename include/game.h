@@ -1316,10 +1316,6 @@ void Lang_MenuCellRows(int code, unsigned char rows[44]);
 // a cutscene speaker name (cells, 0xFF 0x00 end) as one gold serif sprite:
 // sets type, tpage, clut, u0, v0, u1, v1 of prim
 void Lang_ActorName(const char* cells, Primitive* prim);
-// uk: paint the pick-up banner `which` (0 Level up, 1 Heart max up, 2 Life max
-// up, 3 Got an item) as serif text over its stock picture in VRAM (texture page
-// 0x1C); 0 when the language keeps the stock picture
-int Lang_Banner(int which);
 // the atlas cell of a 12x16 font code (Shift-JIS, or an ASCII letter), or -1
 int Lang_SjisCell(int sjis);
 // the status page's words (src/dra/menu.c): 0..5 ATT DEF STR CON INT LCK in
