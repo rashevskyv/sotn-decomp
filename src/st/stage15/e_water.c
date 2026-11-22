@@ -7,8 +7,10 @@
 
 u16 g_WaterSounds[] = {SFX_WATER_SPLASH_JUMP, SFX_WATER_SPLASH_MOVE};
 // Saturn g_Stage15WaterRegions (0x060F2044): x, width, slope, top, bottom
-// x and width are Saturn px: the PC room is 4/5 as wide (as in rstage15)
-s16 g_WaterXTbl[] = {1608 * 4 / 5, 532 * 4 / 5, 0, 441, 512, 7, 7, 0};
+// x and width scaled to the PC room (Saturn x * 4/5, as in rstage15); y as is
+#define SAT_X(v) ((v) * 4 / 5)
+s16 g_WaterXTbl[] = {
+    SAT_X(1608), SAT_X(1608 + 532) - SAT_X(1608), 0, 441, 512, 7, 7, 0};
 
 #include "../water_effects.h"
 
@@ -64,7 +66,7 @@ void EntityModWaterTint(Entity* self) {
     x = r[0] - g_Tilemap.scrollX.i.hi;
     y0 = r[3] - g_Tilemap.scrollY.i.hi;
     y1 = r[4] - g_Tilemap.scrollY.i.hi;
-    if (x + r[1] <= -0x80 || x >= 0x180 || y1 <= 0 || y0 >= 0xF0) {
+    if (x + r[1] < -WIDE_X || x > DISP_STAGE_W + WIDE_X || y1 <= 0 || y0 >= 0xF0) {
         prim->drawMode = DRAW_HIDE;
         return;
     }
