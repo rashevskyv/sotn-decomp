@@ -1741,11 +1741,14 @@ def cmd_pack(_args):
         extra.add(key)
     # ua_items.json: the Saturn's own items of the port (src/config_us.h, PLATFORM_PSYZ), keyed by
     # our English text: {"EQUIP_NAME": {en: uk}, "EQUIP_DESC": {en: uk}, "ENEMY": {en: uk}} (ENEMY: the Saturn-only enemies, gdn_entities.py)
+    # and OTHER_SJIS: the Shift-JIS strings (the save room box lines, src/dra/62DEC.c; drawn
+    # in the 8 px serif cells, 18 at most in the 144 px box)
     for table, rows in load_json(os.path.join(UK, "ua_items.json")).items():
         font = "cell" if table in ("EQUIP_NAME", "ENEMY") else "sjis"
         for en, text in rows.items():
             data, bad = enc_cells(text, menu=table == "EQUIP_NAME") if font == "cell" else enc_bios(text)
             assert not bad, f"ua_items.json {en}: {bad}"
+            assert table != "OTHER_SJIS" or len(text) <= 18, f"ua_items.json {en}: wider than the save box"
             key = (TABLES.index(table), fnv(stock_bytes(font, en)), NO_INDEX)
             assert table != "ENEMY" or key not in entries, f"ua_items.json ENEMY {en}: name already in the table"
             entries[key] = (FONT[font], 0, data)

@@ -280,7 +280,7 @@ static s32 HandleSaveMenu(s32 arg0) {
                 func_800F9D88(LANG_SJIS("Memory Card"), 0, 1);
                 func_800F9D88(LANG_SJIS("  not found．"), 1, 0);
 #elif VERSION == VER_USPROTO
-                func_800F9D88(LANG_SJIS("Memory Card"), 0, 1);
+                func_800F9D88("Memory Card", 0, 1);
                 func_800F9D88("not detected．", 1, 0);
 #elif TARGET != TARGET_PSP
                 func_800F9D40("メモリーカードが　　", 0, 1);
