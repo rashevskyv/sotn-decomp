@@ -2363,7 +2363,12 @@ void func_800F84CC(void) {
 
     D_801377FC[NUM_MENU + 0] = AllocPrimitivesReverse(PRIM_GT4, 1);
     prim = &g_PrimBuf[D_801377FC[NUM_MENU + 0]];
+#ifdef PLATFORM_PSYZ
+    // a 15x15 texel icon: square, not 42x28 (stretched 1.5 times wide)
+    SetPrimRect(prim, 27, 195, 28, 28);
+#else
     SetPrimRect(prim, 20, 195, 42, 28);
+#endif
     prim->u0 = 113;
     prim->v0 = 177;
     prim->u1 = 127;
