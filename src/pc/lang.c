@@ -765,8 +765,8 @@ void Lang_ActorName(const char* s, Primitive* prim) {
 // The banners of EntityLevelUpAnimation (src/dra/7E4BC.c): 112x24 pictures of
 // 4 bits at VRAM x 800, y 256 + 0x30, 0x18, 0, 0x48 (Level up, Heart max up,
 // Life max up, Got an item), read through the CLUT 0x19F (black to white).
-// Under uk the picture is the serif line of ua_port.json 228 + which, 8 px a
-// cell, centred, ink 15 at the top to 12 at the foot, a shadow 1 px right and
+// Under uk (en: the English words) the picture is the serif line of ua_port.json 228 + which, 8 px a
+// cell, centred, ink 15 at the top to 13 at the foot, a shadow 1 px right and
 // down in ink 5.
 #define BANNER_W 112
 #define BANNER_H 24
@@ -775,18 +775,34 @@ int Lang_Banner(int which) {
     u8 tx[BANNER_H][BANNER_W + 1];
     u16 pic[BANNER_H * BANNER_W / 4];
     RECT r = {800, 256, BANNER_W / 4, BANNER_H};
-    const char* s = Lang_Port(228 + which);
+    static const char* const en[4] = {"Level Up", "Heart Max Up", "Life Max Up",
+                                      "Got an Item"};
+    u8 code[16];
+    const char* s;
     int n, x, y, i;
-    if (!s || which < 0 || which > 3) {
+    if (which < 0 || which > 3) {
         return 0;
     }
-    for (n = 0; (u8)s[n] != 0xFF; n++) {
+    if (g_Lang) {
+        if (!(s = Lang_Port(228 + which))) {
+            return 0;
+        }
+        for (n = 0; (u8)s[n] != 0xFF && n < 14; n++) {
+            code[n] = s[n];
+        }
+    } else { // en: the shared serif Latin cells, sheet cell = ASCII - 0x20
+        for (n = 0; en[which][n]; n++) {
+            code[n] = en[which][n] - 0x20;
+        }
+    }
+    if (!Lang_MenuCellAny(code[0])) { // no mfont.bin: keep the stock picture
+        return 0;
     }
     r.y += v[which];
     memset(tx, 0, sizeof(tx));
     x = (BANNER_W - n * 8) / 2;
     for (i = 0; i < n; i++, x += 8) {
-        const u8* cell = Lang_MenuCell((u8)s[i]);
+        const u8* cell = Lang_MenuCellAny(code[i]);
         for (y = 0; cell && y < 11; y++) {
             int c;
             for (c = 0; c < 8; c++) {

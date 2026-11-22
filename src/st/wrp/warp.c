@@ -202,6 +202,8 @@ void EntityWarpRoom(Entity* self) {
         }
         if (pick >= LEN(WarpRoomCoords)) { // a room this build lacks
             pick = -2;
+            g_PauseAllowed = true; // as the cancel path of PortMenu_WarpPick
+            g_Player.demo_timer = 0;
         }
         if (pick >= 0) {
             PickedWarpRoom = pick;

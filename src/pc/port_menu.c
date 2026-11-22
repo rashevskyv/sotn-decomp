@@ -2900,6 +2900,7 @@ static const s16 warp_cell_n[6][2] = {{0x0F, 0x26}, {0x23, 0x2C}, {0x3B, 0x11},
 static const s16 warp_cell_r[5][2] = {
     {0x30, 0x19}, {0x1C, 0x13}, {0x04, 0x2E}, {0x17, 0x33}, {0x1A, 0x2A}};
 static int warp_cur;
+static int warp_arm; // 0 until every arrow is released after the map opened
 static int warp_inv; // the map of this portal: the inverted castle
 
 #define WARP_COUNT() (warp_inv ? LEN(warp_cell_r) : LEN(warp_cell_n))
@@ -2914,6 +2915,7 @@ static int WarpOpen(int room) {
 int PortMenu_WarpOpen(int here) {
     int r;
     warp_inv = (g_StageId & 0x20) != 0;
+    warp_arm = 0;
     for (r = 1; r < WARP_COUNT(); r++) {
         warp_cur = (here + r) % WARP_COUNT();
         if (WarpOpen(warp_cur)) {
@@ -2933,7 +2935,14 @@ static u32 WarpArrows(void) {
     static int held;
     u16 now = (u16)(g_pads[0].pressed | StickDirs()) &
               (PAD_LEFT | PAD_RIGHT | PAD_UP | PAD_DOWN);
-    u16 hit = now & ~prev;
+    u16 hit;
+    if (!warp_arm) { // the UP that opened the map is still held
+        prev = now;
+        held = 0;
+        warp_arm = now == 0;
+        return 0;
+    }
+    hit = now & ~prev;
     held = now && now == prev ? held + 1 : 0;
     if (held >= 24 && (held - 24) % 8 == 0) {
         hit = now;

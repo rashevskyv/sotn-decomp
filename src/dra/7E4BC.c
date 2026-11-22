@@ -1474,7 +1474,7 @@ void EntityLevelUpAnimation(Entity* self) {
             prim = prim->next;
         }
 #ifdef PLATFORM_PSYZ
-        Lang_Banner(upperParams); // uk: the serif line over the stock picture
+        Lang_Banner(upperParams); // uk, en: the serif line over the stock picture
 #endif
         self->ext.timer.t = 0;
         self->ext.factory.unk80 = 0x100;

@@ -16,6 +16,9 @@
 //   POST /cheat?name=&on=             switch a cheat (as the port menu)
 //   POST /equip?hand=&item=           equip a hand item (as the menu does)
 //   POST /save?slot=                  write the save (as the save coffin)
+//   POST /gain?exp=  or  ?t=&a=       tests: set the experience, or a pick-up
+//                                     (t 0x8000 life, 0x4000 heart, 0x2000 relic)
+//   GET  /vram?x=&y=&w=&h=            tests: the 16 bit words of a VRAM rect
 //
 // No password: anyone on the network can use it while it is on. All work
 // runs on the game thread, one request per connection, Connection: close.
@@ -488,7 +491,9 @@ static void Handle(int fd) {
         int e = Arg(query, "exp", -1);
         if (e >= 0) {
             g_Status.exp = e;
-        } else {
+        } else if (Arg(query, "t", 0x8000) != 0x2000 ||
+                   (Arg(query, "a", 1) >= 0 &&
+                    Arg(query, "a", 1) < LEN(g_Status.relics))) {
             func_800FE044(Arg(query, "a", 1), Arg(query, "t", 0x8000));
         }
         State();
