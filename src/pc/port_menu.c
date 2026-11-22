@@ -3060,8 +3060,10 @@ static void WarpMove(u32 dir) {
     }
     if (best >= 0) {
         warp_cur = best;
-        fprintf(stderr, "[warp] cursor room %d cell %d,%d\n", best,
-                WARP_CELL(best)[0], WARP_CELL(best)[1]);
+        fprintf(stderr, "[warp] jump %s to room %d cell %d,%d\n",
+                dir & PAD_LEFT ? "left" : dir & PAD_RIGHT ? "right"
+                : dir & PAD_UP ? "up" : "down",
+                best, WARP_CELL(best)[0], WARP_CELL(best)[1]);
     }
 }
 
