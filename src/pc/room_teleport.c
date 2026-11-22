@@ -24,6 +24,12 @@ static RoomTeleport s_SaturnDoorTeleports[] = {
     // 143: the pad of the Olrox room (src/st/wrp/warp.c, the last one of the
     // PS1 cycle) to the sixth room, once the player has been there
     {128, 132, 0x0028, STAGE_WRP, STAGE_ID_SATURN_WARP},
+    // 144..147: the pad of the sixth room to the other warp rooms picked on the
+    // map (warp_map): Castle Keep, Olrox, Outer Wall, Catacombs (rooms 0,1,2,4)
+    {128, 132, 0x0000, STAGE_ID_SATURN_WARP, STAGE_WRP},
+    {128, 132, 0x0008, STAGE_ID_SATURN_WARP, STAGE_WRP},
+    {128, 132, 0x0010, STAGE_ID_SATURN_WARP, STAGE_WRP},
+    {128, 132, 0x0020, STAGE_ID_SATURN_WARP, STAGE_WRP},
 };
 
 RoomTeleport* PC_GetRoomTeleport(int id) {

@@ -241,6 +241,7 @@ static const char ini_hd[] =
     "; track with that id (tools/music/ost_map.py); 0 = always the disc.\n";
 
 extern int g_BackgroundInput; // psyz sdl3_common.h
+extern int g_WarpMapPick;     // port_menu.c
 static const struct {
     const char* key;
     int* value;
@@ -259,6 +260,7 @@ static const struct {
     {"editor", &g_EditorOn},
     {"overlay", &g_OverlayOn},
     {"background_input", &g_BackgroundInput},
+    {"warp_map", &g_WarpMapPick},
     {"fps", &g_FpsOn},
     {"fullscreen", &g_Fullscreen},
     {"room_stitch", &g_RoomStitch},
@@ -288,7 +290,9 @@ static const char ini_overlay[] =
     "; overlay: 1 = a corner shows the stage, room, map cell and the cheats.\n"
     "; fps: 1 = a corner shows the frames per second.\n"
     "; background_input: 0 = no controller input while the window has no\n"
-    "; focus; 1 = the game reads them always.\n";
+    "; focus; 1 = the game reads them always.\n"
+    "; warp_map: 1 = the warp portal shows the map and you pick the room;\n"
+    "; 0 = the portal cycles through the open rooms, as on the PS1.\n";
 
 static const char ini_spawn[] =
     "\n"

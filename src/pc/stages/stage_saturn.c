@@ -849,6 +849,15 @@ static u32 s_WarpAngles[SATURN_WARP_PAD_SECTORS] = {
     ROT(540), ROT(585), ROT(630), ROT(675),
 };
 static s32 s_WarpPhase;
+#ifdef PLATFORM_PSYZ
+// warp_map: the map picks the room (src/pc/port_menu.c); the teleport rows
+// (src/pc/room_teleport.c) of the PS1 warp rooms 0..4
+extern int g_WarpMapPick;
+int PortMenu_WarpOpen(int here);
+int PortMenu_WarpPick(int here);
+static const u8 s_WarpRows[5] = {142, 147, 146, 144, 145};
+static s32 s_WarpPicked = -1;
+#endif
 
 static void SaturnWarpSetFade(Primitive* fade, s32 level) {
     fade->r0 = fade->g0 = fade->b0 = level;
@@ -940,9 +949,31 @@ void EntityWarpRoom(Entity* self) {
             g_PauseAllowed = false;
             PLAYER.velocityX = 0;
             PLAYER.velocityY = 0;
+#ifdef PLATFORM_PSYZ
+            if (g_WarpMapPick && PortMenu_WarpOpen(self->params)) {
+                self->flags |= FLAG_UNK_10000; // runs while the map is open
+                self->step = 0x10;
+                break;
+            }
+#endif
             self->step++;
         }
         break;
+#ifdef PLATFORM_PSYZ
+    case 0x10: {
+        s32 pick = PortMenu_WarpPick(self->params);
+        if (pick != -1) {
+            self->flags &= ~FLAG_UNK_10000;
+        }
+        if (pick >= 0 && pick < 5) {
+            s_WarpPicked = pick;
+            self->step = 2;
+        } else if (pick == -2) {
+            self->step = 1;
+        }
+        break;
+    }
+#endif
     case 2:
         // the player goes white
         g_Player.padSim = 0;
@@ -979,6 +1010,12 @@ void EntityWarpRoom(Entity* self) {
     case 4:
         // the warp: the next unlocked room after the sixth is the Entrance
         D_8006C374 = SATURN_WARP_PAD_TELEPORT;
+#ifdef PLATFORM_PSYZ
+        if (s_WarpPicked >= 0) {
+            D_8006C374 = s_WarpRows[s_WarpPicked];
+            s_WarpPicked = -1;
+        }
+#endif
         g_GameStep = Play_PrepareNextStage;
         self->step = 0x80;
         break;

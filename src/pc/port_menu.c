@@ -57,6 +57,7 @@ enum {
     PAGE_CONTROLS,
     PAGE_LIST
 };
+extern int g_WarpMapPick; // warp_map
 enum {
     ITEM_SCALE,
     ITEM_ASPECT, // the picture shape, for tests (g_Aspect)
@@ -67,6 +68,7 @@ enum {
     ITEM_LANGUAGE,
     ITEM_BUTTONS, // the button marks of the menus
     ITEM_CONFIRM, // menu_confirm
+    ITEM_WARPMAP, // warp_map
     ITEM_CDROOMS, // skip_cd_rooms
     ITEM_LOADING, // show_loading_text
     ITEM_EDGEFADE, // room_edge_fade
@@ -1115,6 +1117,10 @@ static void Change(int dir) {
                     ? "stock"
                     : g_MenuConfirmNames[PortMenu_ConfirmMode()]);
         Wide_SaveIni();
+    } else if (sel == ITEM_WARPMAP) {
+        g_WarpMapPick ^= 1;
+        fprintf(stderr, "[warp] menu: warp_map %d\n", g_WarpMapPick);
+        Wide_SaveIni();
     } else if (sel == ITEM_CDROOMS || sel == ITEM_LOADING) {
         flag = sel == ITEM_CDROOMS ? &g_SkipCdRooms : &g_ShowLoadingText;
         *flag ^= 1;
@@ -1856,6 +1862,7 @@ static void DrawMain(void) {
 #endif
         {P_VOICE, "VOICE"},     {P_LANGUAGE, "LANGUAGE"},
         {P_BUTTONS, "BUTTONS"}, {P_CONFIRM, "MENU OK"},
+        {-1, "WARP MAP"},
         {P_CDROOMS, "SKIP CD ROOMS"},
         {P_LOADING, "LOADING TEXT"}, {P_EDGEFADE, "ROOM EDGE FADE"},
         {P_OVERLAY, "OVERLAY"}, {-1, "FPS"},
@@ -1939,6 +1946,8 @@ static void DrawMain(void) {
     }
     Add(lines[ITEM_CONFIRM], HINT_OK);
     Add(lines[ITEM_CONFIRM], " >");
+    AddValue(lines[ITEM_WARPMAP], g_WarpMapPick ? P_ON : P_OFF,
+             g_WarpMapPick ? "ON" : "OFF");
     for (i = 0; i < 6; i++) { // CD ROOMS, LOADING, EDGE, OVERLAY, FPS, EDITOR
         AddValue(lines[ITEM_CDROOMS + i], on[i] ? P_ON : P_OFF,
                  on[i] ? "ON" : "OFF");
@@ -2879,6 +2888,83 @@ static void DrawOverlay(void) {
 // The OT is drawn in index order, so 0x1FF puts the menu on top.
 // Marks and serif cells a stage asked for this frame (PortMenu_Mark,
 // PortMenu_Cell), drawn once and forgotten.
+int g_WarpMapPick = 1; // warp_map: the portal picks the room on the map
+s32 g_WarpMapCursor[3];
+static int warp_hint;
+
+// The warp portal map (warp_map): the game's own map screen (Engine_Map) with
+// the cursor on the open warp rooms. Cells of src/st/wrp/warp.c.
+static const s16 warp_cell[6][2] = {{0x0F, 0x26}, {0x23, 0x2C}, {0x3B, 0x11},
+                                    {0x28, 0x0C}, {0x25, 0x15}, {0x02, 0x2D}};
+static int warp_cur;
+
+static int WarpOpen(int room) {
+    return room >= 0 && room < LEN(warp_cell) &&
+           (g_CastleFlags[WRP_UNLOCKS] & (1 << room));
+}
+
+// Opens the map on the next open room after here. 0: there is none.
+int PortMenu_WarpOpen(int here) {
+    int r;
+    for (r = 1; r < LEN(warp_cell); r++) {
+        warp_cur = (here + r) % LEN(warp_cell);
+        if (WarpOpen(warp_cur)) {
+            g_api.SetFadeMode(FADE_SHOW_MAP);
+            D_800974A4 = 1;
+            g_GameEngineStep = Engine_Map;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// Each frame while the map is open: -1 still open, -2 backed out, else the
+// room picked (the map closes).
+int PortMenu_WarpPick(int here) {
+    u32 tap = g_pads[0].tapped, dir = tap & (PAD_LEFT | PAD_RIGHT | PAD_UP | PAD_DOWN);
+    int r, best = warp_cur, bestd = 0x7FFFFFFF, dx, dy, major, minor, res = -1;
+    int east = PortMenu_ConfirmEast();
+    if (g_GameEngineStep != Engine_Map) { // START or SELECT closed it
+        g_WarpMapCursor[0] = 0;
+        return -2;
+    }
+    for (r = 0; dir && r < LEN(warp_cell); r++) {
+        if (r == warp_cur || r == here || !WarpOpen(r)) {
+            continue;
+        }
+        dx = warp_cell[r][0] - warp_cell[warp_cur][0];
+        dy = warp_cell[r][1] - warp_cell[warp_cur][1];
+        if (!((dir & PAD_LEFT && dx < 0) || (dir & PAD_RIGHT && dx > 0) ||
+              (dir & PAD_UP && dy < 0) || (dir & PAD_DOWN && dy > 0))) {
+            continue;
+        }
+        major = dir & (PAD_LEFT | PAD_RIGHT) ? abs(dx) : abs(dy);
+        minor = dir & (PAD_LEFT | PAD_RIGHT) ? abs(dy) : abs(dx);
+        if (major + 2 * minor < bestd) {
+            bestd = major + 2 * minor;
+            best = r;
+        }
+    }
+    warp_cur = best;
+    if (tap & (east ? PAD_CIRCLE : PAD_CROSS)) {
+        res = warp_cur;
+    } else if (tap & (east ? PAD_CROSS : PAD_CIRCLE)) {
+        res = -2;
+    }
+    if (res != -1) {
+        g_WarpMapCursor[0] = 0;
+        g_api.SetFadeMode(FADE_HIDE_MAP);
+        D_800974A4 = 0;
+        g_GameEngineStep = Engine_Normal;
+    } else {
+        g_WarpMapCursor[0] = 1;
+        g_WarpMapCursor[1] = warp_cell[warp_cur][0];
+        g_WarpMapCursor[2] = warp_cell[warp_cur][1];
+        warp_hint = 1;
+    }
+    return res;
+}
+
 static struct {
     s16 x, y;
     u8 b, cell; // cell 0: mark b
@@ -2936,6 +3022,18 @@ void PortMenu_Draw(OT_TYPE* ot) {
         }
     }
     queued_count = 0;
+    if (warp_hint && !is_open) { // the warp portal map: the buttons
+        char s[LINE_MAX];
+        int x0, y0, x1, y1;
+        ViewRect(&x0, &y0, &x1, &y1);
+        Clear(s);
+        Add(s, HINT_OK), Add(s, " "), AddW(s, P_GO, "GO");
+        Add(s, "  "), Add(s, HINT_BACK), Add(s, " "), AddW(s, P_BACK, "BACK");
+        Add(s, "  \x0B "), AddW(s, P_MOVE, "MOVE");
+        Line(x0 + 4, y1 - LINE_H + 3, s, 255, 255, 64);
+        Rect(x0, y1 - LINE_H, x1 - x0, LINE_H, 8, 8, 24);
+    }
+    warp_hint = 0;
     if (!is_open) {
         DrawOverlay();
         return;

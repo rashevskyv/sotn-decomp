@@ -41,6 +41,15 @@ static Point16 WarpRoomCoords[] = {
 #define SATURN_SIXTH_ROOM_TELEPORT 143
 #endif
 
+#ifdef PLATFORM_PSYZ
+// PC: UP in the portal opens the game's map and the player picks the room
+// (src/pc/port_menu.c, warp_map in sotn.ini); 0 keeps the cycle of the PS1.
+extern int g_WarpMapPick;
+int PortMenu_WarpOpen(int here);
+int PortMenu_WarpPick(int here);
+static s32 PickedWarpRoom = -1;
+#endif
+
 // Mask for all of the statuses where the UP button will
 // be ignored when in warp position or on the warp platform
 //
@@ -174,9 +183,32 @@ void EntityWarpRoom(Entity* self) {
             PLAYER.velocityX = 0;
             PLAYER.velocityY = 0;
 #endif
+#ifdef PLATFORM_PSYZ
+            if (g_WarpMapPick && PortMenu_WarpOpen(self->params)) {
+                self->flags |= FLAG_UNK_10000; // runs while the map is open
+                self->step = 0x10;
+                break;
+            }
+#endif
             self->step++;
         }
         break;
+
+#ifdef PLATFORM_PSYZ
+    case 0x10: {
+        s32 pick = PortMenu_WarpPick(self->params);
+        if (pick != -1) {
+            self->flags &= ~FLAG_UNK_10000;
+        }
+        if (pick >= 0) {
+            PickedWarpRoom = pick;
+            self->step = 2;
+        } else if (pick == -2) {
+            self->step = 1;
+        }
+        break;
+    }
+#endif
 
     case 2:
         // Move Alucard in the background and fade him to white
@@ -222,6 +254,12 @@ void EntityWarpRoom(Entity* self) {
     case 4:
         // Perform the actual warp
         move_room = self->params + 1;
+#ifdef PLATFORM_PSYZ
+        if (PickedWarpRoom >= 0) {
+            move_room = PickedWarpRoom;
+            PickedWarpRoom = -1;
+        } else
+#endif
         for (i = 0; i < LEN(WarpRoomCoords); i++, move_room++) {
             if (move_room > LEN(WarpRoomCoords) - 1) {
                 move_room = 0;

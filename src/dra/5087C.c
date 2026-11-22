@@ -1190,6 +1190,10 @@ void func_800F24F4(void) {
     }
 }
 
+#ifdef PLATFORM_PSYZ
+extern s32 g_WarpMapCursor[3]; // src/pc/port_menu.c
+#endif
+
 void DrawMapCursor(void) {
     s32 x;
     s32 y;
@@ -1200,6 +1204,12 @@ void DrawMapCursor(void) {
 
     x = g_Tilemap.left + (g_PlayerX >> 8);
     y = g_Tilemap.top + (g_PlayerY >> 8);
+#ifdef PLATFORM_PSYZ
+    if (g_WarpMapCursor[0]) { // the warp room picked in the portal
+        x = g_WarpMapCursor[1];
+        y = g_WarpMapCursor[2];
+    }
+#endif
     x = x * 4 - 14;
     y = y * 4 - 13;
     if (g_StageId & 0x20) {

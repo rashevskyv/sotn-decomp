@@ -473,6 +473,14 @@ static void Handle(int fd) {
         }
         State();
         ReplyOut(fd, code, "application/json");
+    } else if (!strcmp(path, "/castleflag") && !strcmp(method, "POST")) {
+        // tests: g_CastleFlags[i] = v (the warp rooms: i 208, bits 0..5)
+        int i = Arg(query, "i", -1);
+        if (i >= 0 && i < LEN(g_CastleFlags)) {
+            g_CastleFlags[i] = Arg(query, "v", 0);
+        }
+        State();
+        ReplyOut(fd, 200, "application/json");
     } else if (!strcmp(path, "/c40") && !strcmp(method, "POST")) {
         // tests: set D_80097C40 (Alucard's Muramasa counter, Maria's slot)
         g_Status.D_80097C40 = Arg(query, "v", 0);
