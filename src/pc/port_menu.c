@@ -251,19 +251,32 @@ static int GamepadDown(SDL_GamepadButton b) {
 
 // The left stick as the D-pad of the port menu (the map cursor, the lines):
 // psyz maps the stick to no PS button.
+#define STICK_DEAD 12000
+extern int g_StickDpad; // wide.c: stick_dpad in sotn.ini
 static u16 StickDirs(void) {
+    static int logged, seen = -1;
     int n = 0, i, x, y;
     u16 r = 0;
-    if (Psyz_ControllerBlocked()) {
+    if (!g_StickDpad || Psyz_ControllerBlocked()) {
         return 0;
     }
     SDL_JoystickID* ids = SDL_GetGamepads(&n);
+    if (n != seen) { // what the owner's sotn.log shows about the pads
+        seen = n;
+        fprintf(stderr, "[stick] %d gamepad(s) for the stick\n", n);
+    }
     for (i = 0; ids && i < n; i++) {
         SDL_Gamepad* g = SDL_GetGamepadFromID(ids[i]);
         x = g ? SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTX) : 0;
         y = g ? SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTY) : 0;
-        r |= x < -16000 ? PAD_LEFT : x > 16000 ? PAD_RIGHT : 0;
-        r |= y < -16000 ? PAD_UP : y > 16000 ? PAD_DOWN : 0;
+        if (!logged && (abs(x) > STICK_DEAD || abs(y) > STICK_DEAD)) {
+            logged = 1;
+            fprintf(stderr, "[stick] left stick x %d y %d on '%s' id %d%s\n",
+                    x, y, g ? SDL_GetGamepadName(g) : "(not opened)",
+                    (int)ids[i], g ? "" : " NOT OPENED");
+        }
+        r |= x < -STICK_DEAD ? PAD_LEFT : x > STICK_DEAD ? PAD_RIGHT : 0;
+        r |= y < -STICK_DEAD ? PAD_UP : y > STICK_DEAD ? PAD_DOWN : 0;
     }
     SDL_free(ids);
     return r;
@@ -1312,7 +1325,8 @@ u16 PortMenu_Pad(u16 pressed) {
     u16 tap;
     int count;
     pressed = MenuButtons(pressed, is_open);
-    if (is_open) {
+    if (is_open || g_GameState == Game_Title || g_GameState == Game_MainMenu ||
+        (g_GameState == Game_Play && g_GameEngineStep == Engine_Menu)) {
         pressed |= StickDirs();
     }
     tap = pressed & ~prev;

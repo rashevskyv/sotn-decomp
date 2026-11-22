@@ -181,6 +181,16 @@ void Cheat_OnFrame(void) {
         return;
     }
     RematchWatch();
+    {
+        // tests: SOTN_TEST_EXP=N sets the experience once, 300 frames into
+        // play (the editor /gain call, which the Windows build lacks)
+        static int expWait, expDone;
+        const char* e = getenv("SOTN_TEST_EXP");
+        if (e && !expDone && ++expWait == 300) {
+            expDone = 1;
+            g_Status.exp = atoi(e);
+        }
+    }
     if (g_Cheat.map && !mapped && g_StageId != STAGE_ST0) {
         mapped = 1;
         RevealMap();

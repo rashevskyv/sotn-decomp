@@ -128,6 +128,7 @@ static const char ini_cheats[] =
     "; 1 = Alucard; 2 = Richter; 4 = Maria (PSP). 3 (Richter, Saturn)\n"
     "; and 5 (Maria, Saturn) are kept for later. A save keeps its own owner.\n";
 
+int g_StickDpad = 1; // stick_dpad in sotn.ini
 static const char ini_buttons[] =
     "\n"
     "; buttons: the button marks of the menus: auto = as the gamepad in use\n"
@@ -327,6 +328,9 @@ void Wide_SaveIni(void) {
     fprintf(f, "buttons = %s\n",
             g_ButtonPick < 0 ? "auto" : g_ButtonSetNames[g_ButtonPick]);
     fprintf(f, "menu_confirm = %s\n", g_MenuConfirmNames[g_MenuConfirm]);
+    fprintf(f, "; stick_dpad: 1 = the left stick also works as the D-pad in the\n");
+    fprintf(f, "; menus and the warp map (0 = off)\n");
+    fprintf(f, "stick_dpad = %d\n", g_StickDpad);
     fputs(ini_controls, f);
     for (i = 0; i < 2 * PSYZ_PAD_BUTTONS; i++) {
         fprintf(f, "%s_%s = %s\n", input_dev[i & 1], ps_buttons[i >> 1],
@@ -401,6 +405,8 @@ void Wide_LoadIni(const char* path) {
                 g_MenuConfirm = IniWord("menu_confirm", word,
                                         g_MenuConfirmNames, MENU_CONFIRMS,
                                         MENU_CONFIRM_AUTO);
+            } else if (sscanf(line, " stick_dpad = %d", &v) == 1) {
+                g_StickDpad = v != 0;
             } else if (sscanf(line, " voice = %15s", word) == 1) {
                 for (v = 0; v < VOICE_COUNT; v++) {
                     if (!strcmp(word, g_VoiceSetNames[v])) {
