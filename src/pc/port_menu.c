@@ -3030,6 +3030,7 @@ static u32 WarpArrows(void) {
 // The arrows move the cursor over the map: to the nearest room (this portal
 // room or an open one) in that direction, first among those whose main axis is
 // the arrow's, else any room on that side; none: stay.
+static long long jump_tick = -1000; // ms of the last arrow jump
 static void WarpMove(u32 dir) {
     int r, best = -1, bestd = 0, pass;
     int cx = WARP_CELL(warp_cur)[0], cy = WARP_CELL(warp_cur)[1];
@@ -3060,6 +3061,7 @@ static void WarpMove(u32 dir) {
     }
     if (best >= 0) {
         warp_cur = best;
+        jump_tick = SDL_GetTicks(); // a resting mouse must not undo the jump
         fprintf(stderr, "[warp] jump %s to room %d cell %d,%d\n",
                 dir & PAD_LEFT ? "left" : dir & PAD_RIGHT ? "right"
                 : dir & PAD_UP ? "up" : "down",
@@ -3089,7 +3091,7 @@ static int WarpNear(int px, int py) {
 }
 
 static void WarpSelect(int r) {
-    if (r >= 0 && r != warp_cur) {
+    if (r >= 0 && r != warp_cur && SDL_GetTicks() - jump_tick > 400) {
         warp_cur = r;
         fprintf(stderr, "[warp] cursor room %d cell %d,%d (pointer)\n", r,
                 WARP_CELL(r)[0], WARP_CELL(r)[1]);
