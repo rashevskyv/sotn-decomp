@@ -345,6 +345,8 @@ void Wide_SaveIni(void) {
             fprintf(f, "%s = %d\n", ini_flags[i].key, *ini_flags[i].value);
         }
     }
+    fprintf(f, "background_input = %d\nwarp_map = %d\n", g_BackgroundInput,
+            g_WarpMapPick);
     fputs(ini_editor, f);
     fprintf(f, "editor = %d\n", g_EditorOn);
     fputs(ini_overlay, f);
