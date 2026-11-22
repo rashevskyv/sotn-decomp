@@ -87,6 +87,31 @@ def map_marks(fmap):
     return marks
 
 
+# The Saturn castle map (SUB_DISP.MAP, 320x240 texels 4bpp, high nibble
+# first): a cell is 5x4 texels, colour 1 a room, 4 a save room, 6 a teleporter.
+# F_MAP.BIN is the same map with 4x4 texels a cell: Saturn columns 1, 0, 3, 4
+# become its columns 0..3, and the teleporter colour is 5. The cells only the
+# Saturn has (the Garden and the Prison) are added to F_MAP.BIN's.
+SATURN_MAP_COLUMNS = (1, 0, 3, 4)
+SATURN_MAP_COLOUR = {0: 0, 1: 1, 4: 4, 6: 5}
+
+
+def saturn_map_cells(sub_disp, fmap):
+    sat = bytearray()
+    for b in sub_disp[:320 * 240 // 2]:
+        sat += bytes((b >> 4, b & 15))
+    cells = []
+    for cy in range(60):
+        for cx in range(64):
+            t = [SATURN_MAP_COLOUR.get(sat[(cy * 4 + j) * 320 + cx * 5 + c], 1)
+                 for j in range(4) for c in SATURN_MAP_COLUMNS]
+            old = [fmap[(cy * 4 + j) * 128 + cx * 2 + i // 2] >> (4 * (i % 2)) & 15
+                   for j in range(4) for i in range(4)]
+            if any(t) and not any(old):
+                cells.append((cx, cy, bytes(t[i] | t[i + 1] << 4 for i in range(0, 16, 2))))
+    return cells
+
+
 def boss_marks(assets):
     """The rooms of the boss overlays (BO0..BO7, RBO0..RBO8); MAR is the
     Maria scene, not a boss. Bosses fought inside a castle stage have no
@@ -129,10 +154,21 @@ def main():
               if sid not in named]
     marks = boss_marks(assets)
     fmap_path = os.path.join(assets, "..", "disks", "us", "F_MAP.BIN")
+    sat_cells = []
     if os.path.exists(fmap_path):
-        marks += map_marks(open(fmap_path, "rb").read())
-    # check: each yellow map cell is a room of WRP (normal) or RWRP (turned)
-    warp = {(m[0], m[2], m[3]) for m in marks if m[1] == MARK_WARP}
+        fmap = bytearray(open(fmap_path, "rb").read())
+        marks += map_marks(fmap)
+        sub_disp = os.path.join(saturn_dir or "", "SUB_DISP.MAP")
+        if saturn_dir and os.path.exists(sub_disp):
+            sat_cells = saturn_map_cells(open(sub_disp, "rb").read(), fmap)
+            for cx, cy, tex in sat_cells:  # the marks of the new cells too
+                for j in range(4):
+                    fmap[(cy * 4 + j) * 128 + cx * 2:][:2] = tex[j * 2:j * 2 + 2]
+            marks = boss_marks(assets) + map_marks(fmap)
+    # check: each yellow map cell is a room of WRP (normal) or RWRP (turned);
+    # the Saturn's own teleporter (a room of its WARP.PRG) has none
+    own = {(0, cx, cy) for cx, cy, _ in sat_cells} | {(0x20, 63 - cx, 63 - cy) for cx, cy, _ in sat_cells}
+    warp = {(m[0], m[2], m[3]) for m in marks if m[1] == MARK_WARP} - own
     wrp = {(r[0] & 0x20, r[2], r[3]) for r in rows if r[0] & 0x1F == 0x0E}
     if wrp and not warp <= wrp:
         print("castle: WARNING teleporter cells outside WRP:", sorted(warp - wrp))
@@ -155,7 +191,12 @@ def main():
         for m in marks:
             f.write("    {0x%02X, %d, %d, %d, %d, %d},\n" % m)
         f.write("    {0xFF, 0, 0, 0, 0, 0},\n};\n")
-        f.write("const int g_CastleMarkCount = %d;\n" % len(marks))
+        f.write("const int g_CastleMarkCount = %d;\n\n" % len(marks))
+        f.write("const struct SaturnMapCell g_SaturnMapCells[] = {\n")
+        for cx, cy, tex in sat_cells:
+            f.write("    {%d, %d, {%s}},\n" % (cx, cy, ", ".join("0x%02X" % b for b in tex)))
+        f.write("    {0xFF, 0xFF, {0}},\n};\n")
+        f.write("const int g_SaturnMapCellCount = %d;\n" % len(sat_cells))
     os.replace(out + ".tmp", out)
     print("castle: %d stages, %d rooms, %d marks (boss %d, save %d, warp %d) -> %s" % (
         len(names), len(rows), len(marks), *(sum(m[1] == k for m in marks) for k in range(3)), out))

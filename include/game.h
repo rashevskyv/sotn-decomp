@@ -1192,6 +1192,14 @@ struct CastleMark {
 };
 extern const struct CastleMark g_CastleMarks[];
 extern const int g_CastleMarkCount;
+// Map cells the Saturn castle map has and F_MAP.BIN lacks (the Underground
+// Garden and the Prison): 4x4 texels, 4 bits each, low nibble first, as in
+// F_MAP.BIN. InitGame draws them into g_BmpCastleMap. Same generated file.
+struct SaturnMapCell {
+    u8 x, y, texels[8];
+};
+extern const struct SaturnMapCell g_SaturnMapCells[];
+extern const int g_SaturnMapCellCount;
 const char* Castle_StageName(int stage);
 // The zone name of a stage for the log ("Marble Gallery"), "" if unknown.
 const char* Castle_ZoneName(int stage);

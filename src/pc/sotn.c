@@ -163,6 +163,14 @@ bool InitGame(struct InitGameParams* params) {
                       sizeof(g_BmpCastleMap)) <= 0) {
         WARNF("no F_MAP.BIN: the game map stays empty");
     }
+    for (int i = 0; i < g_SaturnMapCellCount; i++) {
+        const struct SaturnMapCell* c = &g_SaturnMapCells[i];
+        for (int row = 0; row < 4; row++) {
+            memcpy(g_BmpCastleMap + (c->y * 4 + row) * WIDTH_OF_MAP_ROW_IN_BYTES +
+                       c->x * WIDTH_OF_MAP_TILE_IN_BYTES,
+                   &c->texels[row * 2], WIDTH_OF_MAP_TILE_IN_BYTES);
+        }
+    }
 
     // These two are necessary to make HandleTitle working
     GameApi api;
