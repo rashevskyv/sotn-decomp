@@ -1192,6 +1192,8 @@ void func_800F24F4(void) {
 
 #ifdef PLATFORM_PSYZ
 extern s32 g_WarpMapCursor[3]; // src/pc/port_menu.c
+extern s32 g_WarpMapOpen[8][2]; // the open warp rooms: map cells, count last
+extern s32 g_WarpMapOpenN;
 
 // A cursor at map cell (cx, cy): pulsing (fixed < 0) or of a fixed size.
 static void MapCursorAt(s32 cx, s32 cy, s32 fixed) {
@@ -1248,6 +1250,7 @@ static void MapCursorAt(s32 cx, s32 cy, s32 fixed) {
 }
 
 void DrawMapCursor(void) {
+    s32 i;
     s32 x = g_Tilemap.left + (g_PlayerX >> 8);
     s32 y = g_Tilemap.top + (g_PlayerY >> 8);
 
@@ -1255,12 +1258,13 @@ void DrawMapCursor(void) {
         MapCursorAt(x, y, -1);
         return;
     }
-    // the warp portal map: this place blinks like a radar blip, the room
-    // picked stays as a ring
-    if (g_MapCursorTimer & 0x20) {
-        MapCursorAt(x, y, -1);
+    // the warp portal map: every open room a small ring, this place a steady
+    // ring a little larger, the room picked a pulsing one
+    for (i = 0; i < g_WarpMapOpenN; i++) {
+        MapCursorAt(g_WarpMapOpen[i][0], g_WarpMapOpen[i][1], 10);
     }
-    MapCursorAt(g_WarpMapCursor[1], g_WarpMapCursor[2], 3);
+    MapCursorAt(x, y, 6);
+    MapCursorAt(g_WarpMapCursor[1], g_WarpMapCursor[2], -1);
 }
 #else
 void DrawMapCursor(void) {

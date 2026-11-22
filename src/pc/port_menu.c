@@ -1637,6 +1637,9 @@ enum {
     P_PAN,
     P_MOVE,
     P_SATURN, // the SS tag of the teleport lists (the legend)
+    P_WARP_GO = 232, // the warp map: Телепортуватись, Обрати, no other warp
+    P_WARP_PICK,
+    P_WARP_NONE,
 };
 #define LINE_MAX 64
 #define MARK_ESC 0xFE
@@ -2890,6 +2893,10 @@ static void DrawOverlay(void) {
 // PortMenu_Cell), drawn once and forgotten.
 int g_WarpMapPick = 1; // warp_map: the portal picks the room on the map
 s32 g_WarpMapCursor[3];
+s32 g_WarpMapOpen[8][2]; // the open warp rooms (map cells) for DrawMapCursor
+s32 g_WarpMapOpenN;
+static int warp_here; // the room of the portal
+static int warp_none; // no other room is open
 static int warp_hint;
 
 // The warp portal map (warp_map): the game's own map screen (Engine_Map) with
@@ -2906,26 +2913,65 @@ static int warp_inv; // the map of this portal: the inverted castle
 #define WARP_COUNT() (warp_inv ? LEN(warp_cell_r) : LEN(warp_cell_n))
 #define WARP_CELL(r) (warp_inv ? warp_cell_r[r] : warp_cell_n[r])
 
+// A warp room can be picked when its own map cell is explored (the map cheat
+// explores them all) or the castle warp flag of the original is set (the
+// portal was used): the union, nothing the original allowed is lost.
 static int WarpOpen(int room) {
-    return room >= 0 && room < WARP_COUNT() &&
-           (g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS] & (1 << room));
+    int cx, cy, idx;
+    if (room < 0 || room >= WARP_COUNT()) {
+        return 0;
+    }
+    if (g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS] & (1 << room)) {
+        return 1;
+    }
+    cx = WARP_CELL(room)[0];
+    cy = WARP_CELL(room)[1];
+    idx = (cx >> 2) + cy * 16 +
+          (warp_inv ? 2 * 4 * WIDTH_OF_MAP_ROW_IN_BYTES : 0);
+    return (g_CastleMap[idx] >> ((3 - (cx & 3)) * 2) & 1) != 0;
 }
 
-// Opens the map on the next open room after here. 0: there is none.
+// the area next to the map cell of a warp room (the warp room itself is a
+// stage of its own, WRP or RWRP: the nearest other area names the place)
+static int WarpZone(int room) {
+    int i, best = g_StageId, bd = 9999, cx = WARP_CELL(room)[0],
+           cy = WARP_CELL(room)[1];
+    for (i = 0; i < g_CastleRoomCount; i++) {
+        const struct CastleRoom* r = &g_CastleRooms[i];
+        int dx = cx < r->left ? r->left - cx : cx > r->right ? cx - r->right : 0;
+        int dy = cy < r->top ? r->top - cy : cy > r->bottom ? cy - r->bottom : 0;
+        if (dx + dy < bd && (r->stage & 0x1F) != 0x0E &&
+            *Castle_ZoneName(r->stage) && !!(r->stage & 0x20) == !!warp_inv) {
+            bd = dx + dy;
+            best = r->stage;
+        }
+    }
+    return best;
+}
+
+// Opens the map on the next open room after here; with no other open room
+// the map shows the place and a message. Always 1.
 int PortMenu_WarpOpen(int here) {
     int r;
     warp_inv = (g_StageId & 0x20) != 0;
     warp_arm = 0;
+    warp_here = here;
+    warp_cur = here;
+    warp_none = 1;
     for (r = 1; r < WARP_COUNT(); r++) {
-        warp_cur = (here + r) % WARP_COUNT();
-        if (WarpOpen(warp_cur)) {
-            g_api.SetFadeMode(FADE_SHOW_MAP);
-            D_800974A4 = 1;
-            g_GameEngineStep = Engine_Map;
-            return 1;
+        if (WarpOpen((here + r) % WARP_COUNT())) {
+            warp_cur = (here + r) % WARP_COUNT();
+            warp_none = 0;
+            break;
         }
     }
-    return 0;
+    fprintf(stderr, "[warp] portal %d, open mask %#x, %s\n", here,
+            g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS],
+            warp_none ? "no other room open" : "other rooms open");
+    g_api.SetFadeMode(FADE_SHOW_MAP);
+    D_800974A4 = 1;
+    g_GameEngineStep = Engine_Map;
+    return 1;
 }
 
 // The pad and the left stick as one set of arrows: a new press, then a repeat
@@ -2960,6 +3006,7 @@ int PortMenu_WarpPick(int here) {
     int east = PortMenu_ConfirmEast();
     if (g_GameEngineStep != Engine_Map) { // START or SELECT closed it
         g_WarpMapCursor[0] = 0;
+        g_WarpMapOpenN = 0;
         g_PauseAllowed = true; // the map screen cleared it: START pauses again
         g_Player.demo_timer = 0;
         return -2;
@@ -2976,12 +3023,15 @@ int PortMenu_WarpPick(int here) {
         }
     }
     if (tap & (east ? PAD_CIRCLE : PAD_CROSS)) {
-        res = warp_cur;
+        if (!warp_none) {
+            res = warp_cur;
+        }
     } else if (tap & (east ? PAD_CROSS : PAD_CIRCLE)) {
         res = -2;
     }
     if (res != -1) {
         g_WarpMapCursor[0] = 0;
+        g_WarpMapOpenN = 0;
         if (res == -2) {
             g_PauseAllowed = true;
             g_Player.demo_timer = 0;
@@ -2993,6 +3043,13 @@ int PortMenu_WarpPick(int here) {
         g_WarpMapCursor[0] = 1;
         g_WarpMapCursor[1] = WARP_CELL(warp_cur)[0];
         g_WarpMapCursor[2] = WARP_CELL(warp_cur)[1];
+        g_WarpMapOpenN = 0;
+        for (r = 0; r < WARP_COUNT(); r++) {
+            if (r != warp_here && r != warp_cur && WarpOpen(r)) {
+                g_WarpMapOpen[g_WarpMapOpenN][0] = WARP_CELL(r)[0];
+                g_WarpMapOpen[g_WarpMapOpenN++][1] = WARP_CELL(r)[1];
+            }
+        }
         warp_hint = 1;
     }
     return res;
@@ -3055,14 +3112,28 @@ void PortMenu_Draw(OT_TYPE* ot) {
         }
     }
     queued_count = 0;
-    if (warp_hint && !is_open) { // the warp portal map: the buttons
+    if (warp_hint && !is_open) { // the warp portal map: name and buttons
         char s[LINE_MAX];
         int x0, y0, x1, y1;
         ViewRect(&x0, &y0, &x1, &y1);
         Clear(s);
-        Add(s, HINT_OK), Add(s, " "), AddW(s, P_GO, "GO");
-        Add(s, "  "), Add(s, HINT_BACK), Add(s, " "), AddW(s, P_BACK, "BACK");
-        Add(s, "  \x0B "), AddW(s, P_MOVE, "MOVE");
+        if (warp_none) {
+            AddW(s, P_WARP_NONE, "NO OTHER WARP UNLOCKED YET");
+            Line(x0 + 4, y1 - 2 * LINE_H + 3, s, 255, 160, 64);
+        } else {
+            AddZone(s, WarpZone(warp_cur));
+            Line(x0 + 4, y1 - 2 * LINE_H + 3, s, 255, 255, 255);
+        }
+        Rect(x0, y1 - 2 * LINE_H, x1 - x0, LINE_H, 8, 8, 24);
+        Clear(s);
+        if (!warp_none) {
+            Add(s, HINT_OK), Add(s, " "), AddW(s, P_WARP_GO, "WARP");
+            Add(s, "  ");
+        }
+        Add(s, HINT_BACK), Add(s, " "), AddW(s, P_BACK, "BACK");
+        if (!warp_none) {
+            Add(s, "  \x0B "), AddW(s, P_WARP_PICK, "SELECT");
+        }
         Line(x0 + 4, y1 - LINE_H + 3, s, 255, 255, 64);
         Rect(x0, y1 - LINE_H, x1 - x0, LINE_H, 8, 8, 24);
     }

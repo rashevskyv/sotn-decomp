@@ -18,6 +18,7 @@
 //   POST /save?slot=                  write the save (as the save coffin)
 //   POST /gain?exp=  or  ?t=&a=       tests: set the experience, or a pick-up
 //                                     (t 0x8000 life, 0x4000 heart, 0x2000 relic)
+//   POST /stick?x=&y=                 tests: a virtual pad, left stick -32768..32767
 //   GET  /vram?x=&y=&w=&h=            tests: the 16 bit words of a VRAM rect
 //
 // No password: anyone on the network can use it while it is on. All work
@@ -35,6 +36,7 @@ const char* Editor_Status(void) {
     return g_EditorOn ? "NOT IN THE WINDOWS BUILD" : NULL;
 }
 #else
+#include <SDL3/SDL.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -498,6 +500,28 @@ static void Handle(int fd) {
         }
         State();
         ReplyOut(fd, 200, "application/json");
+    } else if (!strcmp(path, "/stick") && !strcmp(method, "POST")) {
+        // tests: a virtual gamepad; its left stick x, y (-32768..32767)
+        static SDL_Joystick* vj;
+        if (!vj) {
+            SDL_VirtualJoystickDesc d;
+            SDL_INIT_INTERFACE(&d);
+            d.type = SDL_JOYSTICK_TYPE_GAMEPAD;
+            d.naxes = SDL_GAMEPAD_AXIS_COUNT;
+            d.nbuttons = SDL_GAMEPAD_BUTTON_COUNT;
+            d.name = "test pad";
+            k = SDL_AttachVirtualJoystick(&d);
+            vj = k ? SDL_OpenJoystick(k) : NULL;
+        }
+        code = vj ? 200 : 500;
+        if (vj) {
+            SDL_SetJoystickVirtualAxis(vj, SDL_GAMEPAD_AXIS_LEFTX,
+                                       Arg(query, "x", 0));
+            SDL_SetJoystickVirtualAxis(vj, SDL_GAMEPAD_AXIS_LEFTY,
+                                       Arg(query, "y", 0));
+        }
+        State();
+        ReplyOut(fd, code, "application/json");
     } else if (!strcmp(path, "/vram") && !strcmp(method, "GET")) {
         // tests: the 16 bit words of a VRAM rect (x, y, w, h in words)
         static u16 buf[1024 * 512];
