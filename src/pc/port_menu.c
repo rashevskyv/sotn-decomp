@@ -2893,21 +2893,29 @@ s32 g_WarpMapCursor[3];
 static int warp_hint;
 
 // The warp portal map (warp_map): the game's own map screen (Engine_Map) with
-// the cursor on the open warp rooms. Cells of src/st/wrp/warp.c.
-static const s16 warp_cell[6][2] = {{0x0F, 0x26}, {0x23, 0x2C}, {0x3B, 0x11},
-                                    {0x28, 0x0C}, {0x25, 0x15}, {0x02, 0x2D}};
+// the cursor on the open warp rooms. Cells of src/st/wrp/warp.c (normal
+// castle) and src/st/rwrp/warp.c (inverted castle).
+static const s16 warp_cell_n[6][2] = {{0x0F, 0x26}, {0x23, 0x2C}, {0x3B, 0x11},
+                                      {0x28, 0x0C}, {0x25, 0x15}, {0x02, 0x2D}};
+static const s16 warp_cell_r[5][2] = {
+    {0x30, 0x19}, {0x1C, 0x13}, {0x04, 0x2E}, {0x17, 0x33}, {0x1A, 0x2A}};
 static int warp_cur;
+static int warp_inv; // the map of this portal: the inverted castle
+
+#define WARP_COUNT() (warp_inv ? LEN(warp_cell_r) : LEN(warp_cell_n))
+#define WARP_CELL(r) (warp_inv ? warp_cell_r[r] : warp_cell_n[r])
 
 static int WarpOpen(int room) {
-    return room >= 0 && room < LEN(warp_cell) &&
-           (g_CastleFlags[WRP_UNLOCKS] & (1 << room));
+    return room >= 0 && room < WARP_COUNT() &&
+           (g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS] & (1 << room));
 }
 
 // Opens the map on the next open room after here. 0: there is none.
 int PortMenu_WarpOpen(int here) {
     int r;
-    for (r = 1; r < LEN(warp_cell); r++) {
-        warp_cur = (here + r) % LEN(warp_cell);
+    warp_inv = (g_StageId & 0x20) != 0;
+    for (r = 1; r < WARP_COUNT(); r++) {
+        warp_cur = (here + r) % WARP_COUNT();
         if (WarpOpen(warp_cur)) {
             g_api.SetFadeMode(FADE_SHOW_MAP);
             D_800974A4 = 1;
@@ -2918,11 +2926,28 @@ int PortMenu_WarpOpen(int here) {
     return 0;
 }
 
+// The pad and the left stick as one set of arrows: a new press, then a repeat
+// after 24 frames every 8 (the stick has a dead zone in StickDirs).
+static u32 WarpArrows(void) {
+    static u16 prev;
+    static int held;
+    u16 now = (u16)(g_pads[0].pressed | StickDirs()) &
+              (PAD_LEFT | PAD_RIGHT | PAD_UP | PAD_DOWN);
+    u16 hit = now & ~prev;
+    held = now && now == prev ? held + 1 : 0;
+    if (held >= 24 && (held - 24) % 8 == 0) {
+        hit = now;
+    }
+    prev = now;
+    return hit;
+}
+
 // Each frame while the map is open: -1 still open, -2 backed out, else the
-// room picked (the map closes).
+// room picked (the map closes). LEFT and UP: the previous open room, RIGHT and
+// DOWN: the next one (the room of the portal is skipped).
 int PortMenu_WarpPick(int here) {
-    u32 tap = g_pads[0].tapped, dir = tap & (PAD_LEFT | PAD_RIGHT | PAD_UP | PAD_DOWN);
-    int r, best = warp_cur, bestd = 0x7FFFFFFF, dx, dy, major, minor, res = -1;
+    u32 tap = g_pads[0].tapped, dir = WarpArrows();
+    int r, step = 0, res = -1;
     int east = PortMenu_ConfirmEast();
     if (g_GameEngineStep != Engine_Map) { // START or SELECT closed it
         g_WarpMapCursor[0] = 0;
@@ -2930,24 +2955,17 @@ int PortMenu_WarpPick(int here) {
         g_Player.demo_timer = 0;
         return -2;
     }
-    for (r = 0; dir && r < LEN(warp_cell); r++) {
-        if (r == warp_cur || r == here || !WarpOpen(r)) {
-            continue;
-        }
-        dx = warp_cell[r][0] - warp_cell[warp_cur][0];
-        dy = warp_cell[r][1] - warp_cell[warp_cur][1];
-        if (!((dir & PAD_LEFT && dx < 0) || (dir & PAD_RIGHT && dx > 0) ||
-              (dir & PAD_UP && dy < 0) || (dir & PAD_DOWN && dy > 0))) {
-            continue;
-        }
-        major = dir & (PAD_LEFT | PAD_RIGHT) ? abs(dx) : abs(dy);
-        minor = dir & (PAD_LEFT | PAD_RIGHT) ? abs(dy) : abs(dx);
-        if (major + 2 * minor < bestd) {
-            bestd = major + 2 * minor;
-            best = r;
+    if (dir & (PAD_LEFT | PAD_UP)) {
+        step = WARP_COUNT() - 1;
+    } else if (dir & (PAD_RIGHT | PAD_DOWN)) {
+        step = 1;
+    }
+    for (r = 0; step && r < WARP_COUNT(); r++) {
+        warp_cur = (warp_cur + step) % WARP_COUNT();
+        if (warp_cur != here && WarpOpen(warp_cur)) {
+            break;
         }
     }
-    warp_cur = best;
     if (tap & (east ? PAD_CIRCLE : PAD_CROSS)) {
         res = warp_cur;
     } else if (tap & (east ? PAD_CROSS : PAD_CIRCLE)) {
@@ -2964,8 +2982,8 @@ int PortMenu_WarpPick(int here) {
         g_GameEngineStep = Engine_Normal;
     } else {
         g_WarpMapCursor[0] = 1;
-        g_WarpMapCursor[1] = warp_cell[warp_cur][0];
-        g_WarpMapCursor[2] = warp_cell[warp_cur][1];
+        g_WarpMapCursor[1] = WARP_CELL(warp_cur)[0];
+        g_WarpMapCursor[2] = WARP_CELL(warp_cur)[1];
         warp_hint = 1;
     }
     return res;

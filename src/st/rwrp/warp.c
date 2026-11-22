@@ -33,6 +33,15 @@ static Point16 WarpRoomCoords[] = {
     {0x30, 0x19}, {0x1C, 0x13}, {0x04, 0x2E}, {0x17, 0x33}, {0x1A, 0x2A},
 };
 
+#ifdef PLATFORM_PSYZ
+// PC: UP in the portal opens the game's map and the player picks the room
+// (src/pc/port_menu.c, warp_map in sotn.ini); 0 keeps the cycle of the PS1.
+extern int g_WarpMapPick;
+int PortMenu_WarpOpen(int here);
+int PortMenu_WarpPick(int here);
+static s32 PickedWarpRoom = -1;
+#endif
+
 // the room the player will be warping to
 s32 DestinationWarpRoom;
 // the amplitude of the current background phase
@@ -183,9 +192,34 @@ void EntityRWarpRoom(Entity* self) {
             PLAYER.velocityX = 0;
             PLAYER.velocityY = 0;
 #endif
+#ifdef PLATFORM_PSYZ
+            if (g_WarpMapPick && PortMenu_WarpOpen(self->params)) {
+                self->flags |= FLAG_UNK_10000; // runs while the map is open
+                self->step = 0x10;
+                break;
+            }
+#endif
             self->step++;
         }
         break;
+#ifdef PLATFORM_PSYZ
+    case 0x10: {
+        s32 pick = PortMenu_WarpPick(self->params);
+        if (pick != -1) {
+            self->flags &= ~FLAG_UNK_10000;
+        }
+        if (pick >= LEN(WarpRoomCoords)) {
+            pick = -2;
+        }
+        if (pick >= 0) {
+            PickedWarpRoom = pick;
+            self->step = 2;
+        } else if (pick == -2) {
+            self->step = 1;
+        }
+        break;
+    }
+#endif
     case 2:
         // raise alucard on the platform?
         g_Player.padSim = 0;
@@ -242,6 +276,12 @@ void EntityRWarpRoom(Entity* self) {
     case 5:
         // Perform the actual warp
         temp = self->params + 1;
+#ifdef PLATFORM_PSYZ
+        if (PickedWarpRoom >= 0) {
+            temp = PickedWarpRoom;
+            PickedWarpRoom = -1;
+        } else
+#endif
         for (i = 0; i < LEN(WarpRoomCoords); i++, temp++) {
             if (temp > LEN(WarpRoomCoords) - 1) {
                 temp = 0;

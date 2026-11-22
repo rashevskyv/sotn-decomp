@@ -1192,8 +1192,77 @@ void func_800F24F4(void) {
 
 #ifdef PLATFORM_PSYZ
 extern s32 g_WarpMapCursor[3]; // src/pc/port_menu.c
-#endif
 
+// A cursor at map cell (cx, cy): pulsing (fixed < 0) or of a fixed size.
+static void MapCursorAt(s32 cx, s32 cy, s32 fixed) {
+    s32 x;
+    s32 y;
+    s32 tick;
+    s32 cursorSize;
+    OT_TYPE* gpu_ot = &g_CurrentBuffer->ot[0];
+    POLY_GT4* poly = &g_CurrentBuffer->polyGT4[g_GpuUsage.gt4];
+
+    x = cx * 4 - 14;
+    y = cy * 4 - 13;
+    if (g_StageId & 0x20) {
+        x -= 1;
+        y -= 17;
+    }
+    if (fixed >= 0) {
+        tick = fixed;
+    } else {
+        tick = g_MapCursorTimer & 0x3F;
+        tick = 0x3F - tick;
+        tick = SQ(tick) >> 8;
+        tick = 15 - tick;
+        if (tick == 0) {
+            tick = 15;
+        }
+    }
+    x += tick;
+    y += tick;
+    cursorSize = 32 - (tick * 2);
+    setSemiTrans(poly, true);
+    setShadeTex(poly, false);
+    poly->x0 = x;
+    poly->y0 = y;
+    poly->x1 = x + cursorSize;
+    poly->y1 = y;
+    poly->x2 = x;
+    poly->y2 = y + cursorSize;
+    poly->x3 = x + cursorSize;
+    poly->y3 = y + cursorSize;
+    poly->u0 = 0;
+    poly->v0 = 0;
+    poly->u1 = 32;
+    poly->v1 = 0;
+    poly->u2 = 0;
+    poly->v2 = 32;
+    poly->u3 = 32;
+    poly->v3 = 32;
+    poly->tpage = 0x1A;
+    poly->clut = g_ClutIds[0x170];
+    func_80107250((Primitive*)poly, tick * 0x10);
+    AddPrim(&gpu_ot[OTSIZE - 1], poly);
+    g_GpuUsage.gt4++;
+}
+
+void DrawMapCursor(void) {
+    s32 x = g_Tilemap.left + (g_PlayerX >> 8);
+    s32 y = g_Tilemap.top + (g_PlayerY >> 8);
+
+    if (!g_WarpMapCursor[0]) {
+        MapCursorAt(x, y, -1);
+        return;
+    }
+    // the warp portal map: this place blinks like a radar blip, the room
+    // picked stays as a ring
+    if (g_MapCursorTimer & 0x20) {
+        MapCursorAt(x, y, -1);
+    }
+    MapCursorAt(g_WarpMapCursor[1], g_WarpMapCursor[2], 3);
+}
+#else
 void DrawMapCursor(void) {
     s32 x;
     s32 y;
@@ -1204,12 +1273,6 @@ void DrawMapCursor(void) {
 
     x = g_Tilemap.left + (g_PlayerX >> 8);
     y = g_Tilemap.top + (g_PlayerY >> 8);
-#ifdef PLATFORM_PSYZ
-    if (g_WarpMapCursor[0]) { // the warp room picked in the portal
-        x = g_WarpMapCursor[1];
-        y = g_WarpMapCursor[2];
-    }
-#endif
     x = x * 4 - 14;
     y = y * 4 - 13;
     if (g_StageId & 0x20) {
@@ -1254,6 +1317,7 @@ void DrawMapCursor(void) {
     AddPrim(&gpu_ot[OTSIZE - 1], poly);
     g_GpuUsage.gt4++;
 }
+#endif
 
 #if VERSION == VER_JP10
 bool func_800F27F4(s32 arg0) { return false; }
