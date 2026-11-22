@@ -231,8 +231,13 @@ int PortMenu_ConfirmEast(void) {
     return PortMenu_ConfirmMode() == MENU_CONFIRM_EAST;
 }
 
+int Psyz_ControllerBlocked(void); // psyz: no controller while unfocused
+
 static int GamepadDown(SDL_GamepadButton b) {
     int n = 0, i, r = 0;
+    if (Psyz_ControllerBlocked()) {
+        return 0;
+    }
     SDL_JoystickID* ids = SDL_GetGamepads(&n);
     for (i = 0; ids && i < n && !r; i++) {
         SDL_Gamepad* g = SDL_GetGamepadFromID(ids[i]);
@@ -247,6 +252,9 @@ static int GamepadDown(SDL_GamepadButton b) {
 static u16 StickDirs(void) {
     int n = 0, i, x, y;
     u16 r = 0;
+    if (Psyz_ControllerBlocked()) {
+        return 0;
+    }
     SDL_JoystickID* ids = SDL_GetGamepads(&n);
     for (i = 0; ids && i < n; i++) {
         SDL_Gamepad* g = SDL_GetGamepadFromID(ids[i]);

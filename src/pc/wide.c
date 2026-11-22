@@ -240,6 +240,7 @@ static const char ini_hd[] =
     "; music_files: 1 = music/<ID>.mp3 or .flac plays in place of the disc\n"
     "; track with that id (tools/music/ost_map.py); 0 = always the disc.\n";
 
+extern int g_BackgroundInput; // psyz sdl3_common.h
 static const struct {
     const char* key;
     int* value;
@@ -257,6 +258,7 @@ static const struct {
     {"cheat_character", &g_Cheat.character},
     {"editor", &g_EditorOn},
     {"overlay", &g_OverlayOn},
+    {"background_input", &g_BackgroundInput},
     {"fps", &g_FpsOn},
     {"fullscreen", &g_Fullscreen},
     {"room_stitch", &g_RoomStitch},
@@ -284,7 +286,9 @@ static const char ini_loading[] =
 static const char ini_overlay[] =
     "\n"
     "; overlay: 1 = a corner shows the stage, room, map cell and the cheats.\n"
-    "; fps: 1 = a corner shows the frames per second.\n";
+    "; fps: 1 = a corner shows the frames per second.\n"
+    "; background_input: 0 = no controller input while the window has no\n"
+    "; focus; 1 = the game reads them always.\n";
 
 static const char ini_spawn[] =
     "\n"
