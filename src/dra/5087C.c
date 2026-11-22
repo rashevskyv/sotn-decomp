@@ -1195,7 +1195,8 @@ extern s32 g_WarpMapCursor[3]; // src/pc/port_menu.c
 extern s32 g_WarpMapOpen[8][2]; // the open warp rooms (map cells); g_WarpMapOpenN of them
 extern s32 g_WarpMapOpenN;
 
-// A cursor at map cell (cx, cy): pulsing (fixed < 0) or of a fixed size.
+// A cursor at map cell (cx, cy): fixed -1 a big circle shrinking to a dot,
+// -2 the reverse, else a fixed size.
 static void MapCursorAt(s32 cx, s32 cy, s32 fixed) {
     s32 x;
     s32 y;
@@ -1219,6 +1220,9 @@ static void MapCursorAt(s32 cx, s32 cy, s32 fixed) {
         tick = 15 - tick;
         if (tick == 0) {
             tick = 15;
+        }
+        if (fixed == -2) { // the reverse: a dot grows to the big circle
+            tick = 15 - tick;
         }
     }
     x += tick;
@@ -1258,13 +1262,12 @@ void DrawMapCursor(void) {
         MapCursorAt(x, y, -1);
         return;
     }
-    // the warp portal map: every open room a small ring, this place a steady
-    // ring a little larger, the room picked a pulsing one
-    for (i = 0; i < g_WarpMapOpenN; i++) {
-        MapCursorAt(g_WarpMapOpen[i][0], g_WarpMapOpen[i][1], 10);
+    // the warp portal map: this place shrinks to a dot, the room picked grows
+    // from a dot (one marker when the pick is this place)
+    MapCursorAt(x, y, -1);
+    if (g_WarpMapCursor[1] != x || g_WarpMapCursor[2] != y) {
+        MapCursorAt(g_WarpMapCursor[1], g_WarpMapCursor[2], -2);
     }
-    MapCursorAt(x, y, 6);
-    MapCursorAt(g_WarpMapCursor[1], g_WarpMapCursor[2], -1);
 }
 #else
 void DrawMapCursor(void) {

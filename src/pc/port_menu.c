@@ -846,8 +846,20 @@ static void Tap(int x, int y) {
     Activate();
 }
 
+static int WarpPointer(int n, const int* x, const int* y);
+static int WarpNear(int px, int py);
+static void WarpSelect(int r);
+extern s32 g_WarpMapCursor[3];
+static int warp_click = -1; // a room tapped: PortMenu_WarpPick warps there
+static int warp_cancel;             // a right click: back out of the warp map
+static long long focus_tick = -1000; // SDL ticks (ms) of the last focus gain
+
 void PortMenu_Touch(int n, const int* x, const int* y) {
     int i, d, pd, mx, my;
+    if (WarpPointer(n, x, y)) { // the warp map: pick a room by pointer or touch
+        pt_n = 0;
+        return;
+    }
     if (!is_open) {
         pt_n = 0;
         return;
@@ -1015,6 +1027,11 @@ static void OnSdlEvent(const SDL_Event* e) {
             e->button.x * k, e->button.y * k, &mouse_x, &mouse_y);
         mouse_down = 1;
         mouse_seen = 0;
+    } else if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
+               e->button.button == SDL_BUTTON_RIGHT) {
+        warp_cancel = SDL_GetTicks() - focus_tick > 300;
+    } else if (e->type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
+        focus_tick = SDL_GetTicks(); // the click that focuses is no click
     } else if (e->type == SDL_EVENT_MOUSE_BUTTON_UP &&
                e->button.button == SDL_BUTTON_LEFT) {
         mouse_down = 0;
@@ -1330,6 +1347,10 @@ u16 PortMenu_Pad(u16 pressed) {
                     mouse_x, mouse_y, cx, cy,
                     n_owners ? Castle_StageName(owners[0]->stage) : "-",
                     n_owners ? owners[0]->room : -1);
+        }
+        if (g_WarpMapCursor[0] && !mouse_down &&
+            (mouse_x != hover_x || mouse_y != hover_y)) {
+            WarpSelect(WarpNear(mouse_x, mouse_y)); // the pointer picks
         }
         hover_x = mouse_x;
         hover_y = mouse_y;
@@ -2960,6 +2981,8 @@ int PortMenu_WarpOpen(int here) {
     int r;
     warp_inv = (g_StageId & STAGE_INVERTEDCASTLE_FLAG) != 0;
     warp_arm = 0;
+    warp_click = -1;
+    warp_cancel = 0;
     if (here < 0 || here >= WARP_COUNT()) {
         here = 0;
     }
@@ -2968,12 +2991,12 @@ int PortMenu_WarpOpen(int here) {
     warp_none = 1;
     for (r = 1; r < WARP_COUNT(); r++) {
         if (WarpOpen((here + r) % WARP_COUNT())) {
-            warp_cur = (here + r) % WARP_COUNT();
             warp_none = 0;
             break;
         }
     }
-    fprintf(stderr, "[warp] portal %d, open mask %#x, %s\n", here,
+    fprintf(stderr, "[warp] portal %d cell %d,%d, open mask %#x, %s\n", here,
+            WARP_CELL(here)[0], WARP_CELL(here)[1],
             g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS],
             warp_none ? "no other room open" : "other rooms open");
     g_api.SetFadeMode(FADE_SHOW_MAP);
@@ -3005,12 +3028,112 @@ static u32 WarpArrows(void) {
     return hit;
 }
 
+// The arrows move the cursor over the map: to the nearest room (this portal
+// room or an open one) in that direction, first among those whose main axis is
+// the arrow's, else any room on that side; none: stay.
+static void WarpMove(u32 dir) {
+    int r, best = -1, bestd = 0, pass;
+    int cx = WARP_CELL(warp_cur)[0], cy = WARP_CELL(warp_cur)[1];
+    for (pass = 0; pass < 2 && best < 0; pass++) {
+        for (r = 0; r < WARP_COUNT(); r++) {
+            int dx = WARP_CELL(r)[0] - cx, dy = WARP_CELL(r)[1] - cy;
+            int d, p, dist;
+            if (r == warp_cur || (r != warp_here && !WarpOpen(r))) {
+                continue;
+            }
+            if (dir & PAD_LEFT) {
+                d = -dx, p = dy;
+            } else if (dir & PAD_RIGHT) {
+                d = dx, p = dy;
+            } else if (dir & PAD_UP) {
+                d = -dy, p = dx;
+            } else {
+                d = dy, p = dx;
+            }
+            if (d <= 0 || (pass == 0 && abs(p) > d)) {
+                continue;
+            }
+            dist = dx * dx + dy * dy;
+            if (best < 0 || dist < bestd) {
+                best = r, bestd = dist;
+            }
+        }
+    }
+    if (best >= 0) {
+        warp_cur = best;
+        fprintf(stderr, "[warp] cursor room %d cell %d,%d\n", best,
+                WARP_CELL(best)[0], WARP_CELL(best)[1]);
+    }
+}
+
+// ---- the warp map by pointer (PC mouse, SDL touch as mouse, Switch touch) ----
+
+// the room whose map cell is nearest (pointer in frame pixels, within 12) among
+// this portal room and the open ones, or -1
+static int WarpNear(int px, int py) {
+    int r, best = -1, bd = 12 * 12 + 1;
+    for (r = 0; r < WARP_COUNT(); r++) {
+        int dx, dy;
+        if (r != warp_here && !WarpOpen(r)) {
+            continue;
+        }
+        dx = px - (WARP_CELL(r)[0] * 4 + (warp_inv ? 1 : 2));
+        dy = py - (WARP_CELL(r)[1] * 4 + (warp_inv ? -14 : 3));
+        if (dx * dx + dy * dy < bd) {
+            bd = dx * dx + dy * dy;
+            best = r;
+        }
+    }
+    return best;
+}
+
+static void WarpSelect(int r) {
+    if (r >= 0 && r != warp_cur) {
+        warp_cur = r;
+        fprintf(stderr, "[warp] cursor room %d cell %d,%d (pointer)\n", r,
+                WARP_CELL(r)[0], WARP_CELL(r)[1]);
+    }
+}
+
+// While the warp map is open the pointer is ours: touching or pressing selects
+// the nearest room, lifting warps there; the hint bar cancels. 1 = handled.
+static int WarpPointer(int n, const int* x, const int* y) {
+    static int down, blocked, lx, ly;
+    int x0, y0, x1, y1, r;
+    if (!g_WarpMapCursor[0] || g_GameEngineStep != Engine_Map) {
+        down = 0;
+        return 0;
+    }
+    if (n >= 1) {
+        if (!down) {
+            down = 1;
+            blocked = SDL_GetTicks() - focus_tick < 300;
+        }
+        lx = x[0];
+        ly = y[0];
+        if (!blocked) {
+            WarpSelect(WarpNear(lx, ly));
+        }
+    } else if (down) {
+        down = 0;
+        ViewRect(&x0, &y0, &x1, &y1);
+        if (!blocked) {
+            if (ly >= y1 - LINE_H) {
+                warp_cancel = 1;
+            } else if ((r = WarpNear(lx, ly)) >= 0 && r != warp_here) {
+                warp_click = r;
+                fprintf(stderr, "[warp] pointer pick room %d\n", r);
+            }
+        }
+    }
+    return 1;
+}
+
 // Each frame while the map is open: -1 still open, -2 backed out, else the
-// room picked (the map closes). LEFT and UP: the previous open room, RIGHT and
-// DOWN: the next one (the room of the portal is skipped).
+// room picked (the map closes). The cursor starts on this portal room.
 int PortMenu_WarpPick(int here) {
     u32 tap = g_pads[0].tapped, dir = WarpArrows();
-    int r, step = 0, res = -1;
+    int res = -1;
     int east = PortMenu_ConfirmEast();
     if (g_GameEngineStep != Engine_Map) { // START or SELECT closed it
         g_WarpMapCursor[0] = 0;
@@ -3019,19 +3142,16 @@ int PortMenu_WarpPick(int here) {
         g_Player.demo_timer = 0;
         return -2;
     }
-    if (dir & (PAD_LEFT | PAD_UP)) {
-        step = WARP_COUNT() - 1;
-    } else if (dir & (PAD_RIGHT | PAD_DOWN)) {
-        step = 1;
+    if (dir) {
+        WarpMove(dir);
     }
-    for (r = 0; step && r < WARP_COUNT(); r++) {
-        warp_cur = (warp_cur + step) % WARP_COUNT();
-        if (warp_cur != here && WarpOpen(warp_cur)) {
-            break;
-        }
-    }
-    if (tap & (east ? PAD_CIRCLE : PAD_CROSS)) {
-        if (!warp_none) {
+    if (warp_click >= 0) {
+        res = warp_click;
+        warp_click = -1;
+    } else if (warp_cancel) {
+        res = -2;
+    } else if (tap & (east ? PAD_CIRCLE : PAD_CROSS)) {
+        if (!warp_none && warp_cur != warp_here) {
             res = warp_cur;
         }
     } else if (tap & (east ? PAD_CROSS : PAD_CIRCLE)) {
@@ -3051,13 +3171,7 @@ int PortMenu_WarpPick(int here) {
         g_WarpMapCursor[0] = 1;
         g_WarpMapCursor[1] = WARP_CELL(warp_cur)[0];
         g_WarpMapCursor[2] = WARP_CELL(warp_cur)[1];
-        g_WarpMapOpenN = 0;
-        for (r = 0; r < WARP_COUNT(); r++) {
-            if (r != warp_here && r != warp_cur && WarpOpen(r)) {
-                g_WarpMapOpen[g_WarpMapOpenN][0] = WARP_CELL(r)[0];
-                g_WarpMapOpen[g_WarpMapOpenN++][1] = WARP_CELL(r)[1];
-            }
-        }
+        g_WarpMapOpenN = 0; // no marker for the other rooms
         warp_hint = 1;
     }
     return res;
