@@ -240,10 +240,14 @@ int Main(int argc, char* argv[]) {
             Psyz_HdTexAllow(64, 256, 32, 128, 4);
             // the pick-up banners of EntityLevelUpAnimation: Life, Heart,
             // Level, relic (26x24 words sampled of the 4 bpp picture)
-            Psyz_HdTexAllow(800, 256, 26, 24, 4);
-            Psyz_HdTexAllow(800, 280, 26, 24, 4);
-            Psyz_HdTexAllow(800, 304, 26, 24, 4);
-            Psyz_HdTexAllow(800, 328, 26, 24, 4);
+            {
+                int by;
+                for (by = 256; by <= 328; by += 24) {
+                    if (!Psyz_HdTexAllow(800, by, 26, 24, 4)) {
+                        fprintf(stderr, "[hd] allow table full: banner y %d\n", by);
+                    }
+                }
+            }
         }
         if (g_HdDump) {
             Psyz_HdTexDump("data/textures/dump");

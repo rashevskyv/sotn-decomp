@@ -2805,7 +2805,7 @@ endif()
 add_subdirectory(tools/psyz/psyz)
 
 # the port version: the NACP and the boot line of the log
-set(SOTN_VERSION "0.8.97")
+set(SOTN_VERSION "0.8.98")
 set_source_files_properties(src/pc/main.c PROPERTIES
     COMPILE_DEFINITIONS "SOTN_VERSION=\"${SOTN_VERSION}\"")
 
@@ -2842,7 +2842,8 @@ if(WIN32 AND SOTN_ICON AND EXISTS "${SOTN_ICON}")
     check_language(RC)
     if(CMAKE_RC_COMPILER)
         enable_language(RC)
-        file(WRITE "${CMAKE_BINARY_DIR}/sotn_icon.rc" "1 ICON \"${SOTN_ICON}\"\n")
+        file(TO_CMAKE_PATH "${SOTN_ICON}" SOTN_ICON_PATH)
+        file(WRITE "${CMAKE_BINARY_DIR}/sotn_icon.rc" "1 ICON \"${SOTN_ICON_PATH}\"\n")
         target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_BINARY_DIR}/sotn_icon.rc")
     endif()
 endif()

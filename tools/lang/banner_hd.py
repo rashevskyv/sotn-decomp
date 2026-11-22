@@ -54,7 +54,13 @@ def draw(fontpath, text, cx):
 
 
 def main():
+    if len(sys.argv) < 3:
+        print("usage: banner_hd.py <script .ttf> <textures folder> [preview.png]", file=sys.stderr)
+        sys.exit(2)
     font, root = sys.argv[1], sys.argv[2]
+    if not os.path.isfile(font):
+        print("font not found: %s" % font, file=sys.stderr)
+        sys.exit(2)
     pics = []
     for lang, col in (("en", 3), ("uk", 4)):
         os.makedirs(os.path.join(root, lang), exist_ok=True)

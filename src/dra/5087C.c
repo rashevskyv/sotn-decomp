@@ -1192,7 +1192,7 @@ void func_800F24F4(void) {
 
 #ifdef PLATFORM_PSYZ
 extern s32 g_WarpMapCursor[3]; // src/pc/port_menu.c
-extern s32 g_WarpMapOpen[8][2]; // the open warp rooms: map cells, count last
+extern s32 g_WarpMapOpen[8][2]; // the open warp rooms (map cells); g_WarpMapOpenN of them
 extern s32 g_WarpMapOpenN;
 
 // A cursor at map cell (cx, cy): pulsing (fixed < 0) or of a fixed size.

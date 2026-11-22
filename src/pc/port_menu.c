@@ -2921,6 +2921,11 @@ static int WarpOpen(int room) {
     if (room < 0 || room >= WARP_COUNT()) {
         return 0;
     }
+#ifndef ENABLE_SATURN_STAGES
+    if (!warp_inv && room == 5) { // the Saturn warp room needs its stages
+        return 0;
+    }
+#endif
     if (g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS] & (1 << room)) {
         return 1;
     }
@@ -2940,8 +2945,8 @@ static int WarpZone(int room) {
         const struct CastleRoom* r = &g_CastleRooms[i];
         int dx = cx < r->left ? r->left - cx : cx > r->right ? cx - r->right : 0;
         int dy = cy < r->top ? r->top - cy : cy > r->bottom ? cy - r->bottom : 0;
-        if (dx + dy < bd && (r->stage & 0x1F) != 0x0E &&
-            *Castle_ZoneName(r->stage) && !!(r->stage & 0x20) == !!warp_inv) {
+        if (dx + dy < bd && (r->stage & ~STAGE_INVERTEDCASTLE_FLAG) != STAGE_WRP &&
+            *Castle_ZoneName(r->stage) && !!(r->stage & STAGE_INVERTEDCASTLE_FLAG) == !!warp_inv) {
             bd = dx + dy;
             best = r->stage;
         }
@@ -2953,8 +2958,11 @@ static int WarpZone(int room) {
 // the map shows the place and a message. Always 1.
 int PortMenu_WarpOpen(int here) {
     int r;
-    warp_inv = (g_StageId & 0x20) != 0;
+    warp_inv = (g_StageId & STAGE_INVERTEDCASTLE_FLAG) != 0;
     warp_arm = 0;
+    if (here < 0 || here >= WARP_COUNT()) {
+        here = 0;
+    }
     warp_here = here;
     warp_cur = here;
     warp_none = 1;
@@ -3089,15 +3097,22 @@ static void WindowIcon(void) {
     int n = 0;
     SDL_Window** w;
     char path[1024];
+    const char* base;
     SDL_Surface* ic;
-    if (done || !(w = SDL_GetWindows(&n)) || n < 1) {
+    if (done || !(w = SDL_GetWindows(&n))) {
+        return;
+    }
+    if (n < 1) {
+        SDL_free(w);
         return;
     }
     done = 1;
-    snprintf(path, sizeof(path), "%sicon.png", SDL_GetBasePath());
-    if ((ic = SDL_LoadPNG(path))) {
-        SDL_SetWindowIcon(w[0], ic);
-        SDL_DestroySurface(ic);
+    if ((base = SDL_GetBasePath())) { // NULL on some targets: no icon
+        snprintf(path, sizeof(path), "%sicon.png", base);
+        if ((ic = SDL_LoadPNG(path))) {
+            SDL_SetWindowIcon(w[0], ic);
+            SDL_DestroySurface(ic);
+        }
     }
     SDL_free(w);
 }
