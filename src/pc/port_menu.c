@@ -2926,6 +2926,8 @@ int PortMenu_WarpPick(int here) {
     int east = PortMenu_ConfirmEast();
     if (g_GameEngineStep != Engine_Map) { // START or SELECT closed it
         g_WarpMapCursor[0] = 0;
+        g_PauseAllowed = true; // the map screen cleared it: START pauses again
+        g_Player.demo_timer = 0;
         return -2;
     }
     for (r = 0; dir && r < LEN(warp_cell); r++) {
@@ -2953,6 +2955,10 @@ int PortMenu_WarpPick(int here) {
     }
     if (res != -1) {
         g_WarpMapCursor[0] = 0;
+        if (res == -2) {
+            g_PauseAllowed = true;
+            g_Player.demo_timer = 0;
+        }
         g_api.SetFadeMode(FADE_HIDE_MAP);
         D_800974A4 = 0;
         g_GameEngineStep = Engine_Normal;

@@ -200,6 +200,9 @@ void EntityWarpRoom(Entity* self) {
         if (pick != -1) {
             self->flags &= ~FLAG_UNK_10000;
         }
+        if (pick >= LEN(WarpRoomCoords)) { // a room this build lacks
+            pick = -2;
+        }
         if (pick >= 0) {
             PickedWarpRoom = pick;
             self->step = 2;
