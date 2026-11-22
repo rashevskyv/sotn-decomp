@@ -612,6 +612,23 @@ void DrawGlyph8x8(s32 ch, s32 x, s32 y, s32 tge) {
         x, y, 8, 8, (ch & 0xF) * 8, (ch & 0xF0) / 2, 0x196, 0x1E, tge, 0x80);
 }
 
+#ifdef PLATFORM_PSYZ
+// A hint label (Select, Decide, Cancel, Yes...): the serif cells of the pause
+// menu (uk and en), as the dialogue and the shop use, instead of the 8x8 sheet.
+// The 8x8 row sits on rows 3..10 of the 8x11 cell. Without the cells (no pack)
+// the sheet stays.
+void DrawHint8x8(u8* str, s32 x, s32 y, s32 tge) {
+    str = (u8*)LANG_CELL((const char*)str);
+    for (; *str != 0xFF; str++, x += 8) {
+        if (Lang_MenuCellAny(*str)) {
+            PortMenu_Cell(x, y - 3, *str, 0xDCDCDC);
+        } else {
+            DrawGlyph8x8(*str, x, y, tge);
+        }
+    }
+}
+#endif
+
 void DrawString8x8(u8* str, s32 x, s32 y, s32 tge) {
     str = (u8*)LANG_CELL((const char*)str);
     while (true) {

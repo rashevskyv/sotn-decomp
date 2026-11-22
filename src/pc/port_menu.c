@@ -2872,7 +2872,7 @@ static struct {
     s16 x, y;
     u8 b, cell; // cell 0: mark b
     u8 r, g, bl;
-} queued[12];
+} queued[48]; // the file-select hint labels: up to 17 cells
 static int queued_count;
 
 void PortMenu_Mark(int x, int y, int b) {

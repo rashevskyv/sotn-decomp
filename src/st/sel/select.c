@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "sel.h"
+#ifdef PLATFORM_PSYZ
+void DrawHint8x8(u8* str, s32 x, s32 y, s32 tge);
+#else
+#define DrawHint8x8 DrawString8x8
+#endif
 
 extern u8* ending_sprites[];
 extern char g_AsciiSet[];
@@ -712,15 +717,15 @@ void DrawYesNo(void) {
     DrawString12x16(STR_YES, 0x30, 0xC0, 1);
     DrawString12x16(STR_NO, 0x30, 0xD0, 1);
 #else
-    DrawString8x8(STR_YES, 0x34, 0xC4, 1);
-    DrawString8x8(STR_NO, 0x34, 0xD4, 1);
+    DrawHint8x8(STR_YES, 0x34, 0xC4, 1);
+    DrawHint8x8(STR_NO, 0x34, 0xD4, 1);
 #endif
 }
 
 #if VERSION >= VER_US
 void DrawNoYes(void) {
-    DrawString8x8(STR_NO, 0x34, 0xC4, 1);
-    DrawString8x8(STR_YES, 0x34, 0xD4, 1);
+    DrawHint8x8(STR_NO, 0x34, 0xC4, 1);
+    DrawHint8x8(STR_YES, 0x34, 0xD4, 1);
 }
 #endif
 
@@ -805,7 +810,7 @@ void DrawNavigationTips(NavigationTips mode) {
         prim = prim->next;
         SetPrimRect(prim, 0x20, 0xC0, 0x10, 0x10);
         prim->drawMode = DRAW_DEFAULT;
-        DrawString8x8(STR_CONFIRM, 0x34, 0xC4, 1);
+        DrawHint8x8(STR_CONFIRM, 0x34, 0xC4, 1);
         break;
 
     case Tips_MenuNavigation:
@@ -828,8 +833,8 @@ void func_801AD490(void) {
     DrawString12x16(STR_SELECT, 0x30, 0xB8, 1);
     DrawString12x16(STR_DECIDE, 0x30, 0xC8, 1);
 #else
-    DrawString8x8(STR_SELECT, 0x34, 0xBC, 1);
-    DrawString8x8(STR_DECIDE, 0x34, 0xCC, 1);
+    DrawHint8x8(STR_SELECT, 0x34, 0xBC, 1);
+    DrawHint8x8(STR_DECIDE, 0x34, 0xCC, 1);
 #endif
     DrawString16x16("select", 0xF0, 0x20, 1);
     DrawString16x16("your", 0x100, 0x30, 1);
@@ -985,7 +990,7 @@ void func_801AD78C(void) {
 #else
     DrawString8x8(STR_SELECT, 0x134, 0x24, 1);
     DrawString8x8(STR_INPUT, 0x134, 0x34, 1);
-    DrawString8x8(LANG_NAME_DELETE(STR_CANCEL), 0x134, 0x44, 1);
+    DrawString8x8((u8*)LANG_NAME_DELETE(STR_CANCEL), 0x134, 0x44, 1);
     DrawString8x8(STR_DECIDE, 0x134, 0x54, 1);
 #endif
     DrawString16x16("a b c d e f g h", 0x48, 0x70, 1);
@@ -1179,9 +1184,9 @@ void func_801ADF94(s32 flags, s32 yOffset) {
         DrawString12x16(STR_DECIDE, 0x30, 0xC0, 1);
         DrawString12x16(STR_CANCEL, 0x30, 0xD0, 1);
 #else
-        DrawString8x8(STR_SELECT, 0x34, 0xB4, 1);
-        DrawString8x8(STR_DECIDE, 0x34, 0xC4, 1);
-        DrawString8x8(STR_CANCEL, 0x34, 0xD4, 1);
+        DrawHint8x8(STR_SELECT, 0x34, 0xB4, 1);
+        DrawHint8x8(STR_DECIDE, 0x34, 0xC4, 1);
+        DrawHint8x8(STR_CANCEL, 0x34, 0xD4, 1);
 #endif
     }
 
