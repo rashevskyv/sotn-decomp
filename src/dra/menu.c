@@ -3073,11 +3073,12 @@ void func_800F98AC(const char* str, u32 y) {
 static s32 g_SaveBoxSerif;
 static u8 g_SerifGlyph[16 * 6];
 static u8* SerifGlyph(s32 sj) {
-    const u8* cell;
+    const u8* cell = NULL;
     s32 c = Lang_SjisCell(sj);
     s32 y, i, ink = 0;
 
-    if (c < 0 || (c && !(cell = Lang_MenuCellAny(c)))) {
+    // < and > are the port menu's cells, as in Lang_DialogueGlyph
+    if (sj == '<' || sj == '>' || c < 0 || (c && !(cell = Lang_MenuCellAny(c)))) {
         return NULL;
     }
     memset(g_SerifGlyph, 0, sizeof(g_SerifGlyph));

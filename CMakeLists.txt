@@ -2887,6 +2887,7 @@ file(GLOB SOTN_CASTLE_ROOMS CONFIGURE_DEPENDS
 set(SOTN_CASTLE_SATURN "")
 if(ENABLE_SATURN_STAGES)
     set(SOTN_CASTLE_SATURN "${CMAKE_SOURCE_DIR}/disks/saturn")
+    list(APPEND SOTN_CASTLE_ROOMS "${CMAKE_SOURCE_DIR}/disks/saturn/SUB_DISP.MAP")
 endif()
 add_custom_command(
     OUTPUT "${SOTN_GEN_DIR}/castle_data.c"

@@ -90,10 +90,12 @@ def map_marks(fmap):
 
 # The Saturn castle map (SUB_DISP.MAP, 320x240 texels 4bpp, high nibble
 # first): a cell is 5x4 texels, colour 1 a room, 4 a save room, 6 a teleporter.
-# F_MAP.BIN is the same map with 4x4 texels a cell: Saturn columns 1, 0, 3, 4
-# become its columns 0..3, and the teleporter colour is 5. The cells only the
+# F_MAP.BIN is the same map with 4x4 texels a cell: Saturn columns 0, 2, 3, 4
+# become its columns 0..3 (column 0 is the left wall, as in F_MAP.BIN; over
+# the cells of both maps this leaves 13 of 15000 texels apart), and the
+# teleporter colour is 5. The cells only the
 # Saturn has (the Garden and the Prison) are added to F_MAP.BIN's.
-SATURN_MAP_COLUMNS = (1, 0, 3, 4)
+SATURN_MAP_COLUMNS = (0, 2, 3, 4)
 SATURN_MAP_COLOUR = {0: 0, 1: 1, 4: 4, 6: 5}
 
 
@@ -176,7 +178,6 @@ def main():
     sat_cells = []
     if os.path.exists(fmap_path):
         fmap = bytearray(open(fmap_path, "rb").read())
-        marks += map_marks(fmap)
         sub_disp = os.path.join(saturn_dir or "", "SUB_DISP.MAP")
         if saturn_dir and os.path.exists(sub_disp):
             sat_bytes = open(sub_disp, "rb").read()
@@ -187,8 +188,9 @@ def main():
             sat_cells = saturn_map_cells(sat_bytes, fmap)
             for cx, cy, tex in sat_cells:  # the marks of the new cells too
                 for j in range(4):
-                    fmap[(cy * 4 + j) * 128 + cx * 2:][:2] = tex[j * 2:j * 2 + 2]
-            marks = boss_marks(assets) + map_marks(fmap)
+                    o = (cy * 4 + j) * 128 + cx * 2
+                    fmap[o:o + 2] = tex[j * 2:j * 2 + 2]
+        marks += map_marks(fmap)
     # check: each yellow map cell is a room of WRP (normal) or RWRP (turned);
     # the Saturn's own teleporter (a room of its WARP.PRG) has none
     own = {(0, cx, cy) for cx, cy, _ in sat_cells} | {(0x20, 63 - cx, 63 - cy) for cx, cy, _ in sat_cells}
