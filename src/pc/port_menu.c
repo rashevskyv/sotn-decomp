@@ -1029,7 +1029,8 @@ static void OnSdlEvent(const SDL_Event* e) {
         mouse_seen = 0;
     } else if (e->type == SDL_EVENT_MOUSE_BUTTON_DOWN &&
                e->button.button == SDL_BUTTON_RIGHT) {
-        warp_cancel = SDL_GetTicks() - focus_tick > 300;
+        warp_cancel = g_WarpMapCursor[0] && !is_open &&
+                      SDL_GetTicks() - focus_tick > 300;
     } else if (e->type == SDL_EVENT_WINDOW_FOCUS_GAINED) {
         focus_tick = SDL_GetTicks(); // the click that focuses is no click
     } else if (e->type == SDL_EVENT_MOUSE_BUTTON_UP &&
@@ -1348,7 +1349,7 @@ u16 PortMenu_Pad(u16 pressed) {
                     n_owners ? Castle_StageName(owners[0]->stage) : "-",
                     n_owners ? owners[0]->room : -1);
         }
-        if (g_WarpMapCursor[0] && !mouse_down &&
+        if (g_WarpMapCursor[0] && !is_open && !mouse_down &&
             (mouse_x != hover_x || mouse_y != hover_y)) {
             WarpSelect(WarpNear(mouse_x, mouse_y)); // the pointer picks
         }
@@ -2914,8 +2915,6 @@ static void DrawOverlay(void) {
 // PortMenu_Cell), drawn once and forgotten.
 int g_WarpMapPick = 1; // warp_map: the portal picks the room on the map
 s32 g_WarpMapCursor[3];
-s32 g_WarpMapOpen[8][2]; // the open warp rooms (map cells) for DrawMapCursor
-s32 g_WarpMapOpenN;
 static int warp_here; // the room of the portal
 static int warp_none; // no other room is open
 static int warp_hint;
@@ -2975,8 +2974,8 @@ static int WarpZone(int room) {
     return best;
 }
 
-// Opens the map on the next open room after here; with no other open room
-// the map shows the place and a message. Always 1.
+// Opens the map with the cursor on this portal room; warp_none is set when no
+// other room is open (the map then shows the place and a message). Always 1.
 int PortMenu_WarpOpen(int here) {
     int r;
     warp_inv = (g_StageId & STAGE_INVERTEDCASTLE_FLAG) != 0;
@@ -3100,7 +3099,7 @@ static void WarpSelect(int r) {
 static int WarpPointer(int n, const int* x, const int* y) {
     static int down, blocked, lx, ly;
     int x0, y0, x1, y1, r;
-    if (!g_WarpMapCursor[0] || g_GameEngineStep != Engine_Map) {
+    if (!g_WarpMapCursor[0] || g_GameEngineStep != Engine_Map || is_open) {
         down = 0;
         return 0;
     }
@@ -3137,7 +3136,6 @@ int PortMenu_WarpPick(int here) {
     int east = PortMenu_ConfirmEast();
     if (g_GameEngineStep != Engine_Map) { // START or SELECT closed it
         g_WarpMapCursor[0] = 0;
-        g_WarpMapOpenN = 0;
         g_PauseAllowed = true; // the map screen cleared it: START pauses again
         g_Player.demo_timer = 0;
         return -2;
@@ -3159,7 +3157,6 @@ int PortMenu_WarpPick(int here) {
     }
     if (res != -1) {
         g_WarpMapCursor[0] = 0;
-        g_WarpMapOpenN = 0;
         if (res == -2) {
             g_PauseAllowed = true;
             g_Player.demo_timer = 0;
@@ -3171,7 +3168,6 @@ int PortMenu_WarpPick(int here) {
         g_WarpMapCursor[0] = 1;
         g_WarpMapCursor[1] = WARP_CELL(warp_cur)[0];
         g_WarpMapCursor[2] = WARP_CELL(warp_cur)[1];
-        g_WarpMapOpenN = 0; // no marker for the other rooms
         warp_hint = 1;
     }
     return res;

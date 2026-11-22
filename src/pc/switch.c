@@ -73,7 +73,9 @@ void Switch_OnFrame(void) {
     // touch for the port menu map (switch_nx.c reads libnx)
     int SwitchNx_Touches(float* x, float* y, int max);
     float tx[2], ty[2];
-    int x[2], y[2], n = PortMenu_IsOpen() ? SwitchNx_Touches(tx, ty, 2) : 0;
+    extern s32 g_WarpMapCursor[3]; // the warp map takes touch too
+    int x[2], y[2], n = (PortMenu_IsOpen() || g_WarpMapCursor[0])
+                            ? SwitchNx_Touches(tx, ty, 2) : 0;
     PsyzSize d = Psyz_VideoGetDisplaySize();
     for (int i = 0; i < n; i++) {
         // touch is 1280x720 screen pixels; the display may differ

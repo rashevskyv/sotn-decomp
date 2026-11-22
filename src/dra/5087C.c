@@ -1192,8 +1192,6 @@ void func_800F24F4(void) {
 
 #ifdef PLATFORM_PSYZ
 extern s32 g_WarpMapCursor[3]; // src/pc/port_menu.c
-extern s32 g_WarpMapOpen[8][2]; // the open warp rooms (map cells); g_WarpMapOpenN of them
-extern s32 g_WarpMapOpenN;
 
 // A cursor at map cell (cx, cy): fixed -1 a big circle shrinking to a dot,
 // -2 the reverse, else a fixed size.
@@ -1248,13 +1246,18 @@ static void MapCursorAt(s32 cx, s32 cy, s32 fixed) {
     poly->v3 = 32;
     poly->tpage = 0x1A;
     poly->clut = g_ClutIds[0x170];
-    func_80107250((Primitive*)poly, tick * 0x10);
+    {
+        s32 bright = tick * 0x10;
+        if (fixed == -2 && bright < 0x90) { // the picked room stays visible
+            bright = 0x90;
+        }
+        func_80107250((Primitive*)poly, bright);
+    }
     AddPrim(&gpu_ot[OTSIZE - 1], poly);
     g_GpuUsage.gt4++;
 }
 
 void DrawMapCursor(void) {
-    s32 i;
     s32 x = g_Tilemap.left + (g_PlayerX >> 8);
     s32 y = g_Tilemap.top + (g_PlayerY >> 8);
 
