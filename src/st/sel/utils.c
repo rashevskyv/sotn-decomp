@@ -617,11 +617,20 @@ void DrawGlyph8x8(s32 ch, s32 x, s32 y, s32 tge) {
 // menu (uk and en), as the dialogue and the shop use, instead of the 8x8 sheet.
 // The 8x8 row sits on rows 3..10 of the 8x11 cell. Without the cells (no pack)
 // the sheet stays.
+extern s32 MainMenuMaskPrimIndex;
 void DrawHint8x8(u8* str, s32 x, s32 y, s32 tge) {
+    // the serif cells sit above the black fade mask (OT 0x1FD): dim them by
+    // the mask, as the stock glyphs (OT 0x20) are dimmed
+    Primitive* m = &g_PrimBuf[MainMenuMaskPrimIndex];
+    s32 v = 0xDC;
+    if (m->type == PRIM_TILE && m->priority == 0x1FD &&
+        !(m->drawMode & DRAW_HIDE)) {
+        v = v * (0xFF - m->r0) / 0xFF;
+    }
     str = (u8*)LANG_CELL((const char*)str);
     for (; *str != 0xFF; str++, x += 8) {
         if (Lang_MenuCellAny(*str)) {
-            PortMenu_Cell(x, y - 3, *str, 0xDCDCDC);
+            PortMenu_Cell(x, y - 3, *str, v * 0x010101);
         } else {
             DrawGlyph8x8(*str, x, y, tge);
         }

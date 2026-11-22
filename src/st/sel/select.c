@@ -24,7 +24,11 @@ static s32 D_801BAF10;
 static s32 D_801BAF14;
 static s32 D_801BAF18[NUM_GFX][2];
 static s32 D_801BAFC0;
+#ifdef PLATFORM_PSYZ
+s32 MainMenuMaskPrimIndex; // DrawHint8x8 (utils.c) reads the fade mask
+#else
 static s32 MainMenuMaskPrimIndex;
+#endif
 static s32 g_SelNextCrossPressEngStep;
 static s32 g_SelEng220NextStep;
 #ifdef PLATFORM_PSYZ
