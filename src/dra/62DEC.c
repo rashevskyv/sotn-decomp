@@ -237,7 +237,11 @@ static s32 HandleSaveMenu(s32 arg0) {
 #define V62P46 62
 #define V144P184 144
 #define V56P40 56
+#ifdef PLATFORM_PSYZ
+#define V24P36 36
+#else
 #define V24P36 24
+#endif
 #endif
     u8 temp_t0;
 
@@ -273,10 +277,10 @@ static s32 HandleSaveMenu(s32 arg0) {
             }
             if (D_80137E4C == 7) {
 #if IS_VER_INTL
-                func_800F9D88("Memory Card", 0, 1);
-                func_800F9D88("  not found．", 1, 0);
+                func_800F9D88(LANG_SJIS("Memory Card"), 0, 1);
+                func_800F9D88(LANG_SJIS("  not found．"), 1, 0);
 #elif VERSION == VER_USPROTO
-                func_800F9D88("Memory Card", 0, 1);
+                func_800F9D88(LANG_SJIS("Memory Card"), 0, 1);
                 func_800F9D88("not detected．", 1, 0);
 #elif TARGET != TARGET_PSP
                 func_800F9D40("メモリーカードが　　", 0, 1);
@@ -289,8 +293,8 @@ static s32 HandleSaveMenu(s32 arg0) {
             }
             if (D_80137E4C == 8) {
 #if REGION != REGION_JP
-                func_800F9D88("Memory Card", 0, 1);
-                func_800F9D88("is Defective．", 1, 0);
+                func_800F9D88(LANG_SJIS("Memory Card"), 0, 1);
+                func_800F9D88(LANG_SJIS("is Defective．"), 1, 0);
 #elif TARGET != TARGET_PSP
                 func_800F9D40("メモリーカードが　　", 0, 1);
                 func_800F9D40("　壊れています　　　", 1, 0);
@@ -302,8 +306,8 @@ static s32 HandleSaveMenu(s32 arg0) {
             }
             if (D_80137E4C == 9) {
 #if REGION != REGION_JP
-                func_800F9D88("Memory Card is", 0, 1);
-                func_800F9D88("not formatted．", 1, 0);
+                func_800F9D88(LANG_SJIS("Memory Card is"), 0, 1);
+                func_800F9D88(LANG_SJIS("not formatted．"), 1, 0);
 #elif TARGET != TARGET_PSP
                 func_800F9D40("　メモリーカードが　", 0, 1);
                 func_800F9D40("初期化されていません", 1, 0);
@@ -316,8 +320,8 @@ static s32 HandleSaveMenu(s32 arg0) {
             if (D_80137E4C == 10) {
                 if (D_80137E54 == 2) {
 #if IS_VER_INTL
-                    func_800F9D88("Cannot", 0, 1);
-                    func_800F9D88("overwrite file．", 1, 0);
+                    func_800F9D88(LANG_SJIS("Cannot"), 0, 1);
+                    func_800F9D88(LANG_SJIS("overwrite file．"), 1, 0);
 #elif VERSION == VER_USPROTO
                     func_800F9D88("Cannot", 0, 1);
                     func_800F9D88("overwrite．", 1, 0);
@@ -330,8 +334,8 @@ static s32 HandleSaveMenu(s32 arg0) {
 #endif
                 } else if (D_80137E54 == 3) {
 #if IS_VER_INTL
-                    func_800F9D88("No game", 0, 1);
-                    func_800F9D88("data found．", 1, 0);
+                    func_800F9D88(LANG_SJIS("No game"), 0, 1);
+                    func_800F9D88(LANG_SJIS("data found．"), 1, 0);
 #elif VERSION == VER_USPROTO
                     func_800F9D88("Cannot", 0, 1);
                     func_800F9D88("overwrite．", 1, 0);
@@ -344,8 +348,8 @@ static s32 HandleSaveMenu(s32 arg0) {
 #endif
                 } else {
 #if IS_VER_INTL
-                    func_800F9D88("   ０ memory", 0, 1);
-                    func_800F9D88("blocks available．", 1, 0);
+                    func_800F9D88(LANG_SJIS("   ０ memory"), 0, 1);
+                    func_800F9D88(LANG_SJIS("blocks available．"), 1, 0);
 #elif VERSION == VER_USPROTO
                     func_800F9D88("No block", 0, 1);
                     func_800F9D88("available．", 1, 0);
@@ -361,8 +365,8 @@ static s32 HandleSaveMenu(s32 arg0) {
             }
             if (D_80137E4C == 11) {
 #if IS_VER_INTL
-                func_800F9D88("  Memory card", 0, 1);
-                func_800F9D88("  format error．", 1, 0);
+                func_800F9D88(LANG_SJIS("  Memory card"), 0, 1);
+                func_800F9D88(LANG_SJIS("  format error．"), 1, 0);
 #elif VERSION == VER_USPROTO
                 func_800F9D88("Failed", 0, 1);
                 func_800F9D88("to format．", 1, 0);
@@ -523,7 +527,7 @@ static s32 HandleSaveMenu(s32 arg0) {
         prim2->p1 += 2;
         if (arg0 == 2) {
 #if IS_VER_INTL
-            func_800F9D88(" Wish to format？", 0, 1);
+            func_800F9D88(LANG_SJIS(" Wish to format？"), 0, 1);
 #elif VERSION == VER_USPROTO
             func_800F9D88("Format？", 0, 1);
 #elif TARGET != TARGET_PSP
@@ -535,7 +539,7 @@ static s32 HandleSaveMenu(s32 arg0) {
         }
         if (arg0 == 3) {
 #if IS_VER_INTL
-            func_800F9D88(" Overwrite data？", 0, 1);
+            func_800F9D88(LANG_SJIS(" Overwrite data？"), 0, 1);
 #elif VERSION == VER_USPROTO
             func_800F9D88("Overwrite？", 0, 1);
 #elif TARGET != TARGET_PSP
@@ -547,7 +551,7 @@ static s32 HandleSaveMenu(s32 arg0) {
         }
         if (arg0 == 4) {
 #if IS_VER_INTL
-            func_800F9D88("   Wish to save？", 0, 1);
+            func_800F9D88(LANG_SJIS("   Wish to save？"), 0, 1);
 #elif VERSION == VER_USPROTO
             func_800F9D88("    Save？", 0, 1);
 #elif TARGET != TARGET_PSP
@@ -558,8 +562,8 @@ static s32 HandleSaveMenu(s32 arg0) {
             D_80137E6C = false;
         }
 #if IS_VER_INTL
-        func_800F9D88("Yes ", 1, 0);
-        func_800F9D88("  No  ", 2, 0);
+        func_800F9D88(LANG_SJIS("Yes "), 1, 0);
+        func_800F9D88(LANG_SJIS("  No  "), 2, 0);
 #elif VERSION == VER_USPROTO
         func_800F9D88("Yes ", 1, 0);
         func_800F9D88(" No  ", 2, 0);

@@ -28,5 +28,25 @@
     "Wight": "Мрець",
     "Wraith": "Примара",
     "Skeleton Guardian": "Скелет-вартовий"
+  },
+  "OTHER_SJIS": {
+    " Wish to format？": "Форматувати？",
+    " Overwrite data？": "Замінити дані？",
+    "   Wish to save？": "Зберегти гру？",
+    "Yes ": "Так ",
+    "  No  ": "Ні",
+    "Memory Card": "Картка",
+    "  not found．": "не знайдена．",
+    "is Defective．": "пошкоджена．",
+    "Memory Card is": "Картка не",
+    "not formatted．": "форматована．",
+    "Cannot": "Не можна",
+    "overwrite file．": "замінити файл．",
+    "No game": "Немає",
+    "data found．": "даних гри．",
+    "   ０ memory": "０ блоків",
+    "blocks available．": "вільних．",
+    "  Memory card": "Помилка",
+    "  format error．": "форматування．"
   }
 }
