@@ -892,7 +892,7 @@ void EntityWarpRoom(Entity* self) {
                        (((rsin(angle) >> 4) * SATURN_WARP_PAD_RADIUS) >> 8);
             prim->x2 = prim->x3 = self->posX.i.hi;
             prim->y2 = prim->y3 = self->posY.i.hi;
-            prim->priority = 0x50;
+            prim->priority = 0x30; // behind the layers of the room (0x40, 0xA0), above the backdrop (0x20)
             prim->drawMode = DRAW_TRANSP;
             prim = prim->next;
         }
