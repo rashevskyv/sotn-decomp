@@ -1759,7 +1759,7 @@ static void MenuDrawStatusPage(MenuContext* ctx) {
         MenuDrawInt(g_Status.statsBase[i], v ? 194 : 218, y, ctx);
         if (v != 0) {
             MENU_TINT(v > 0 ? TINT_BONUS_UP : TINT_BONUS_DOWN);
-            MenuDrawChar(STAT_SIGN(v > 0), 202, y, ctx);
+            MenuDrawChar(STAT_SIGN(v > 0), 201, y, ctx);
             MenuDrawInt(v > 0 ? v : -v, 218, y, ctx);
             MENU_TINT(0);
         }
@@ -1986,11 +1986,11 @@ void MenuDrawStats(s32 menuDialogue) {
             // port: the bonus is an arrow and a number, blue up, red down
             if (g_Status.statsEquip[i] > 0) {
                 MENU_TINT(TINT_BONUS_UP);
-                MenuDrawChar(STAT_SIGN(1), x + 52, y + i * 12, ctx);
+                MenuDrawChar(STAT_SIGN(1), x + 51, y + i * 12, ctx);
                 phi_a0_5 = g_Status.statsEquip[i];
             } else {
                 MENU_TINT(TINT_BONUS_DOWN);
-                MenuDrawChar(STAT_SIGN(0), x + 52, y + i * 12, ctx);
+                MenuDrawChar(STAT_SIGN(0), x + 51, y + i * 12, ctx);
                 phi_a0_5 = -g_Status.statsEquip[i];
             }
             MenuDrawInt(phi_a0_5, x + 68, y + i * 12, ctx);
