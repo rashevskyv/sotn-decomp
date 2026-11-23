@@ -18,7 +18,7 @@
 //   POST /save?slot=                  write the save (as the save coffin)
 //   POST /gain?exp=  or  ?t=&a=       tests: set the experience, or a pick-up
 //                                     (t 0x8000 life, 0x4000 heart, 0x2000 relic)
-//   POST /stick?x=&y=                 tests: a virtual pad, left stick -32768..32767
+//   POST /stick?x=&y=&rx=&ry=         tests: a virtual pad, left and right stick -32768..32767
 //   GET  /vram?x=&y=&w=&h=            tests: the 16 bit words of a VRAM rect
 //
 // No password: anyone on the network can use it while it is on. All work
@@ -501,7 +501,7 @@ static void Handle(int fd) {
         State();
         ReplyOut(fd, 200, "application/json");
     } else if (!strcmp(path, "/stick") && !strcmp(method, "POST")) {
-        // tests: a virtual gamepad; its left stick x, y (-32768..32767)
+        // tests: a virtual gamepad; its left stick x, y, right stick rx, ry
         static SDL_Joystick* vj;
         if (!vj) {
             SDL_VirtualJoystickDesc d;
@@ -519,6 +519,10 @@ static void Handle(int fd) {
                                        Arg(query, "x", 0));
             SDL_SetJoystickVirtualAxis(vj, SDL_GAMEPAD_AXIS_LEFTY,
                                        Arg(query, "y", 0));
+            SDL_SetJoystickVirtualAxis(vj, SDL_GAMEPAD_AXIS_RIGHTX,
+                                       Arg(query, "rx", 0));
+            SDL_SetJoystickVirtualAxis(vj, SDL_GAMEPAD_AXIS_RIGHTY,
+                                       Arg(query, "ry", 0));
         }
         State();
         ReplyOut(fd, code, "application/json");

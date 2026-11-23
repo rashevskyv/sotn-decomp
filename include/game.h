@@ -1002,6 +1002,12 @@ void Wide_Tile(TILE* tile);
 void Hud_GetPrims(s32* index1, s32* index2);
 // Port menu (src/pc/port_menu.c): L3+R3 opens it.
 u16 PortMenu_Pad(u16 pressed);
+// The right stick of the pad whose stick is out the most, -32768..32767
+// (SDL: up and left < 0); 0, 0 while the controller is blocked.
+void PortMenu_RightStick(int* x, int* y);
+// sotn.ini (src/pc/wide.c): stick_dpad = 0|1, stick_dead = percent,
+// look_stick_range_px = game px (0 = off), look_stick_dead = percent
+extern int g_StickDpad, g_StickDead, g_LookRange, g_LookDead;
 void Wide_LoadIni(const char* path);
 // scale = max: always the highest scale the output allows
 #define WIDE_SCALE_MAX 99

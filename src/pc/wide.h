@@ -112,4 +112,65 @@ static inline int Wide_InPsxSpawnWindow(int sx, int sy) {
     return sx >= -0x40 && sx <= 0x140 && sy >= -0x40 && sy <= 0x120;
 }
 
+// The left stick as a D-pad, 8 directions of 45 degrees each. The stick is
+// on past dead (of 32767); an axis gives its direction when it holds at
+// least sin 22.5 deg (0.38) of the stick length, so walking with the stick a
+// little low does not crouch. held = the bits of the last frame: a held
+// stick stays on down to 3/4 of dead and a held direction down to 0.30 of
+// the length, so a stick on a sector edge does not flicker.
+enum { WIDE_STICK_L = 1, WIDE_STICK_R = 2, WIDE_STICK_U = 4, WIDE_STICK_D = 8 };
+static inline int Wide_StickDirs(int x, int y, int dead, int held) {
+    long long xx = (long long)x * x, yy = (long long)y * y, m2 = xx + yy;
+    long long on = held ? dead - dead / 4 : dead;
+    int r = 0;
+
+    if (m2 <= on * on) {
+        return 0;
+    }
+    if (xx * 1000 >=
+        (held & (WIDE_STICK_L | WIDE_STICK_R) ? 90 : 147) * m2) {
+        r |= x < 0 ? WIDE_STICK_L : WIDE_STICK_R;
+    }
+    if (yy * 1000 >=
+        (held & (WIDE_STICK_U | WIDE_STICK_D) ? 90 : 147) * m2) {
+        r |= y < 0 ? WIDE_STICK_U : WIDE_STICK_D;
+    }
+    return r;
+}
+
+// The right stick look: one frame of the view offset cur (game px) on one
+// axis. The target is the axis past dead, scaled to 0..range px; the offset
+// moves 1/8 of the way there a frame (at least 1 px), so a released stick
+// eases the view back to 0.
+static inline int Wide_LookStep(int cur, int axis, int dead, int range) {
+    int a = axis < 0 ? -axis : axis, t = 0, d, step;
+
+    a = a > 32767 ? 32767 : a;
+    if (a > dead && dead < 32767) {
+        t = (int)((long long)(a - dead) * range / (32767 - dead));
+    }
+    t = axis < 0 ? -t : t;
+    d = t - cur;
+    step = d / 8;
+    if (!step && d) {
+        step = d > 0 ? 1 : -1;
+    }
+    return cur + step;
+}
+
+// The scroll with the look: base + look, limited so the player p (world,
+// the same axis) stays a..b px from the scroll on the screen. The look never
+// moves the player further out than the base scroll does.
+static inline int Wide_LookClamp(int base, int look, int p, int a, int b) {
+    int s = base + look;
+
+    if (look > 0 && s > p - a) {
+        s = p - a > base ? p - a : base;
+    }
+    if (look < 0 && s < p - b) {
+        s = p - b < base ? p - b : base;
+    }
+    return s;
+}
+
 #endif

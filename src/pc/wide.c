@@ -128,7 +128,10 @@ static const char ini_cheats[] =
     "; 1 = Alucard; 2 = Richter; 4 = Maria (PSP). 3 (Richter, Saturn)\n"
     "; and 5 (Maria, Saturn) are kept for later. A save keeps its own owner.\n";
 
-int g_StickDpad = 1; // stick_dpad in sotn.ini
+int g_StickDpad = 1;  // stick_dpad in sotn.ini
+int g_StickDead = 35;  // stick_dead: percent of the left stick
+int g_LookRange = 48;  // look_stick_range_px: about the player height
+int g_LookDead = 20;   // look_stick_dead: percent of the right stick
 static const char ini_buttons[] =
     "\n"
     "; buttons: the button marks of the menus: auto = as the gamepad in use\n"
@@ -333,9 +336,17 @@ void Wide_SaveIni(void) {
     fprintf(f, "buttons = %s\n",
             g_ButtonPick < 0 ? "auto" : g_ButtonSetNames[g_ButtonPick]);
     fprintf(f, "menu_confirm = %s\n", g_MenuConfirmNames[g_MenuConfirm]);
-    fprintf(f, "; stick_dpad: 1 = the left stick also works as the D-pad in the\n");
-    fprintf(f, "; menus and the warp map (0 = off)\n");
+    fprintf(f, "; stick_dpad: 1 = the left stick also works as the D-pad, in the\n");
+    fprintf(f, "; game and in the menus (0 = off). 8 directions.\n");
     fprintf(f, "stick_dpad = %d\n", g_StickDpad);
+    fprintf(f, "; stick_dead: the left stick dead zone, percent (5..90)\n");
+    fprintf(f, "stick_dead = %d\n", g_StickDead);
+    fprintf(f, "; look_stick_range_px: the right stick moves the view up to this\n");
+    fprintf(f, "; many game pixels up, down, left and right (0 = off; 48 is about\n");
+    fprintf(f, "; the player height). The view goes back when the stick is free.\n");
+    fprintf(f, "look_stick_range_px = %d\n", g_LookRange);
+    fprintf(f, "; look_stick_dead: the right stick dead zone, percent (5..90)\n");
+    fprintf(f, "look_stick_dead = %d\n", g_LookDead);
     fputs(ini_controls, f);
     for (i = 0; i < 2 * PSYZ_PAD_BUTTONS; i++) {
         fprintf(f, "%s_%s = %s\n", input_dev[i & 1], ps_buttons[i >> 1],
@@ -385,6 +396,8 @@ void Wide_SaveIni(void) {
 // show_loading_text = 0|1 (1).
 // aspect = auto|4:3|16:10|16:9|21:9|2.39:1|32:9 (auto),
 // menu_confirm = auto|east|south (auto; right, bottom: the 0.8.68 names).
+// stick_dpad = 0|1 (1), stick_dead = 5..90 (35), look_stick_range_px =
+// 0..120 (48), look_stick_dead = 5..90 (20).
 // A missing key keeps its default (cheats, editor, overlay and fps off).
 void Wide_LoadIni(const char* path) {
     int scale = 5, v, i; // docked 5, handheld 3 (ScaleRange)
@@ -414,6 +427,12 @@ void Wide_LoadIni(const char* path) {
                                         MENU_CONFIRM_AUTO);
             } else if (sscanf(line, " stick_dpad = %d", &v) == 1) {
                 g_StickDpad = v != 0;
+            } else if (sscanf(line, " stick_dead = %d", &v) == 1) {
+                g_StickDead = v < 5 ? 5 : v > 90 ? 90 : v;
+            } else if (sscanf(line, " look_stick_range_px = %d", &v) == 1) {
+                g_LookRange = v < 0 ? 0 : v > 120 ? 120 : v;
+            } else if (sscanf(line, " look_stick_dead = %d", &v) == 1) {
+                g_LookDead = v < 5 ? 5 : v > 90 ? 90 : v;
             } else if (sscanf(line, " voice = %15s", word) == 1) {
                 for (v = 0; v < VOICE_COUNT; v++) {
                     if (!strcmp(word, g_VoiceSetNames[v])) {

@@ -346,6 +346,10 @@ s32 SetNextRoomToLoad(u32 x, u32 y) {
 // range widened so the whole view stays inside the room. A room smaller than
 // the view is centred. The player screen position is always derived from the
 // world position, because the scroll is no longer page aligned at room load.
+// The right stick moves the view up to look_stick_range_px (look_x, look_y):
+// the follow keeps its own base scroll, the look is added and clamped to the
+// room. Only the camera moves: world positions and collisions stay, but the
+// camera-bound spawn window moves with the view, as when the player walks.
 static void WideCamera(void) {
     // the range of the last frame and its room: a range that collapses to
     // its centre inside the same room (a script or a lock narrows the
@@ -353,6 +357,9 @@ static void WideCamera(void) {
     // instead of one jump. A room load snaps, and so does a lock in the
     // first half second of a room (an entry lock).
     static s32 last_lo, last_hi, last_room = -1, age, ease;
+    // the look offset, its frame (one step a frame: this runs more than once
+    // in some frames) and the part of it in the vertical scroll now
+    static s32 look_x, look_y, look_frame = -1, put_y;
     s32 lo, hi, scroll, room;
 
     Wide_ScrollRange(g_Tilemap.x, g_Tilemap.width, 256, g_WideX, 0, 256, &lo,
@@ -373,6 +380,18 @@ static void WideCamera(void) {
     last_room = room;
     last_lo = lo;
     last_hi = hi;
+    if (age == 0) { // a room load: the view starts at the player
+        look_x = look_y = put_y = 0;
+    } else if (look_frame != g_GameTimer) {
+        int rx, ry, dead = g_LookDead * 32767 / 100;
+        look_frame = g_GameTimer;
+        PortMenu_RightStick(&rx, &ry);
+        if (g_CutsceneHasControl || g_DemoMode != Demo_None) {
+            rx = ry = 0; // eases back
+        }
+        look_x = Wide_LookStep(look_x, rx, dead, g_LookRange);
+        look_y = Wide_LookStep(look_y, ry, dead, g_LookRange);
+    }
     if (ease) {
         s32 cur = g_Tilemap.scrollX.i.hi;
         if (scroll > cur + 2) {
@@ -383,13 +402,24 @@ static void WideCamera(void) {
             ease = 0;
         }
     }
+    if (!ease) { // the player stays 32 px inside the view
+        scroll = Wide_LookClamp(scroll, (CLAMP(scroll + look_x, lo, hi)) - scroll,
+                                g_PlayerX, 32 - g_WideX, 224 + g_WideX);
+    }
     g_Tilemap.scrollX.i.hi = scroll;
     PLAYER.posX.i.hi = g_PlayerX - scroll;
 
     Wide_BandRange(g_Tilemap.y, g_Tilemap.height, 240, g_WideY, 4, 252,
                    g_WideBandTop, g_WideBandBottom, &lo, &hi);
-    scroll = Wide_FollowY(g_Tilemap.scrollY.i.hi, g_PlayerY, lo, hi,
+    scroll = Wide_FollowY(g_Tilemap.scrollY.i.hi - put_y, g_PlayerY, lo, hi,
                           g_Tilemap.y, g_unkGraphicsStruct.unk24 != 0);
+    // no look in a snap or in the slide into a room whose top is below
+    put_y = g_unkGraphicsStruct.unk24 || scroll < lo || scroll > hi
+                ? 0
+                : Wide_LookClamp(scroll, (CLAMP(scroll + look_y, lo, hi)) - scroll,
+                                 g_PlayerY, 56, 200) -
+                      scroll;
+    scroll += put_y;
     g_Tilemap.scrollY.i.hi = scroll;
     PLAYER.posY.i.hi = g_PlayerY - scroll;
     // the art rows on the screen: the clip hides the empty band of a room

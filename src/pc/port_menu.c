@@ -38,6 +38,7 @@
 #include <time.h>
 #include <psyz/audio.h>
 #include <psyz/input.h>
+#include "wide.h"
 #include <psyz/video.h>
 #ifdef __SWITCH__
 #include <unistd.h>
@@ -250,16 +251,17 @@ static int GamepadDown(SDL_GamepadButton b) {
     return r;
 }
 
-// The left stick as the D-pad of the port menu (the map cursor, the lines):
-// psyz maps the stick to no PS button.
-#define STICK_DEAD 12000
-extern int g_StickDpad; // wide.c: stick_dpad in sotn.ini
-static u16 StickDirs(void) {
-    static int logged, seen = -1;
-    int n = 0, i, x, y;
-    u16 r = 0;
-    if (!g_StickDpad || Psyz_ControllerBlocked()) {
-        return 0;
+// The sticks: psyz maps them to no PS button. The left stick works as the
+// D-pad everywhere (stick_dpad), the right stick moves the view (WideCamera
+// in src/dra/5087C.c). Of several pads, the one whose stick is out the most
+// counts.
+static void ReadStick(int right, int* x, int* y) {
+    static int logged[2], seen = -1;
+    int n = 0, i, ax, ay, best = 0;
+    SDL_Gamepad* from = NULL;
+    *x = *y = 0;
+    if (Psyz_ControllerBlocked()) {
+        return;
     }
     SDL_JoystickID* ids = SDL_GetGamepads(&n);
     if (n != seen) { // what the owner's sotn.log shows about the pads
@@ -268,20 +270,44 @@ static u16 StickDirs(void) {
     }
     for (i = 0; ids && i < n; i++) {
         SDL_Gamepad* g = SDL_GetGamepadFromID(ids[i]);
-        x = g ? SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTX) : 0;
-        y = g ? SDL_GetGamepadAxis(g, SDL_GAMEPAD_AXIS_LEFTY) : 0;
-        if (!logged && (abs(x) > STICK_DEAD || abs(y) > STICK_DEAD)) {
-            logged = 1;
-            fprintf(stderr, "[stick] left stick x %d y %d on '%s' id %d%s\n",
-                    x, y, g ? SDL_GetGamepadName(g) : "(not opened)",
-                    (int)ids[i], g ? "" : " NOT OPENED");
+        if (!g) {
+            continue;
         }
-        r |= x < -STICK_DEAD ? PAD_LEFT : x > STICK_DEAD ? PAD_RIGHT : 0;
-        r |= y < -STICK_DEAD ? PAD_UP : y > STICK_DEAD ? PAD_DOWN : 0;
+        ax = SDL_GetGamepadAxis(
+            g, right ? SDL_GAMEPAD_AXIS_RIGHTX : SDL_GAMEPAD_AXIS_LEFTX);
+        ay = SDL_GetGamepadAxis(
+            g, right ? SDL_GAMEPAD_AXIS_RIGHTY : SDL_GAMEPAD_AXIS_LEFTY);
+        if (abs(ax) + abs(ay) > best) {
+            best = abs(ax) + abs(ay);
+            *x = ax;
+            *y = ay;
+            from = g;
+        }
     }
     SDL_free(ids);
-    return r;
+    if (!logged[right] && best > 12000) {
+        logged[right] = 1;
+        fprintf(stderr, "[stick] %s stick x %d y %d on '%s'\n",
+                right ? "right" : "left", *x, *y, SDL_GetGamepadName(from));
+    }
 }
+
+// The left stick as D-pad bits (Wide_StickDirs: dead zone stick_dead,
+// 8 directions, hysteresis).
+static u16 StickDirs(void) {
+    static int held;
+    int x, y, d;
+    if (!g_StickDpad) {
+        return 0;
+    }
+    ReadStick(0, &x, &y);
+    held = d = Wide_StickDirs(x, y, g_StickDead * 32767 / 100, held);
+    return (d & WIDE_STICK_L ? PAD_LEFT : 0) |
+           (d & WIDE_STICK_R ? PAD_RIGHT : 0) |
+           (d & WIDE_STICK_U ? PAD_UP : 0) | (d & WIDE_STICK_D ? PAD_DOWN : 0);
+}
+
+void PortMenu_RightStick(int* x, int* y) { ReadStick(1, x, y); }
 
 static u16 MenuButtons(u16 pressed, int open) {
     static const SDL_GamepadButton btn[2] = {SDL_GAMEPAD_BUTTON_EAST,
@@ -954,7 +980,8 @@ static int mouse_seen = 1; // 0: a press not seen by a frame yet (fast click)
 // SOTN_TEST_PAD=switch|xbox|ps|other (tests; any other value: switch): an
 // SDL virtual pad of that type (vendor and product ids). Keypad 6, 2, 8, 4
 // hold its right, bottom, top, left face button, keypad 5 its Start; keypad
-// 1, 3, 7, 9 push its left stick left, right, up, down.
+// 1, 3, 7, 9 push its left stick left, right, up, down; keypad /, *, -, +
+// its right stick.
 static SDL_Joystick* test_pad;
 static void TestPadInit(void) {
     static const struct {
@@ -1003,7 +1030,11 @@ static void TestPadKey(const SDL_Event* e) {
     } sticks[] = {{SDL_SCANCODE_KP_1, SDL_GAMEPAD_AXIS_LEFTX, -32767},
                   {SDL_SCANCODE_KP_3, SDL_GAMEPAD_AXIS_LEFTX, 32767},
                   {SDL_SCANCODE_KP_7, SDL_GAMEPAD_AXIS_LEFTY, -32767},
-                  {SDL_SCANCODE_KP_9, SDL_GAMEPAD_AXIS_LEFTY, 32767}};
+                  {SDL_SCANCODE_KP_9, SDL_GAMEPAD_AXIS_LEFTY, 32767},
+                  {SDL_SCANCODE_KP_DIVIDE, SDL_GAMEPAD_AXIS_RIGHTX, -32767},
+                  {SDL_SCANCODE_KP_MULTIPLY, SDL_GAMEPAD_AXIS_RIGHTX, 32767},
+                  {SDL_SCANCODE_KP_MINUS, SDL_GAMEPAD_AXIS_RIGHTY, -32767},
+                  {SDL_SCANCODE_KP_PLUS, SDL_GAMEPAD_AXIS_RIGHTY, 32767}};
     int i, down = e->type == SDL_EVENT_KEY_DOWN;
     if (!test_pad ||
         (e->type != SDL_EVENT_KEY_DOWN && e->type != SDL_EVENT_KEY_UP)) {
@@ -1334,8 +1365,9 @@ u16 PortMenu_Pad(u16 pressed) {
     u16 tap;
     int count;
     pressed = MenuButtons(pressed, is_open);
-    if (is_open || g_GameState == Game_Title || g_GameState == Game_MainMenu ||
-        (g_GameState == Game_Play && g_GameEngineStep == Engine_Menu)) {
+    // the stick in the game and in every menu; the D-pad and the keys win,
+    // so the game never sees left and right (or up and down) at once
+    if (!(pressed & (PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT))) {
         pressed |= StickDirs();
     }
     tap = pressed & ~prev;

@@ -147,6 +147,63 @@ int main(void) {
         assert(lo == old_lo && hi == old_hi);
     }
 
+    // the left stick as a D-pad: dead zone, 45 degree sectors, hysteresis
+    {
+        enum { L = WIDE_STICK_L, R = WIDE_STICK_R, U = WIDE_STICK_U,
+               D = WIDE_STICK_D };
+        int dead = 11468; // 35 %
+        assert(Wide_StickDirs(0, 0, dead, 0) == 0);
+        assert(Wide_StickDirs(11000, 0, dead, 0) == 0); // in the dead zone
+        assert(Wide_StickDirs(32767, 0, dead, 0) == R);
+        assert(Wide_StickDirs(-32767, 0, dead, 0) == L);
+        assert(Wide_StickDirs(0, -32767, dead, 0) == U); // SDL: up < 0
+        assert(Wide_StickDirs(0, 32767, dead, 0) == D);
+        assert(Wide_StickDirs(23170, 23170, dead, 0) == (R | D)); // 45 deg
+        assert(Wide_StickDirs(-23170, -23170, dead, 0) == (L | U));
+        // walking right with the stick 15 deg low: no crouch
+        assert(Wide_StickDirs(31650, 8481, dead, 0) == R);
+        // 30 deg low: the diagonal
+        assert(Wide_StickDirs(28377, 16384, dead, 0) == (R | D));
+        // hysteresis: 10000 stays on only when held; 20 deg low keeps down
+        assert(Wide_StickDirs(10000, 0, dead, 0) == 0);
+        assert(Wide_StickDirs(10000, 0, dead, R) == R);
+        assert(Wide_StickDirs(30791, 11207, dead, 0) == R);
+        assert(Wide_StickDirs(30791, 11207, dead, R | D) == (R | D));
+    }
+
+    // the right stick look: proportional target, eased, back to 0
+    {
+        int cur = 0, i;
+        assert(Wide_LookStep(0, 3000, 6553, 48) == 0); // dead zone
+        for (i = 0; i < 200; i++) {
+            cur = Wide_LookStep(cur, 32767, 6553, 48);
+        }
+        assert(cur == 48);
+        for (i = 0; i < 200; i++) {
+            cur = Wide_LookStep(cur, -32768, 6553, 48);
+        }
+        assert(cur == -48);
+        cur = Wide_LookStep(-48, 0, 6553, 48);
+        assert(cur > -48 && cur < 0); // eases, no jump
+        for (i = 0; i < 200; i++) {
+            cur = Wide_LookStep(cur, 0, 6553, 48);
+        }
+        assert(cur == 0);
+        for (i = 0; i < 200; i++) { // half way past the dead zone: half range
+            cur = Wide_LookStep(cur, 6553 + (32767 - 6553) / 2, 6553, 48);
+        }
+        assert(cur == 23 || cur == 24);
+        assert(Wide_LookStep(0, 32767, 6553, 0) == 0); // range 0: off
+        // the player stays 32..224 px from the scroll: free in the middle,
+        // limited near the edges, never pushed out by the look
+        assert(Wide_LookClamp(1000, 48, 1128, 32, 224) == 1048);
+        assert(Wide_LookClamp(1000, -48, 1128, 32, 224) == 952);
+        assert(Wide_LookClamp(1000, 48, 1062, 32, 224) == 1030);
+        assert(Wide_LookClamp(1000, 48, 1020, 32, 224) == 1000);
+        assert(Wide_LookClamp(1000, -48, 1200, 32, 224) == 976);
+        assert(Wide_LookClamp(1000, -48, 1250, 32, 224) == 1000);
+    }
+
     puts("wide_test ok");
     return 0;
 }
