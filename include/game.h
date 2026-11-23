@@ -1020,8 +1020,8 @@ void PortMenu_Mark(int x, int y, int b);
 // Serif menu cell (Lang_MenuCellAny), its 11 rows from x, y, in colour rgb.
 void PortMenu_Cell(int x, int y, int cell, u32 rgb);
 // The stat bonus colours of the status page, the Librarian's compare window.
-#define TINT_BONUS_UP 0xFF3030   // red
-#define TINT_BONUS_DOWN 0x5070FF // blue
+#define TINT_BONUS_UP 0x5070FF   // blue: a stat that goes up
+#define TINT_BONUS_DOWN 0xFF3030 // red: a stat that goes down
 // Label tints (texel x tint / 0x80 of the grey ink 197,206,206): the Gold
 // label (255,255,74), the shop's Number (110,235,130), Next (200,120,255)
 #define TINT_GOLD 0xFFC830
@@ -1137,6 +1137,12 @@ extern int g_SkipCdRooms, g_ShowLoadingText;
 // the left and right room edges, and the edge tile fades to black over its
 // outer 8 px (4CE2C.c). 0: the old fill and vignette.
 extern int g_RoomEdgeFade;
+// sotn.ini elevator_front_ornaments = 1 (default): the gold lattice tiles
+// around the NZ0 elevator shaft draw in front of the elevator, its chain and
+// the player (4CE2C.c). The elevator entity stamps g_ElevatorOrnTimer each
+// frame; 0 = the original order (behind them).
+extern int g_ElevatorFront;
+extern u32 g_ElevatorOrnTimer;
 // The door path (5087C.c) calls it before a room loads: a flushed log line
 // [room] <stage> (<zone>) id <hex> room <n> cell <x>,<y> pos <x>,<y>, and
 // the room for the overlay.

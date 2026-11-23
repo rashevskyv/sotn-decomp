@@ -416,8 +416,16 @@ s32 func_800F0CD8(s32 arg0) {
             return ret;
         }
         if (arg0) {
+#ifdef PLATFORM_PSYZ
+            // A hit throws the player back; at a door in the room edge that
+            // carried him into the next room. The edge holds while the hit
+            // lasts (the clamp below); walking through still works.
+#define KNOCKBACK_STOPS_AT_EDGE() (PLAYER.step == Player_Hit)
+#else
+#define KNOCKBACK_STOPS_AT_EDGE() 0
+#endif
             if (g_PlayerX < g_Tilemap.x) {
-                ret = SetNextRoomToLoad(
+                ret = KNOCKBACK_STOPS_AT_EDGE() ? 0 : SetNextRoomToLoad(
                     g_Tilemap.left - 1, g_Tilemap.top + (g_PlayerY >> 8));
                 if (ret) {
 #if TARGET == TARGET_PSP
@@ -436,7 +444,7 @@ s32 func_800F0CD8(s32 arg0) {
                 }
             }
             if (g_PlayerX >= g_Tilemap.width) {
-                ret = SetNextRoomToLoad(
+                ret = KNOCKBACK_STOPS_AT_EDGE() ? 0 : SetNextRoomToLoad(
                     g_Tilemap.right + 1, g_Tilemap.top + (g_PlayerY >> 8));
                 if (ret) {
 #if TARGET == TARGET_PSP

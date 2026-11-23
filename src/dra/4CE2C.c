@@ -503,7 +503,17 @@ static void WideVignette(TilemapRenderer* r) {
 }
 #endif
 
+#ifdef PLATFORM_PSYZ
+// NZ0 elevator: the lattice tiles draw above the cab, chain and player
+#define ELEV_ORN_ORDER 0x80
+static int ElevatorOrnaments(void) {
+    return g_ElevatorFront && g_ElevatorOrnTimer &&
+           g_Timer - g_ElevatorOrnTimer < 4;
+}
+#endif
+
 void RenderTilemap(void) {
+    s32 fgpass, fgpasses = 1;
     s32 i, j;
     s32 l;
     BgLayer* bg;
@@ -580,6 +590,13 @@ void RenderTilemap(void) {
 #ifdef PLATFORM_PSYZ
             patched = Apron_Has(0);
 #endif
+#ifdef PLATFORM_PSYZ
+            fgpasses = ElevatorOrnaments() ? 2 : 1;
+#endif
+            for (fgpass = 0; fgpass < fgpasses; fgpass++) {
+            if (fgpasses == 2) {
+                r->order = fgpass ? ELEV_ORN_ORDER : t->order;
+            }
             y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
             for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS;
                  i++, y0 += TILE_SIZE) {
@@ -621,6 +638,10 @@ void RenderTilemap(void) {
                     if (tile == 0) {
                         continue;
                     }
+                    if (fgpasses == 2 &&
+                        (tile >= 0x59B && tile <= 0x5AF) != fgpass) {
+                        continue;
+                    }
                     u = r->gfx[tile] << 0x4;
                     v = r->gfx[tile] & 0xF0;
                     page = r->page[tile];
@@ -645,7 +666,9 @@ void RenderTilemap(void) {
                 }
             }
 #ifdef PLATFORM_PSYZ
-            ApronPass(r, sp16, 0, t->fg, startTx, startTy, subX, subY);
+            if (!fgpass) {
+    ApronPass(r, sp16, 0, t->fg, startTx, startTy, subX, subY);
+            }
 #endif
 
             for (i = 0; i < 24; i++) {
@@ -660,6 +683,7 @@ void RenderTilemap(void) {
                 AddPrim(&r->ot[i + r->order], r->dr);
                 r->dr++;
                 g_GpuUsage.drawModes++;
+            }
             }
         }
     }

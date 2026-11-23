@@ -2861,6 +2861,8 @@ static void DrawMap(void) {
 int g_OverlayOn, g_FpsOn;
 int g_SkipCdRooms = 1, g_ShowLoadingText = 1; // sotn.ini, game.h
 int g_RoomEdgeFade = 1;                       // sotn.ini, game.h
+int g_ElevatorFront = 1;                      // sotn.ini, game.h
+u32 g_ElevatorOrnTimer;                       // the elevator entity, game.h
 static int room_num = -1; // the index in g_api.o.rooms, as the teleport uses
 static int fps;
 

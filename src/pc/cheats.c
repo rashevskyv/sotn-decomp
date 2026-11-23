@@ -197,11 +197,27 @@ void Cheat_OnFrame(void) {
     {
         // tests: SOTN_TEST_EXP=N sets the experience once, 300 frames into
         // play (the editor /gain call, which the Windows build lacks)
-        static int expWait, expDone, bossWait;
+        static int expWait, expDone, bossWait, dieWait, knockWait;
         const char* e = getenv("SOTN_TEST_EXP");
         if (e && !expDone && ++expWait == 300) {
             expDone = 1;
             g_Status.exp = atoi(e);
+        }
+        // SOTN_TEST_DIE=N: the hit points drop to 0 at play frame N (the
+        // game over screen, in a hidden test)
+        e = getenv("SOTN_TEST_DIE");
+        if (e && ++dieWait == atoi(e)) {
+            g_Status.hp = 0;
+            g_GameEngineStep = Engine_10;
+            g_MenuStep = 0;
+        }
+        // SOTN_TEST_KNOCK=N: a hit every N play frames, facing right (thrown
+        // left; a test of the room edge)
+        e = getenv("SOTN_TEST_KNOCK");
+        if (e && ++knockWait > 800 && knockWait % atoi(e) == 0) {
+            PLAYER.facingLeft = 0;
+            g_Player.unk18 = 0;
+            SetPlayerStep(Player_Hit);
         }
         // SOTN_TEST_BOSS=N: the boss list entry N, as the map menu does it
         e = getenv("SOTN_TEST_BOSS");

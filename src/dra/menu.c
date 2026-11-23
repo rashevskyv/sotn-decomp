@@ -51,10 +51,11 @@ static s32 g_ServantPrevious;
 // 0 or 0xRRGGBB: MenuDrawImg tints the cells it draws (texel * colour / 0x80)
 static u32 g_MenuTint;
 #define MENU_TINT(rgb) (g_MenuTint = (rgb))
-// The stat bonus sign: the drawn arrow cells of the menu font atlas, or the
+// The stat bonus sign: the diagonal arrow cells 0xE3 (up) and 0xE5 (down), as
+// in the right panel of the equip screen, or the
 // stock + and - when the atlas is off (no language pack)
 #define STAT_SIGN(up)                                                          \
-    (LANG_MENU_FONT_ON() ? ((up) ? MENU_CELL_UP : MENU_CELL_DOWN)              \
+    (LANG_MENU_FONT_ON() ? ((up) ? 0xE3 : 0xE5)              \
                          : ((up) ? CH('+') : CH('-')))
 // The status page in the layout of the PSP version: STPOS(ps1, psp)
 #define STPOS(ps1, psp) (psp)
@@ -1470,7 +1471,7 @@ char StatChangeArrow(u16 arg0, u16 arg1) {
     }
 }
 
-// port: the arrow and the new value of a stat change, red up, blue down
+// port: the arrow and the new value of a stat change, blue up, red down
 #define STAT_CHANGE_TINT(cur, new)                                             \
     MENU_TINT((u16)(cur) < (u16)(new)   ? TINT_BONUS_UP                       \
               : (u16)(cur) > (u16)(new) ? TINT_BONUS_DOWN                     \
@@ -1982,7 +1983,7 @@ void MenuDrawStats(s32 menuDialogue) {
         MenuDrawStr(g_MenuStr[i + 1], x, y + i * 12, ctx);
         MenuDrawInt(g_Status.statsBase[i], x + 44, y + i * 12, ctx);
         if (g_Status.statsEquip[i] != 0) {
-            // port: the bonus is an arrow and a number, red up, blue down
+            // port: the bonus is an arrow and a number, blue up, red down
             if (g_Status.statsEquip[i] > 0) {
                 MENU_TINT(TINT_BONUS_UP);
                 MenuDrawChar(STAT_SIGN(1), x + 52, y + i * 12, ctx);

@@ -201,6 +201,7 @@ void EntityElevator(Entity* self) {
         }
         break;
     }
+    g_ElevatorOrnTimer = g_Timer;
     prim = self->ext.elevator.prim;
     prim->x0 = self->posX.i.hi - 16;
     prim->y0 = self->posY.i.hi;

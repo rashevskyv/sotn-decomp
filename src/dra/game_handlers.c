@@ -801,6 +801,11 @@ extern int g_HdTextures;
 // The game-over picture (two quads, VRAM 640,0) is 256x240 in the middle of
 // the wide view. An HD file wider than 4:3 for it (data/textures) draws it
 // over the whole canvas instead, as the title stretches its background.
+// Any other picture (the stock one, a 4:3 HD file) is scaled to cover the
+// canvas, as the file screens do, and the top and bottom rows that do not fit
+// are cropped (the top ones: the subtitle is in the picture); the letters follow the same scale. A canvas more than twice as
+// wide as high keeps at least half the rows and leaves black at the sides; a
+// canvas narrower than 4:3 shows the picture as it is.
 // With the HD letters file (VRAM 512,0) the letters quad grows to 1.5x
 // around the middle of its band, never wider than the canvas.
 // Runs every frame, so it follows dock changes and a file that appears.
@@ -809,13 +814,31 @@ static void GameOverFillCanvas(void) {
     Primitive* prim = &g_PrimBuf[D_8013640C];
     s32 x0 = 0, x1 = 0x100, y0 = 0x60, y1 = 0x80, l = 0, r = 0xFF;
     s32 tw, th, i, w, h;
+    s32 vh = 0xF0, vy = 0; // the rows of the 240 that show, and the first one
+    s32 cw = a.ex - a.sx, ch = a.ey - a.sy;
+    bool wideHd = Psyz_HdTexSize(0x280, 0, 0x80, 0xF0, 8, &tw, &th) &&
+                  tw * 3 > th * 4 && cw > 0;
 
+    if (!wideHd && cw > 0 && ch > 0 && ch * 256 < cw * 0xF0) {
+        // x0..x1 x y0..y1 of the picture on the canvas
+        vh = MAX(0x78, ch * 256 / cw);
+        vy = 0xF0 - 4 - vh; // the subtitle is in the bottom rows
+        w = ch * 256 / vh;
+        x0 = a.sx + (cw - w) / 2, x1 = x0 + w;
+    } else {
+        cw = 0; // no cover
+    }
+#define COVY(v) (a.sy + ((v) - vy) * ch / vh)
     // letters: stock 0..0xFF x 0x60..0x80
+    if (cw) {
+        l = x0, r = x0 + (x1 - x0) * 0xFF / 0x100;
+        y0 = COVY(0x60), y1 = COVY(0x80);
+    }
     if (Psyz_HdTexSize(0x200, 0, 0x40, 0x80, 4, &tw, &th)) {
-        w = MAX(0xFF, MIN(0xFF * 3 / 2, a.ex - a.sx));
-        h = 0x20 * w / 0xFF;
-        l = 0x80 - w / 2, r = l + w;
-        y0 = 0x70 - h / 2, y1 = y0 + h;
+        w = MAX(r - l, MIN(0xFF * 3 / 2, a.ex - a.sx));
+        h = (y1 - y0) * w / MAX(r - l, 1);
+        i = (l + r) / 2, l = i - w / 2, r = l + w;
+        i = (y0 + y1) / 2, y0 = i - h / 2, y1 = y0 + h;
     }
     prim->x0 = prim->x2 = l;
     prim->x1 = prim->x3 = r;
@@ -824,9 +847,10 @@ static void GameOverFillCanvas(void) {
     prim = prim->next;
     y0 = 0, y1 = 0xF0;
 
-    if (Psyz_HdTexSize(0x280, 0, 0x80, 0xF0, 8, &tw, &th) && tw * 3 > th * 4 &&
-        a.ex > a.sx) {
+    if (wideHd) {
         x0 = a.sx, y0 = a.sy, x1 = a.ex, y1 = a.ey;
+    } else if (cw) {
+        y0 = a.sy, y1 = a.ey;
     }
     for (i = 0; i < 2; i++, prim = prim->next) {
         l = x0 + (x1 - x0) * i / 2;
@@ -835,7 +859,10 @@ static void GameOverFillCanvas(void) {
         prim->x1 = prim->x3 = r;
         prim->y0 = prim->y1 = y0;
         prim->y2 = prim->y3 = y1;
+        prim->v0 = prim->v1 = vy;
+        prim->v2 = prim->v3 = vy + vh;
     }
+#undef COVY
 }
 #endif
 
@@ -882,17 +909,6 @@ void HandleGameOver(void) {
             func_psp_0891AE04();
 #else
             MoveImage(&g_CurrentBuffer->next->disp.disp, 0x300, 0);
-#endif
-#ifdef PLATFORM_PSYZ
-            // HD on: the melt strips show the whole wide frame, not its
-            // 256x240 middle (stock strips, stock timing); MoveImage is
-            // queued, DrawSync runs it first
-            if (g_HdTextures) {
-                DrawSync(0);
-                Psyz_VideoKeepCanvas(g_CurrentBuffer->next->disp.disp.x,
-                                     g_CurrentBuffer->next->disp.disp.y, 0x300,
-                                     0, 0x100, 0xF0);
-            }
 #endif
             SetGPUBuffRGBZero();
             g_GpuBuffers[1].draw.isbg = 1;

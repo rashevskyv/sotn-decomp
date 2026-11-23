@@ -269,6 +269,7 @@ static const struct {
     {"skip_cd_rooms", &g_SkipCdRooms},
     {"show_loading_text", &g_ShowLoadingText},
     {"room_edge_fade", &g_RoomEdgeFade},
+    {"elevator_front_ornaments", &g_ElevatorFront},
 };
 
 static const char ini_stitch[] =
@@ -278,7 +279,10 @@ static const char ini_stitch[] =
     "; room_edge_fade: 1 = in the wide view nothing shows past the left and\n"
     "; right edge of the room (black), and the edge tile fades to black over\n"
     "; its outer 8 pixels. 0 = the old fill (the next room, a mirror image)\n"
-    "; under a wide dark gradient.\n";
+    "; under a wide dark gradient.\n"
+    "; elevator_front_ornaments: 1 = the gold lattice around the elevator\n"
+    "; shaft of the Clock Tower draws in front of the elevator, its chain and\n"
+    "; you. 0 = the original order (the lattice behind them).\n";
 
 static const char ini_loading[] =
     "\n"
@@ -363,6 +367,7 @@ void Wide_SaveIni(void) {
     fputs(ini_stitch, f);
     fprintf(f, "room_stitch = %d\nroom_edge_fade = %d\n", g_RoomStitch,
             g_RoomEdgeFade);
+    fprintf(f, "elevator_front_ornaments = %d\n", g_ElevatorFront);
     fputs(ini_loading, f);
     fprintf(f, "skip_cd_rooms = %d\nshow_loading_text = %d\n", g_SkipCdRooms,
             g_ShowLoadingText);
