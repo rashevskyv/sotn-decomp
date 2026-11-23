@@ -20,6 +20,17 @@ static FILE* OpenFileRead(const char* filename, char* resolved, size_t size) {
     return fopen(filename, "rb");
 }
 
+// 1 when the disc data folder is there (its first file, the title)
+bool Io_DataPresent(void) {
+    char resolved[1024];
+    FILE* f = OpenFileRead(SOTN_DATA_DIR "/BIN/F_TITLE0.BIN", resolved,
+                           sizeof(resolved));
+    if (f) {
+        fclose(f);
+    }
+    return f != NULL;
+}
+
 struct FileAsStringCbParams {
     bool (*callback)(const struct FileAsString*);
     void* param;

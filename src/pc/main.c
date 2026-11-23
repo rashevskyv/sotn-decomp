@@ -216,6 +216,25 @@ int Main(int argc, char* argv[]) {
     if (params.stage < 0 && params.spawnPoint != NULL) {
         params.stage = SpawnPoint_StageForName(params.spawnPoint);
     }
+    {
+        bool Io_DataPresent(void);
+        if (!Io_DataPresent()) {
+            static const char msg[] =
+                "Game data not found: " SOTN_DATA_DIR "/BIN/F_TITLE0.BIN\n"
+                "Put the files of your own Castlevania: Symphony of the Night "
+                "disc (PS1, USA, SLUS-00067) in the folder \"" SOTN_DATA_DIR
+                "\" next to the program.\nSee README_INSTALL.md.";
+            fprintf(stderr, "[boot] %s\n", msg);
+#ifdef _WIN32
+            {
+                int __stdcall MessageBoxA(void*, const char*, const char*,
+                                          unsigned);
+                MessageBoxA(NULL, msg, "sotn-native", 0x10);
+            }
+#endif
+            return -1;
+        }
+    }
     Psyz_VideoSetInternalResolution(params.scale);
     if (!InitGame(&params)) {
         return -1;
