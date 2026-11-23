@@ -228,7 +228,7 @@ static const char ini_editor[] =
 int g_HdTextures = 1; // data/textures PNG files replace pictures
 int g_HdDump;         // write the sampled pictures to data/textures/dump
 int g_HdStats;        // "[hd] stats" log lines, HD counts under the FPS
-int g_MusicFiles = 1; // music/<ID>.mp3 or .flac replaces the XA track
+int g_MusicFiles; // 1 = enhanced: music/<ID>.mp3 or .flac replaces the XA track
 
 static const char ini_hd[] =
     "\n"
@@ -238,8 +238,9 @@ static const char ini_hd[] =
     "; (for artists; slow; stock art: do not share the files).\n"
     "; hd_stats: 1 = every 2 seconds the log gets the frame times and HD\n"
     "; counts; with fps = 1 the corner shows the HD draws and uploads.\n"
-    "; music_files: 1 = music/<ID>.mp3 or .flac plays in place of the disc\n"
-    "; track with that id (tools/music/ost_map.py); 0 = always the disc.\n";
+    "; music_source: original = the disc music (default); enhanced =\n"
+    "; music/<ID>.mp3 or .flac plays in place of the disc track with that id\n"
+    "; (tools/music/ost_map.py). Without those files the disc music plays.\n";
 
 extern int g_BackgroundInput; // psyz sdl3_common.h
 extern int g_WarpMapPick;     // port_menu.c
@@ -356,8 +357,9 @@ void Wide_SaveIni(void) {
     fputs(ini_overlay, f);
     fprintf(f, "overlay = %d\nfps = %d\n", g_OverlayOn, g_FpsOn);
     fputs(ini_hd, f);
-    fprintf(f, "hd_textures = %d\nhd_dump = %d\nhd_stats = %d\nmusic_files = %d\n",
-            g_HdTextures, g_HdDump, g_HdStats, g_MusicFiles);
+    fprintf(f, "hd_textures = %d\nhd_dump = %d\nhd_stats = %d\nmusic_source = %s\n",
+            g_HdTextures, g_HdDump, g_HdStats,
+            g_MusicFiles ? "enhanced" : "original");
     fputs(ini_stitch, f);
     fprintf(f, "room_stitch = %d\nroom_edge_fade = %d\n", g_RoomStitch,
             g_RoomEdgeFade);
@@ -373,7 +375,7 @@ void Wide_SaveIni(void) {
 // pad_<button> = <input name> (IniInput),
 // jp_cards = extra|jp|off, relic_toggle = modern|stock,
 // spawn = <spawn point name>, cheat_* = 0|1 (cheat_character 0..2, 4), editor, overlay, fps = 0|1,
-// hd_textures = 0|1 (missing: 1), hd_dump = 0|1, music_files = 0|1 (1),
+// hd_textures = 0|1 (missing: 1), hd_dump = 0|1, music_source = original|enhanced (original; music_files = 0|1 is read too),
 // room_stitch = 0|1 (0), room_edge_fade = 0|1 (1), skip_cd_rooms = 0|1 (1),
 // show_loading_text = 0|1 (1).
 // aspect = auto|4:3|16:10|16:9|21:9|2.39:1|32:9 (auto),
@@ -415,6 +417,8 @@ void Wide_LoadIni(const char* path) {
                 }
             } else if (sscanf(line, " language = %15s", word) == 1) {
                 g_LangNext = !strcmp(word, "uk");
+            } else if (sscanf(line, " music_source = %15s", word) == 1) {
+                g_MusicFiles = !strcmp(word, "enhanced");
             } else if (sscanf(line, " jp_cards = %15s", word) == 1) {
                 g_JpCards = IniWord("jp_cards", word, g_JpCardsNames,
                                     JP_CARDS_MODES, JP_CARDS_EXTRA);

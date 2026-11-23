@@ -316,6 +316,39 @@ s32 Music_Start(s32 id, s32 mode) {
     return (s32)((t->frames - t->start + 734) / 735);
 }
 
+// 1 when some music/<ID>.flac or .mp3 of the disc tracks (0x300-0x340) is
+// there; looked up once per run
+bool Music_FilesAvailable(void) {
+    static int have = -1;
+    char path[32];
+    FILE* f;
+    int id;
+    for (id = 0x300; have < 0 && id <= 0x340; id++) {
+        snprintf(path, sizeof(path), "music/%03X.flac", id);
+        f = fopen(path, "rb");
+        if (!f) {
+            snprintf(path, sizeof(path), "music/%03X.mp3", id);
+            f = fopen(path, "rb");
+        }
+        if (f) {
+            fclose(f);
+            have = 1;
+        }
+    }
+    if (have < 0) {
+        have = 0;
+    }
+    return have;
+}
+
+static int s_Switched;
+void Music_Switched(void) { s_Switched = 1; }
+int Music_TakeSwitch(void) {
+    int r = s_Switched;
+    s_Switched = 0;
+    return r;
+}
+
 // wall clock for the start-latency logs (the clock of psyz's logs)
 double Music_WallMs(void) { return SDL_GetTicksNS() / 1e6; }
 

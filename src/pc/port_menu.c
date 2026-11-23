@@ -65,6 +65,7 @@ enum {
     ITEM_FULLSCREEN, // the window mode, saved as the mode at the start
 #endif
     ITEM_VOICE,
+    ITEM_MUSIC, // music_source
     ITEM_LANGUAGE,
     ITEM_BUTTONS, // the button marks of the menus
     ITEM_CONFIRM, // menu_confirm
@@ -1119,6 +1120,14 @@ static void Change(int dir) {
         fprintf(
             stderr, "[voice] menu: voice %s\n", g_VoiceSetNames[g_VoiceSet]);
         Wide_SaveIni();
+    } else if (sel == ITEM_MUSIC) {
+        if (Music_FilesAvailable()) { // the track restarts from the new source
+            g_MusicFiles ^= 1;
+            Music_Switched();
+            fprintf(stderr, "[music] menu: music_source %s\n",
+                    g_MusicFiles ? "enhanced" : "original");
+            Wide_SaveIni();
+        }
     } else if (sel == ITEM_LANGUAGE) {
         // saved only: the language of this run is fixed at boot
         g_LangNext ^= 1;
@@ -1673,6 +1682,10 @@ enum {
     P_PAN,
     P_MOVE,
     P_SATURN, // the SS tag of the teleport lists (the legend)
+    P_MUSIC,  // 228..231: the MUSIC line
+    P_ORIGINAL,
+    P_ENHANCED,
+    P_NOFILES,
     P_WARP_GO = 232, // the warp map: Телепортуватись, Обрати, no other warp
     P_WARP_PICK,
     P_WARP_NONE,
@@ -1899,7 +1912,8 @@ static void DrawMain(void) {
 #ifndef __SWITCH__
         {P_FULLSCREEN, "FULLSCREEN"},
 #endif
-        {P_VOICE, "VOICE"},     {P_LANGUAGE, "LANGUAGE"},
+        {P_VOICE, "VOICE"},     {P_MUSIC, "MUSIC"},
+        {P_LANGUAGE, "LANGUAGE"},
         {P_BUTTONS, "BUTTONS"}, {P_CONFIRM, "MENU OK"},
         {-1, "WARP MAP"},
         {P_CDROOMS, "SKIP CD ROOMS"},
@@ -1959,6 +1973,15 @@ static void DrawMain(void) {
     AddValue(lines[ITEM_FULLSCREEN], i ? P_ON : P_OFF, i ? "ON" : "OFF");
 #endif
     AddValue(lines[ITEM_VOICE], -1, voices[g_VoiceSet]);
+    if (Music_FilesAvailable()) {
+        AddValue(lines[ITEM_MUSIC], g_MusicFiles ? P_ENHANCED : P_ORIGINAL,
+                 g_MusicFiles ? "ENHANCED" : "ORIGINAL");
+    } else { // no files: the switch is off, the disc music plays
+        Add(lines[ITEM_MUSIC], "  ");
+        AddW(lines[ITEM_MUSIC], P_ORIGINAL, "ORIGINAL");
+        Add(lines[ITEM_MUSIC], " ");
+        AddW(lines[ITEM_MUSIC], P_NOFILES, "NO FILES");
+    }
     AddValue(lines[ITEM_LANGUAGE], -1, g_LangNext ? "UK" : "EN");
     if (g_LangNext != g_Lang) {
         Add(lines[ITEM_LANGUAGE], " ");

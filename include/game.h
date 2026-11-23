@@ -1039,6 +1039,12 @@ s32 Music_Loop(void);
 void Music_Save(s32 slot);
 s32 Music_Resume(s32 slot);
 bool Music_Playing(void);
+// music/<ID> files exist (the MUSIC switch of the port menu is live)
+bool Music_FilesAvailable(void);
+extern int g_MusicFiles; // 0 original (disc XA), 1 enhanced (music/<ID> files)
+// the menu switched the source: 1 once, the track plays again
+void Music_Switched(void);
+int Music_TakeSwitch(void);
 double Music_WallMs(void);
 // Saturn stages (src/pc/saturn_sfx.c). PlaySfx and PlaySfxVolPan ask first:
 // true = the Saturn WAV of *id plays; false = the PS1 engine plays *id (it
@@ -1152,7 +1158,8 @@ struct CheatBoss {
     u16 enemy[3];
     u8 stage, room;
     s16 px, py;
-    u8 host, host_room, event, flag[2], bestiary;
+    u8 host, host_room, event, bestiary;
+    u16 flag[2];
 };
 extern const struct CheatBoss g_CheatBosses[];
 extern const int g_CheatBossCount;

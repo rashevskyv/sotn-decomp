@@ -182,13 +182,32 @@ void Cheat_OnFrame(void) {
     }
     RematchWatch();
     {
+        // MUSIC changed in the menu: stop the track, then play it again
+        static int musicStop;
+        if (Music_TakeSwitch() && currentMusicId != 0) {
+            fprintf(stderr, "[music] switch: track %X again\n",
+                    (int)currentMusicId);
+            PlaySfx(0xA); // SET_STOP_MUSIC
+            musicStop = 1;
+        } else if (musicStop && !func_80131F68()) { // the fade-out is over
+            musicStop = 0;
+            PlaySfx(currentMusicId);
+        }
+    }
+    {
         // tests: SOTN_TEST_EXP=N sets the experience once, 300 frames into
         // play (the editor /gain call, which the Windows build lacks)
-        static int expWait, expDone;
+        static int expWait, expDone, bossWait;
         const char* e = getenv("SOTN_TEST_EXP");
         if (e && !expDone && ++expWait == 300) {
             expDone = 1;
             g_Status.exp = atoi(e);
+        }
+        // SOTN_TEST_BOSS=N: the boss list entry N, as the map menu does it
+        e = getenv("SOTN_TEST_BOSS");
+        if (e && ++bossWait == 400) {
+            fprintf(stderr, "[test] boss %d: %s\n", atoi(e),
+                    Cheat_WarpBoss(atoi(e)) ?: "ok");
         }
     }
     if (g_Cheat.map && !mapped && g_StageId != STAGE_ST0) {
@@ -448,7 +467,7 @@ const char* Cheat_WarpStart(int stage) {
 // event and flags: what the boss checks to stay away once beaten.
 #define NO_EVENT 0xFF
 #define BOSS(e0, e1, e2, st, rm, x, y, h, hr, ev, f0, f1, b)                   \
-    { {e0, e1, e2}, st, rm, x, y, h, hr, ev, {f0, f1}, b }
+    { {e0, e1, e2}, st, rm, x, y, h, hr, ev, b, {f0, f1} }
 const struct CheatBoss g_CheatBosses[] = {
     BOSS(0x0F3, 0x0FE, 0, STAGE_NZ0, 16, 672, 384, STAGE_NZ0, 16,
          TIMEATTACK_EVENT_SLOGRA_GAIBON_DEFEAT, 0, 0, 20),
@@ -492,6 +511,13 @@ const struct CheatBoss g_CheatBosses[] = {
          144),
     BOSS(0x17B, 0, 0, STAGE_RBO6, 2, 128, 77, STAGE_RCEN, 1, NO_EVENT, 0, 0,
          145),
+#ifdef ENABLE_SATURN_STAGES
+    // Saturn only: Skeleton Leader (TekiInit 0x194), the controller of the
+    // fight is the room's layout entity 1, g_CastleFlags[0x167] bit 7 keeps
+    // him dead (src/st/stage15/e_mod_boss.h); no bestiary picture (255)
+    BOSS(0x194, 0, 0, STAGE_ID_SATURN_15, 2, 40, 176, STAGE_ID_SATURN_15, 2,
+         NO_EVENT, 0x167, 0, 255),
+#endif
 };
 const int g_CheatBossCount = LEN(g_CheatBosses);
 
