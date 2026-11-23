@@ -197,7 +197,7 @@ void Cheat_OnFrame(void) {
     {
         // tests: SOTN_TEST_EXP=N sets the experience once, 300 frames into
         // play (the editor /gain call, which the Windows build lacks)
-        static int expWait, expDone, bossWait, dieWait, knockWait;
+        static int expWait, expDone, bossWait, dieWait, knockWait, warpWait;
         const char* e = getenv("SOTN_TEST_EXP");
         if (e && !expDone && ++expWait == 300) {
             expDone = 1;
@@ -218,6 +218,16 @@ void Cheat_OnFrame(void) {
             PLAYER.facingLeft = 0;
             g_Player.unk18 = 0;
             SetPlayerStep(Player_Hit);
+        }
+        // SOTN_TEST_WARP=stage:room:cx:cy: the teleport of the editor, 400
+        // play frames in
+        e = getenv("SOTN_TEST_WARP");
+        if (e && ++warpWait == 400) {
+            int st, rm, cx, cy;
+            if (sscanf(e, "%d:%d:%d:%d", &st, &rm, &cx, &cy) == 4) {
+                fprintf(stderr, "[test] warp: %s\n",
+                        Cheat_Warp(st, rm, cx, cy) ?: "ok");
+            }
         }
         // SOTN_TEST_BOSS=N: the boss list entry N, as the map menu does it
         e = getenv("SOTN_TEST_BOSS");

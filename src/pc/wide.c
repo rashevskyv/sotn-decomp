@@ -678,7 +678,8 @@ void Wide_OnFrame(void) {
     keep = rows && fbw == DISP_STAGE_W && fbh == DISP_STAGE_H;
     if (!keep) {
         k = MIN(k, MAX(req.h / DISP_STAGE_H, 1)); // all 240 rows must fit
-        if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
+        if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H &&
+            g_GameState != Game_GameOver) { // game over fills the 16:9 canvas
             // black bars above and below, not the VRAM rows past the frame
             req.h = MIN(req.h, DISP_STAGE_H * k);
         }
@@ -737,10 +738,10 @@ void Wide_OnFrame(void) {
     fprintf(stderr,
             "[video] output %dx%d scale %d (asked %d) "
             "frame %dx%d internal %dx%d margin x %d y %d keep rows %d "
-            "aspect %s\n",
+            "aspect %s state %d step %d\n",
             d.w, d.h, s, cfg_scale, fbw, fbh, req.w / s & ~1,
             req.h / s & ~1, (int)g_WideX, (int)g_WideY, keep,
-            g_AspectNames[g_Aspect]);
+            g_AspectNames[g_Aspect], (int)g_GameState, (int)g_GameStep);
 }
 
 // Port menu state.
