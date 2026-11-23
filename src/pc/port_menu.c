@@ -2417,6 +2417,37 @@ static void DrawMini(int it) {
         mini_ox = (x1 << 4) - (r + 1) * mini_s; // right aligned, centred rows
         mini_oy = ((y0 + y1) << 3) - (t + bt + 1) * mini_s / 2;
     }
+    if (!mini_user && mini_s) {
+        // the rooms of the selected line must show beside the list box, not
+        // behind it: centre their box in the free part of the view
+        int fx0 = x0, fy0 = y0, hl = 99, ht = 99, hr = -1, hb = -1;
+        if (x0 <= box_x + box_w) { // the map runs behind the box
+            if (x1 - (box_x + box_w + 6) >= 40) {
+                fx0 = box_x + box_w + 6; // right of the box
+            } else {
+                fy0 = box_y + box_h + 6; // under the box
+            }
+        }
+        for (i = 0; i < g_CastleRoomCount; i++) {
+            rm = &g_CastleRooms[i];
+            if ((rm->stage & 0x20) == mini_castle && ItemHas(it, rm)) {
+                hl = MIN(hl, rm->left);
+                ht = MIN(ht, rm->top);
+                hr = MAX(hr, rm->right);
+                hb = MAX(hb, rm->bottom);
+            }
+        }
+        if (hr >= 0) {
+            int sx0 = (mini_ox + hl * mini_s) >> 4;
+            int sx1 = (mini_ox + (hr + 1) * mini_s) >> 4;
+            int sy0 = (mini_oy + ht * mini_s) >> 4;
+            int sy1 = (mini_oy + (hb + 1) * mini_s) >> 4;
+            if (sx0 < fx0 || sx1 > x1 || sy0 < fy0 || sy1 > y1) {
+                mini_ox += (((fx0 + x1) << 3) - ((sx0 + sx1) << 3));
+                mini_oy += (((fy0 + y1) << 3) - ((sy0 + sy1) << 3));
+            }
+        }
+    }
     mini_x0 = x0;
     mini_y0 = y0;
     mini_x1 = x1;

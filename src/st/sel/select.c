@@ -664,6 +664,10 @@ char* D_801803A8[9] = {
 #define STR_NO D_801803A8[6]
 #define STR_CONFIRM D_801803A8[7]
 #define STR_ERROR D_801803A8[8]
+// the PS1 table has "Cansel" only: "Back" in English, the uk pack has "Назад"
+// for it
+extern int g_Lang;
+#define STR_BACK (g_Lang ? STR_CANCEL : _S("Back"))
 #define STR_MATTED D_801803A8[9]
 
 static char* D_801803D0[] = {
@@ -832,6 +836,17 @@ void DrawNavigationTips(NavigationTips mode) {
         SetPrimRect(prim, 0x20, 0xC0, 0x10, 0x10);
         prim->drawMode = DRAW_DEFAULT;
         DrawHint8x8(STR_CONFIRM, 0x34, 0xC4, 1);
+        break;
+
+    case Tips_ConfirmBack: // Confirm and Back: the Yes and No marks
+        prim = prim->next;
+        SetPrimRect(prim, 0x20, 0xC0, 0x10, 0x10);
+        prim->drawMode = DRAW_DEFAULT;
+        prim = prim->next;
+        SetPrimRect(prim, 0x20, 0xD0, 0x10, 0x10);
+        prim->drawMode = DRAW_DEFAULT;
+        DrawHint8x8(STR_CONFIRM, 0x34, 0xC4, 1);
+        DrawHint8x8(STR_BACK, 0x34, 0xD4, 1);
         break;
 
     case Tips_MenuNavigation:
@@ -1880,9 +1895,9 @@ void Update(void) {
         }
         break;
     case Upd_Eng_0xA0:
-        DrawNavigationTips(Tips_Confirm);
+        DrawNavigationTips(Tips_ConfirmBack);
         func_801ADF94(0x82, 0);
-        if (g_pads[0].tapped & PAD_MENU_CONFIRM) {
+        if (g_pads[0].tapped & (PAD_MENU_CONFIRM | PAD_MENU_BACK)) {
             g_api.PlaySfx(SFX_UI_CONFIRM);
             func_801AE9A8();
             func_801AD490();
@@ -2074,9 +2089,9 @@ void Update(void) {
         }
         break;
     case Upd_Eng_0x60:
-        DrawNavigationTips(Tips_Confirm);
+        DrawNavigationTips(Tips_ConfirmBack);
         func_801ADF94(0x82, 0);
-        if (g_pads[0].tapped & PAD_MENU_CONFIRM) {
+        if (g_pads[0].tapped & (PAD_MENU_CONFIRM | PAD_MENU_BACK)) {
             g_api.PlaySfx(SFX_UI_CONFIRM);
             func_801AE9A8();
             func_801AD490();
@@ -2312,9 +2327,9 @@ void Update(void) {
         }
         break;
     case Upd_Eng_0x80:
-        DrawNavigationTips(Tips_Confirm);
+        DrawNavigationTips(Tips_ConfirmBack);
         func_801ADF94(0x82, 0);
-        if (g_pads[0].tapped & PAD_MENU_CONFIRM) {
+        if (g_pads[0].tapped & (PAD_MENU_CONFIRM | PAD_MENU_BACK)) {
             g_api.PlaySfx(SFX_UI_CONFIRM);
             func_801AE9A8();
             func_801AD490();

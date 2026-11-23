@@ -1748,6 +1748,15 @@ void EntityMist(Entity* self) {
         self->params = FLAG_UNK_4000 | FLAG_UNK_1000 | FLAG_UNK_800 |
                        FLAG_UNK_400 | FLAG_DEAD;
         EntityPlayerBlinkWhite(self);
+#ifdef PLATFORM_PSYZ
+        // a second mist entity with the same id and params (a warp that
+        // asks for mist while one is on) makes the blink code destroy this
+        // one: primIndex is 0 then, and FreePrimitives(0) below freed the
+        // chain at prim 0, the afterimage prims, a crash in the next frame
+        if (self->entityId == 0) {
+            goto block_147;
+        }
+#endif
         if (self->primIndex == -1) {
             goto block_147;
         }
