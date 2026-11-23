@@ -131,6 +131,7 @@ static const char ini_cheats[] =
 int g_StickDpad = 1;  // stick_dpad in sotn.ini
 int g_StickDead = 35;  // stick_dead: percent of the left stick
 int g_LookRange = 48;  // look_stick_range_px: about the player height
+int g_MapHeroPulse = 1, g_MapHeroPeriod = 47; // sotn.ini, game.h
 int g_LookDead = 20;   // look_stick_dead: percent of the right stick
 static const char ini_buttons[] =
     "\n"
@@ -347,6 +348,11 @@ void Wide_SaveIni(void) {
     fprintf(f, "look_stick_range_px = %d\n", g_LookRange);
     fprintf(f, "; look_stick_dead: the right stick dead zone, percent (5..90)\n");
     fprintf(f, "look_stick_dead = %d\n", g_LookDead);
+    fprintf(f, "; map_hero_pulse: 1 = a thin ring pulses round the room of the hero\n");
+    fprintf(f, "; on the port map. map_hero_pulse_period: its length in frames (16..240).\n");
+    fprintf(f, "; 47 is prime: it does not keep step with the cursor blink (32).\n");
+    fprintf(f, "map_hero_pulse = %d\nmap_hero_pulse_period = %d\n", g_MapHeroPulse,
+            g_MapHeroPeriod);
     fputs(ini_controls, f);
     for (i = 0; i < 2 * PSYZ_PAD_BUTTONS; i++) {
         fprintf(f, "%s_%s = %s\n", input_dev[i & 1], ps_buttons[i >> 1],
@@ -397,7 +403,8 @@ void Wide_SaveIni(void) {
 // aspect = auto|4:3|16:10|16:9|21:9|2.39:1|32:9 (auto),
 // menu_confirm = auto|east|south (auto; right, bottom: the 0.8.68 names).
 // stick_dpad = 0|1 (1), stick_dead = 5..90 (35), look_stick_range_px =
-// 0..120 (48), look_stick_dead = 5..90 (20).
+// 0..120 (48), look_stick_dead = 5..90 (20), map_hero_pulse = 0|1 (1),
+// map_hero_pulse_period = 16..240 (47).
 // A missing key keeps its default (cheats, editor, overlay and fps off).
 void Wide_LoadIni(const char* path) {
     int scale = 5, v, i; // docked 5, handheld 3 (ScaleRange)
@@ -433,6 +440,10 @@ void Wide_LoadIni(const char* path) {
                 g_LookRange = v < 0 ? 0 : v > 120 ? 120 : v;
             } else if (sscanf(line, " look_stick_dead = %d", &v) == 1) {
                 g_LookDead = v < 5 ? 5 : v > 90 ? 90 : v;
+            } else if (sscanf(line, " map_hero_pulse_period = %d", &v) == 1) {
+                g_MapHeroPeriod = v < 16 ? 16 : v > 240 ? 240 : v;
+            } else if (sscanf(line, " map_hero_pulse = %d", &v) == 1) {
+                g_MapHeroPulse = v != 0;
             } else if (sscanf(line, " voice = %15s", word) == 1) {
                 for (v = 0; v < VOICE_COUNT; v++) {
                     if (!strcmp(word, g_VoiceSetNames[v])) {

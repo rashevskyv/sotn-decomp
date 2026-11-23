@@ -2843,6 +2843,32 @@ static void DrawMap(void) {
         ClipRect(x, y, 1, w, x0, my0, x1, map_bottom, 255, 255, 0);
         ClipRect(x + w - 1, y, 1, w, x0, my0, x1, map_bottom, 255, 255, 0);
     }
+    // the hero room: a thin ring grows off its edge and fades, on its own
+    // period (47 frames, sotn.ini), prime to the cursor blink (32)
+    if (g_MapHeroPulse) {
+        int t = frame % g_MapHeroPeriod, ex, hx, hy, hw, hh;
+        u8 c;
+        for (i = 0; i < g_CastleRoomCount; i++) {
+            rm = &g_CastleRooms[i];
+            if (rm->stage != g_StageId || D_8009791C.x < rm->left ||
+                D_8009791C.x > rm->right || D_8009791C.y < rm->top ||
+                D_8009791C.y > rm->bottom) {
+                continue;
+            }
+            hx = CellX(rm->left);
+            hy = CellY(rm->top);
+            hw = CellX(rm->right + 1) - hx - gap;
+            hh = CellY(rm->bottom + 1) - hy - gap;
+            // grows by about a third of a cell (min 2 px), fades 255 -> 80
+            ex = 1 + t * MAX(2, (CellX(1) - CellX(0)) / 3) / g_MapHeroPeriod;
+            c = 255 - 175 * t / g_MapHeroPeriod;
+            ClipRect(hx - ex, hy - ex, hw + 2 * ex, 1, x0, my0, x1, map_bottom, c, c, c);
+            ClipRect(hx - ex, hy + hh + ex - 1, hw + 2 * ex, 1, x0, my0, x1, map_bottom, c, c, c);
+            ClipRect(hx - ex, hy - ex, 1, hh + 2 * ex, x0, my0, x1, map_bottom, c, c, c);
+            ClipRect(hx + hw + ex - 1, hy - ex, 1, hh + 2 * ex, x0, my0, x1, map_bottom, c, c, c);
+            break;
+        }
+    }
     // markers over the rooms: a square in the middle of each marked area
     for (i = 0; i < g_CastleMarkCount; i++) {
         const struct CastleMark* mk = &g_CastleMarks[i];

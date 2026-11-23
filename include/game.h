@@ -1008,6 +1008,9 @@ void PortMenu_RightStick(int* x, int* y);
 // sotn.ini (src/pc/wide.c): stick_dpad = 0|1, stick_dead = percent,
 // look_stick_range_px = game px (0 = off), look_stick_dead = percent
 extern int g_StickDpad, g_StickDead, g_LookRange, g_LookDead;
+// sotn.ini map_hero_pulse = 0|1 (1), map_hero_pulse_period = 16..240 frames
+// (47): a ring round the hero room on the port map (port_menu.c)
+extern int g_MapHeroPulse, g_MapHeroPeriod;
 void Wide_LoadIni(const char* path);
 // scale = max: always the highest scale the output allows
 #define WIDE_SCALE_MAX 99
