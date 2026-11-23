@@ -128,6 +128,7 @@ void EntityCutsceneDialogue(Entity* self) {
         return;
     case DIALOGUE_RUN:
         while (true) {
+            CS_FF();
             if (g_Dialogue.nextCharTimer && !skip_cutscene) {
                 g_Dialogue.nextCharTimer--;
                 return;

@@ -74,6 +74,7 @@ enum {
     ITEM_CDROOMS, // skip_cd_rooms
     ITEM_LOADING, // show_loading_text
     ITEM_EDGEFADE, // room_edge_fade
+    ITEM_DIALOGSKIP, // dialogue_skip
     ITEM_OVERLAY,
     ITEM_FPS,
     ITEM_EDITOR, // the HTTP editor server; its address shows in the next line
@@ -1199,6 +1200,10 @@ static void Change(int dir) {
                 "[cdroom] menu: skip_cd_rooms %d show_loading_text %d\n",
                 g_SkipCdRooms, g_ShowLoadingText);
         Wide_SaveIni();
+    } else if (sel == ITEM_DIALOGSKIP) {
+        g_DialogSkip ^= 1;
+        fprintf(stderr, "[dlgskip] menu: dialogue_skip %d\n", g_DialogSkip);
+        Wide_SaveIni();
     } else if (sel == ITEM_EDGEFADE) {
         g_RoomEdgeFade ^= 1;
         fprintf(stderr, "[video] menu: room_edge_fade %d\n", g_RoomEdgeFade);
@@ -1721,6 +1726,7 @@ enum {
     P_WARP_GO = 232, // the warp map: Телепортуватись, Обрати, no other warp
     P_WARP_PICK,
     P_WARP_NONE,
+    P_DIALOGSKIP, // 235: DIALOGUE SKIP
 };
 #define LINE_MAX 64
 #define MARK_ESC 0xFE
@@ -1950,20 +1956,22 @@ static void DrawMain(void) {
         {-1, "WARP MAP"},
         {P_CDROOMS, "SKIP CD ROOMS"},
         {P_LOADING, "LOADING TEXT"}, {P_EDGEFADE, "ROOM EDGE FADE"},
+        {P_DIALOGSKIP, "DIALOGUE SKIP"},
         {P_OVERLAY, "OVERLAY"}, {-1, "FPS"},
         {P_EDITOR, "EDITOR"},   {P_CONTROLS, "CONTROLS"},
         {P_CHEATS, "CHEATS"},   {P_EXIT, "EXIT GAME"},
         {P_CLOSE, "CLOSE"},
     };
-    int on[6];
+    int on[7];
     char lines[N_MAIN + 1][LINE_MAX], tmp[40];
     int scale, lo, hi, i, col = 0;
     on[0] = g_SkipCdRooms;
     on[1] = g_ShowLoadingText;
     on[2] = g_RoomEdgeFade;
-    on[3] = g_OverlayOn;
-    on[4] = g_FpsOn;
-    on[5] = g_EditorOn;
+    on[3] = g_DialogSkip;
+    on[4] = g_OverlayOn;
+    on[5] = g_FpsOn;
+    on[6] = g_EditorOn;
     Wide_MenuGet(&scale, &lo, &hi);
     for (i = 0; i < N_MAIN; i++) {
         Clear(lines[i]);
@@ -2042,7 +2050,7 @@ static void DrawMain(void) {
     Add(lines[ITEM_CONFIRM], " >");
     AddValue(lines[ITEM_WARPMAP], g_WarpMapPick ? P_ON : P_OFF,
              g_WarpMapPick ? "ON" : "OFF");
-    for (i = 0; i < 6; i++) { // CD ROOMS, LOADING, EDGE, OVERLAY, FPS, EDITOR
+    for (i = 0; i < 7; i++) { // CD ROOMS, LOADING, EDGE, DIALOGUE, OVERLAY, FPS, EDITOR
         AddValue(lines[ITEM_CDROOMS + i], on[i] ? P_ON : P_OFF,
                  on[i] ? "ON" : "OFF");
     }

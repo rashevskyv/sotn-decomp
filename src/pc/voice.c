@@ -6,6 +6,7 @@
 #include <game.h>
 #include <psyz/cd.h>
 #include <cutscene.h>
+#include <sfx.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -78,6 +79,9 @@ static s32 BoxFrames(const u8* p, s32 speed, const u8** end) {
 static const u8 *box_first, *box_end; // the box now typing
 static s32 box_voice = -1, last_voice = -1; // vsync the voice line began
 static s32 box_due, box_frames, box_t0, box_v0, stock_pace = -1;
+// dialogue_skip (sotn.ini): Start types the rest of the box at once, then
+// ends the wait and the voice line of the finished box
+static s32 skip_ff, skip_press, skip_hook, skip_box; // vsync stamps
 
 // frames this step (stock n) may take of the time left; n when not paced
 static u8 Pace(s32 n, s32 rest) {
@@ -125,6 +129,9 @@ u8 Cutscene_CharTimer(u8 n, const u8* p) {
                 (s32)(g_Timer - box_t0), (now - box_v0) * 50 / 3, box_frames,
                 box_voice < 0 ? -1 : (now - box_voice) * 50 / 3);
     }
+    if (skip_ff && rest) {
+        return 0;
+    }
     return Pace(n, rest);
 }
 
@@ -137,5 +144,75 @@ u8 Cutscene_WaitTimer(u8** pp, u8 n) {
         return w;
     }
     rest = BoxFrames(p + 1, n, &end);
+    if (skip_ff && rest) {
+        return 0;
+    }
     return rest ? Pace(w, rest) : w; // a wait after the last char stays
+}
+
+void Cutscene_SkipReset(void) {
+    box_first = box_end = NULL;
+    skip_ff = skip_press = skip_hook = skip_box = 0;
+}
+
+// Pads (src/dra/pads.c): with dialogue_skip on, Start is the skip button
+// while a dialogue shows. It never reaches the game then (no pause).
+// A dialogue shows: its script ran this or the last frames, and a box was
+// open at most 2 s ago (a pause between two boxes counts).
+void Cutscene_PadFilter(Pad* pad) {
+    static int held, was_down; // Start taken by us; Start was down (raw)
+    s32 now = VSync(-1);
+    int down = (pad->pressed & PAD_START) != 0;
+    int tap = down && !was_down;
+    was_down = down;
+    if (!g_DialogSkip || !down) {
+        held = 0;
+        return;
+    }
+    if (tap && skip_hook && now - skip_hook <= 30 && skip_box &&
+        now - skip_box <= 120) {
+        held = 1;
+        skip_press = now;
+    }
+    if (held) { // until Start is up
+        pad->pressed &= ~PAD_START;
+        pad->tapped &= ~PAD_START;
+    }
+}
+
+// Each frame of the script loop (CS_FF, include/cutscene.h), before its
+// timer check. The press: text left in the box -> type it at once (the
+// timers are 0 until the last char); box complete -> end the wait and stop
+// the voice line, so the next op runs. Nothing outside a box is skipped.
+void Cutscene_Fast(u8* timer, u8** script) {
+    const u8* end;
+    s32 now = VSync(-1), s;
+    int inbox = box_first && *script >= box_first && *script <= box_end;
+    skip_hook = now;
+    if (inbox) {
+        skip_box = now;
+    }
+    if (skip_ff && !(inbox && BoxFrames(*script, 0, &end))) {
+        skip_ff = 0;
+    }
+    if (skip_press && now - skip_press > 3) {
+        skip_press = 0;
+    }
+    if (skip_press && g_DialogSkip && inbox) {
+        skip_press = 0;
+        if (BoxFrames(*script, 0, &end)) {
+            skip_ff = 1;
+            fprintf(stderr, "[dlgskip] press: type the box at once\n");
+        } else {
+            fprintf(stderr, "[dlgskip] press: next box, timer %d, voice %s\n",
+                    *timer, Cutscene_VoiceClip(&s) > 0 ? "stopped" : "none");
+            *timer = 0;
+            if (Cutscene_VoiceClip(&s) > 0) {
+                g_api.PlaySfx(SET_STOP_MUSIC);
+            }
+        }
+    }
+    if (skip_ff) {
+        *timer = 0;
+    }
 }

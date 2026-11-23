@@ -377,6 +377,7 @@ void CutscenePcAlloc(const CutsceneSymbolRange* symbols, int count) {
         return;
     }
 
+    Cutscene_SkipReset();
     LangSwap(&symbols, &count);
     _symbols = symbols;
     _symbolCount = count;

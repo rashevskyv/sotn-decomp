@@ -104,6 +104,7 @@ void EntityCutscene(Entity* self) {
     case 1:
         // this is a huge While-loop! Don't miss it!
         while (1) {
+            CS_FF();
             if ((g_Dialogue.nextCharTimer != 0) && !g_SkipCutscene) {
                 g_Dialogue.nextCharTimer--;
                 return;

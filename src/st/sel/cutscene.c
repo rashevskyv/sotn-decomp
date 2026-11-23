@@ -180,6 +180,7 @@ void EntityCutscene(Entity* self) {
     case 1:
         while (true) {
 #if IS_VER_INTL
+            CS_FF();
             if (g_Dialogue.nextCharTimer && !g_SkipCutscene) {
 #if REGION == REGION_EU
                 // advance the text faster to compensate for 50Hz on PAL
@@ -202,6 +203,7 @@ void EntityCutscene(Entity* self) {
             nextChar = *g_Dialogue.scriptCur++;
 #else
             nextChar = *g_Dialogue.scriptCur++;
+            CS_FF();
             if (g_Dialogue.nextCharTimer && !g_SkipCutscene) {
                 g_Dialogue.scriptCur--;
                 g_Dialogue.nextCharTimer--;

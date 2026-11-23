@@ -132,6 +132,7 @@ int g_StickDpad = 1;  // stick_dpad in sotn.ini
 int g_StickDead = 35;  // stick_dead: percent of the left stick
 int g_LookRange = 48;  // look_stick_range_px: about the player height
 int g_MapHeroPulse = 1, g_MapHeroPeriod = 47; // sotn.ini, game.h
+int g_DialogSkip = 0, g_PrologueFF = 1;        // sotn.ini, game.h
 int g_LookDead = 20;   // look_stick_dead: percent of the right stick
 static const char ini_buttons[] =
     "\n"
@@ -272,6 +273,8 @@ static const struct {
     {"room_stitch", &g_RoomStitch},
     {"skip_cd_rooms", &g_SkipCdRooms},
     {"show_loading_text", &g_ShowLoadingText},
+    {"dialogue_skip", &g_DialogSkip},
+    {"prologue_fast_forward", &g_PrologueFF},
     {"room_edge_fade", &g_RoomEdgeFade},
     {"elevator_front_ornaments", &g_ElevatorFront},
 };
@@ -388,6 +391,13 @@ void Wide_SaveIni(void) {
     fputs(ini_loading, f);
     fprintf(f, "skip_cd_rooms = %d\nshow_loading_text = %d\n", g_SkipCdRooms,
             g_ShowLoadingText);
+    fputs("; dialogue_skip: 1 = Start skips dialogues: the first press types the\n"
+          "; rest of the box, the next one goes to the next box (and stops its\n"
+          "; voice line). Start does not pause while a dialogue shows.\n"
+          "; prologue_fast_forward: 1 = hold Cross (B on the Switch) to run the\n"
+          "; prologue text scroll 4 times faster.\n", f);
+    fprintf(f, "dialogue_skip = %d\nprologue_fast_forward = %d\n", g_DialogSkip,
+            g_PrologueFF);
     fclose(f);
 }
 

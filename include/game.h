@@ -1011,6 +1011,12 @@ extern int g_StickDpad, g_StickDead, g_LookRange, g_LookDead;
 // sotn.ini map_hero_pulse = 0|1 (1), map_hero_pulse_period = 16..240 frames
 // (47): a ring round the hero room on the port map (port_menu.c)
 extern int g_MapHeroPulse, g_MapHeroPeriod;
+// sotn.ini dialogue_skip = 0|1 (0): Start skips dialogues, box by box
+// (src/pc/voice.c). prologue_fast_forward = 0|1 (1): hold Cross (B on the
+// Switch) to speed the prologue scroll up (src/st/st0/prologue_scroll.c).
+extern int g_DialogSkip, g_PrologueFF;
+void Cutscene_PadFilter(Pad* pad);
+void Cutscene_SkipReset(void);
 void Wide_LoadIni(const char* path);
 // scale = max: always the highest scale the output allows
 #define WIDE_SCALE_MAX 99

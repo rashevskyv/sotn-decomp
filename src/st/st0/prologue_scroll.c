@@ -233,6 +233,27 @@ static s32 IsSkipRequested(void) {
     return 0;
 }
 
+#define PROLOGUE_FF 4 // the speed factor while the button is held
+#ifdef PLATFORM_PSYZ
+static s32 PrologueFFTimes(void) {
+    static s32 on, step = -1;
+    s32 now = g_PrologueFF && (g_pads[0].pressed & PAD_CROSS);
+    if (on != now || step != g_GameStep) {
+        fprintf(stderr, "[prologue] step %d scroll %d timer %d fast %d\n",
+                g_GameStep, D_801BEE00, D_801BEE04, now);
+        on = now;
+        step = g_GameStep;
+    }
+    if (now) { // the cloud drift of PrologueWide keeps step
+        wide_clock += PROLOGUE_FF - 1;
+        return PROLOGUE_FF;
+    }
+    return 1;
+}
+#else
+#define PrologueFFTimes() 1
+#endif
+
 // Post-Dracula fight prologue scroll. This is responsible for scrolling the
 // prologue text and displaying the Castlevania logo.
 void PrologueScroll(void) {
@@ -242,6 +263,7 @@ void PrologueScroll(void) {
     s32 skip;
     Entity* entity;
     s32 primIndex;
+    s32 ffn, ffTimes;
 
 #if TARGET == TARGET_PSP
     const int EndTimer = 0x14C0; // approximately 110 seconds
@@ -250,6 +272,15 @@ void PrologueScroll(void) {
 #else
     const int EndTimer = 0x14B0; // approximately 110 seconds
     entity = &g_Entities[STAGE_ENTITY_START];
+#endif
+#ifdef PLATFORM_PSYZ
+    {
+        static s32 last = -1;
+        if (last != g_GameStep) { // the test log
+            last = g_GameStep;
+            fprintf(stderr, "[prologue] step %d%s", g_GameStep, "\n");
+        }
+    }
 #endif
     switch (g_GameStep) {
     case 0:
@@ -395,7 +426,12 @@ void PrologueScroll(void) {
         }
         break;
     case 6: // 0x801B096C
-        // prologue scroll
+        // prologue scroll. prologue_fast_forward: while Cross (B on the
+        // Switch) is held, this step runs PROLOGUE_FF times a frame: the text,
+        // the picture and the end timer keep one speed. The music goes on at
+        // its own pace; the fade of step 16 ends it after the scroll.
+        ffTimes = PrologueFFTimes();
+        for (ffn = 0; ffn < ffTimes && g_GameStep == 6; ffn++) {
         func_801B1298(entity);
         D_801BEDFC++;
         D_801BEE04++;
@@ -438,6 +474,7 @@ void PrologueScroll(void) {
         skip = IsSkipRequested();
         if (skip) {
             g_GameStep = Play_16;
+        }
         }
         break;
     case 7: // 0x801B0AE8

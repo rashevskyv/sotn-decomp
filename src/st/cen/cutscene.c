@@ -328,6 +328,7 @@ void EntityCutscene(Entity* self) {
                 g_Dialogue.nextCharTimer = 0;
             }
 #endif
+            CS_FF();
             if (g_Dialogue.nextCharTimer && !g_SkipCutscene) {
                 g_Dialogue.nextCharTimer--;
 #if VERSION < VER_JP10 || TARGET == TARGET_PSP

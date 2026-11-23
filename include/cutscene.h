@@ -67,6 +67,10 @@ u8* Lang_NextBox(u8* p);
     }                                                                          \
     g_Dialogue.scriptCur = Lang_NextBox(g_Dialogue.scriptCur);
 u8* CutsceneAddrToPc(u32 psxAddr);
+// dialogue_skip (src/pc/voice.c): called before the timer check of the
+// script loop; Start types the rest of the box, then ends its wait.
+void Cutscene_Fast(u8* timer, u8** script);
+#define CS_FF() Cutscene_Fast(&g_Dialogue.nextCharTimer, (u8**)&g_Dialogue.scriptCur)
 #define CS_NEXT(ptr) (u16*)CutsceneAddrToPc(ptr)
 #define CS_PTR(ptr) CutsceneAddrToPc((u32)(uintptr_t)(ptr) + 0x100000)
 // The wait after a char and a SET_WAIT inside the text: shorter while a
@@ -90,6 +94,9 @@ s32 Lang_DialogueTextShift(void);
 #endif
 #ifndef CS_VOICE_WAIT
 #define CS_VOICE_WAIT()
+#endif
+#ifndef CS_FF
+#define CS_FF()
 #endif
 #ifndef CS_CHAR_TIMER
 #define CS_CHAR_TIMER(n) (n)

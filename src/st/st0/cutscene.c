@@ -315,6 +315,7 @@ void EntityCutscene(Entity* self) {
         nextByte = 0;
         // this is a huge While-loop! Don't miss it!
         while (true) {
+            CS_FF();
             if (g_Dialogue.nextCharTimer && !g_SkipCutscene) {
                 g_Dialogue.nextCharTimer--;
                 return;

@@ -143,6 +143,7 @@ void func_us_801A7DC0(Entity* self) {
     case DIALOGUE_RUN:
         nextChar = 0;
         while (true) {
+            CS_FF();
             if ((g_Dialogue.nextCharTimer) && !g_SkipCutscene) {
                 g_Dialogue.nextCharTimer--;
                 return;

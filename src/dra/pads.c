@@ -86,6 +86,11 @@ void ReadPads(void) {
 #endif
 
         pad->tapped = (pad->pressed ^ pad->previous) & pad->pressed;
+#ifdef PLATFORM_PSYZ
+        if (i == 0) {
+            Cutscene_PadFilter(pad); // dialogue_skip: Start skips, no pause
+        }
+#endif
     }
     UpdatePadsRepeat();
 }

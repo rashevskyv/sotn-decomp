@@ -305,6 +305,7 @@ void EntityCutsceneDialogue(Entity* self) {
             if (PadReadPSP() & PAD_START) {
                 g_Dialogue.nextCharTimer = 0;
             }
+            CS_FF();
             if ((g_Dialogue.nextCharTimer) && !skip_cutscene) {
                 g_Dialogue.nextCharTimer--;
                 g_Dialogue.scriptCur--;
@@ -312,6 +313,7 @@ void EntityCutsceneDialogue(Entity* self) {
             }
             if (!(nextChar & 0x80)) {
 #else
+            CS_FF();
             if ((g_Dialogue.nextCharTimer) && !skip_cutscene) {
                 g_Dialogue.nextCharTimer--;
                 return;

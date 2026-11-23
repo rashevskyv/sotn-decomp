@@ -283,6 +283,7 @@ void EntityCutscene(Entity* self) {
             }
 #endif
 #endif
+            CS_FF();
             if (g_Dialogue.nextCharTimer && !g_SkipCutscene) {
                 g_Dialogue.nextCharTimer--;
 #if VERSION != VER_US
