@@ -40,6 +40,15 @@
 #include <psyz/input.h>
 #include "wide.h"
 #include <psyz/video.h>
+#include "room_stitch.h"
+#ifndef __SWITCH__
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <spawn.h>
+extern char** environ;
+#endif
+#endif
 #ifdef __SWITCH__
 #include <unistd.h>
 #include <SDL3/SDL.h>
@@ -60,39 +69,144 @@ enum {
 };
 extern int g_WarpMapPick; // warp_map
 enum {
+    ITEM_CAT_DISPLAY,
+    ITEM_CAT_LANG,
+    ITEM_CAT_CONTROLS,
+    ITEM_CAT_QOL,
+    ITEM_CAT_CHEATS,
+    ITEM_CAT_DEV,
+    ITEM_KEYS,
+    ITEM_RESTART,
+    ITEM_EXIT,
+    ITEM_CLOSE,
+    ITEM_BACK,
     ITEM_SCALE,
-    ITEM_ASPECT, // the picture shape, for tests (g_Aspect)
-#ifndef __SWITCH__
-    ITEM_FULLSCREEN, // the window mode, saved as the mode at the start
-#endif
-    ITEM_VOICE,
-    ITEM_MUSIC, // music_source
+    ITEM_ASPECT,
+    ITEM_FULLSCREEN,
+    ITEM_MENUFILL,
+    ITEM_EDGEFADE,
+    ITEM_LOADING,
+    ITEM_ELEVATOR,
+    ITEM_HD,
     ITEM_LANGUAGE,
-    ITEM_BUTTONS, // the button marks of the menus
-    ITEM_CONFIRM, // menu_confirm
-    ITEM_WARPMAP, // warp_map
-    ITEM_CDROOMS, // skip_cd_rooms
-    ITEM_LOADING, // show_loading_text
-    ITEM_EDGEFADE, // room_edge_fade
-    ITEM_DIALOGSKIP, // dialogue_skip
+    ITEM_VOICE,
+    ITEM_MUSIC,
+    ITEM_BUTTONS,
+    ITEM_CONFIRM,
+    ITEM_STICKDPAD,
+    ITEM_STICKDEAD,
+    ITEM_LOOKRANGE,
+    ITEM_LOOKDEAD,
+    ITEM_PADBG,
+    ITEM_SKIPPROLOGUE,
+    ITEM_PROLOGUEFF,
+    ITEM_CDROOMS,
+    ITEM_WARPMAP,
+    ITEM_DIALOGSKIP,
+    ITEM_MAP100,
+    ITEM_HEROPULSE,
+    ITEM_RELICTOG,
+    ITEM_JPCARDS,
     ITEM_OVERLAY,
     ITEM_FPS,
-    ITEM_EDITOR, // the HTTP editor server; its address shows in the next line
-    ITEM_CONTROLS,
-    ITEM_CHEATS,
-    ITEM_EXIT, // quit to hbmenu (PC: end the process); press twice
-    ITEM_CLOSE,
+    ITEM_EDITOR,
+    ITEM_HDDUMP,
+    ITEM_HDSTATS,
+    ITEM_STITCH,
+    ITEM_RELICHINT,
     N_MAIN
 };
+#define CHEAT_HELP_WORD 344 // the help words of the cheats page
+// one row of the menu: its label word, English label, one line of help
+static const struct {
+    s16 word;
+    const char* en;
+    s16 help;
+    const char* help_en;
+} menu_items[N_MAIN] = {
+    [ITEM_CAT_DISPLAY] = {237, "DISPLAY", 300, "SCALE, SHAPE, WINDOW AND TEXTURES."},
+    [ITEM_CAT_LANG] = {238, "LANGUAGE AND SOUND", 301, "LANGUAGE, VOICE SET AND MUSIC."},
+    [ITEM_CAT_CONTROLS] = {200, "CONTROLS", 302, "KEYS, BUTTONS, STICKS AND THE PAD."},
+    [ITEM_CAT_QOL] = {239, "QUALITY OF LIFE", 303, "SMALL HELPS: SKIPS, HINTS, SWITCHES."},
+    [ITEM_CAT_CHEATS] = {26, "CHEATS", 304, "CHEATS, CHARACTER AND TELEPORT."},
+    [ITEM_CAT_DEV] = {240, "DEVELOPER", 305, "OVERLAY, FPS, EDITOR AND TEST TOOLS."},
+    [ITEM_KEYS] = {241, "KEY BINDINGS", 306, "A KEY AND A PAD BUTTON FOR EACH PS BUTTON."},
+    [ITEM_RESTART] = {34, "RESTART", 307, "START THE GAME AGAIN. PRESS TWICE."},
+    [ITEM_EXIT] = {27, "EXIT GAME", 308, "QUIT THE GAME. PRESS TWICE."},
+    [ITEM_CLOSE] = {28, "CLOSE", 309, "CLOSE THIS MENU."},
+    [ITEM_BACK] = {32, "BACK", 310, "GO BACK ONE PAGE."},
+    [ITEM_SCALE] = {20, "SCALE", 311, "PIXEL SIZE OF THE PICTURE. MAX FILLS THE SCREEN."},
+    [ITEM_ASPECT] = {220, "ASPECT", 312, "SHAPE OF THE PICTURE INSIDE THE WINDOW."},
+    [ITEM_FULLSCREEN] = {214, "FULLSCREEN", 313, "WINDOW OR FULL SCREEN. THE KEY F11 TOO."},
+    [ITEM_MENUFILL] = {236, "MENU FILL", 314, "PAUSE MENUS FILL A WIDE SCREEN."},
+    [ITEM_EDGEFADE] = {218, "ROOM EDGE FADE", 315, "BLACK PAST THE ROOM EDGE, THE EDGE FADES."},
+    [ITEM_LOADING] = {217, "LOADING TEXT", 316, "SHOW NOW LOADING WHILE A STAGE LOADS."},
+    [ITEM_ELEVATOR] = {242, "ELEVATOR ORNAMENTS", 317, "CLOCK TOWER LATTICE DRAWS IN FRONT."},
+    [ITEM_HD] = {243, "HD TEXTURES", 318, "PNG TEXTURE PACKS. APPLIES AT THE NEXT START."},
+    [ITEM_LANGUAGE] = {22, "LANGUAGE", 319, "GAME LANGUAGE. APPLIES AT THE NEXT START."},
+    [ITEM_VOICE] = {259, "VOICE SET", 320, "VOICE AND THE MATCHING DIALOGUE SCRIPT."},
+    [ITEM_MUSIC] = {228, "MUSIC", 321, "DISC MUSIC OR ENHANCED MUSIC FILES."},
+    [ITEM_BUTTONS] = {260, "BUTTON MARKS", 322, "THE BUTTON PICTURES SHOWN IN THE MENUS."},
+    [ITEM_CONFIRM] = {219, "MENU CONFIRM", 323, "THE PAD BUTTON THAT CONFIRMS IN MENUS."},
+    [ITEM_STICKDPAD] = {244, "STICK AS D-PAD", 324, "THE LEFT STICK ALSO WORKS AS THE D-PAD."},
+    [ITEM_STICKDEAD] = {245, "STICK DEAD ZONE", 325, "LEFT STICK DEAD ZONE, IN PERCENT."},
+    [ITEM_LOOKRANGE] = {246, "LOOK RANGE", 326, "RIGHT STICK VIEW RANGE IN PIXELS. 0 IS OFF."},
+    [ITEM_LOOKDEAD] = {247, "LOOK DEAD ZONE", 327, "RIGHT STICK DEAD ZONE, IN PERCENT."},
+    [ITEM_PADBG] = {248, "PAD IN BACKGROUND", 328, "THE PAD WORKS WHEN THE WINDOW HAS NO FOCUS."},
+    [ITEM_SKIPPROLOGUE] = {40, "SKIP PROLOGUE", 329, "A NEW GAME STARTS AT THE CASTLE GATE."},
+    [ITEM_PROLOGUEFF] = {257, "PROLOGUE SPEED", 330, "HOLD CROSS TO SPEED IT UP. B ON THE SWITCH."},
+    [ITEM_CDROOMS] = {216, "SKIP CD ROOMS", 331, "A CD LOADING CORRIDOR IS SKIPPED."},
+    [ITEM_WARPMAP] = {255, "WARP MAP", 332, "A WARP PORTAL SHOWS A MAP TO PICK THE ROOM."},
+    [ITEM_DIALOGSKIP] = {235, "DIALOGUE SKIP", 333, "START SKIPS DIALOGUE TEXT AND ITS WAIT."},
+    [ITEM_MAP100] = {41, "100% MAP", 334, "BOTH CASTLE MAPS FULLY EXPLORED."},
+    [ITEM_HEROPULSE] = {249, "HERO ROOM PULSE", 335, "A RING PULSES ROUND YOUR ROOM ON THE MAP."},
+    [ITEM_RELICTOG] = {250, "RELIC SWITCH", 336, "THE LOOK OF THE RELIC SWITCH."},
+    [ITEM_JPCARDS] = {251, "JP CARDS", 337, "JP FAMILIAR CARDS. APPLIES AT THE NEXT START."},
+    [ITEM_OVERLAY] = {24, "OVERLAY", 338, "THE CORNER SHOWS STAGE, ROOM AND CHEATS."},
+    [ITEM_FPS] = {256, "FPS", 339, "THE CORNER SHOWS FRAMES PER SECOND."},
+    [ITEM_EDITOR] = {25, "EDITOR", 340, "HTTP TILE EDITOR ON PORT 8080."},
+    [ITEM_HDDUMP] = {252, "HD DUMP", 341, "WRITE DRAWN PICTURES TO FILES FOR ARTISTS."},
+    [ITEM_HDSTATS] = {253, "HD STATS", 342, "LOG FRAME TIMES AND HD COUNTS."},
+    [ITEM_STITCH] = {254, "ROOM STITCH", 343, "SIDE ROOMS PLAY AS ONE WIDE ROOM. A TEST."},
+    [ITEM_RELICHINT] = {258, "RELIC HINT", 360, "A NOTE WHEN YOU PICK UP A NEW RELIC."},
+};
+// the pages of the main menu: a category is a list of rows (-1 ends it).
+// A future "quick item" button row of Controls goes next to KEYS.
+enum { CAT_TOP, CAT_DISPLAY, CAT_LANG, CAT_CONTROLS, CAT_QOL, CAT_DEV };
+static const s8 cat_rows[][16] = {
+    [CAT_TOP] = {ITEM_LANGUAGE, ITEM_CAT_DISPLAY, ITEM_CAT_LANG,
+                 ITEM_CAT_CONTROLS, ITEM_CAT_QOL, ITEM_CAT_CHEATS,
+                 ITEM_CAT_DEV,
+#ifndef __SWITCH__
+                 ITEM_RESTART, // Switch: no restart (hbmenu starts it)
+#endif
+                 ITEM_EXIT, ITEM_CLOSE, -1},
+    [CAT_DISPLAY] = {ITEM_SCALE, ITEM_ASPECT,
+#ifndef __SWITCH__
+                     ITEM_FULLSCREEN,
+#endif
+                     ITEM_MENUFILL, ITEM_EDGEFADE, ITEM_LOADING,
+                     ITEM_ELEVATOR, ITEM_HD, ITEM_BACK, -1},
+    [CAT_LANG] = {ITEM_LANGUAGE, ITEM_VOICE, ITEM_MUSIC, ITEM_BACK, -1},
+    [CAT_CONTROLS] = {ITEM_KEYS, ITEM_BUTTONS, ITEM_CONFIRM, ITEM_STICKDPAD,
+                      ITEM_STICKDEAD, ITEM_LOOKRANGE, ITEM_LOOKDEAD,
+                      ITEM_PADBG, ITEM_BACK, -1},
+    [CAT_QOL] = {ITEM_SKIPPROLOGUE, ITEM_PROLOGUEFF, ITEM_CDROOMS,
+                 ITEM_WARPMAP, ITEM_DIALOGSKIP, ITEM_MAP100, ITEM_HEROPULSE,
+                 ITEM_RELICTOG, ITEM_RELICHINT, ITEM_JPCARDS, ITEM_BACK, -1},
+    [CAT_DEV] = {ITEM_OVERLAY, ITEM_FPS, ITEM_EDITOR, ITEM_HDDUMP,
+                 ITEM_HDSTATS, ITEM_STITCH, ITEM_BACK, -1},
+};
+static int cat;      // the category on the main page
+static int cat_from; // the line of the top page that opened a page
+static int hint_relic = -1, hint_timer, hint_age; // the relic hint
+extern int g_HdTextures, g_HdDump, g_HdStats, g_BackgroundInput;
 enum {
     CH_REFILL,
     CH_INVINCIBLE,
     CH_WALLS,
     CH_ITEMS,
-    CH_SKIP,
-    CH_MAP,
     CH_CHARACTER,
-    CH_APPLY,
     CH_TELEPORT,
     CH_BACK,
     N_CHEATS
@@ -377,6 +491,35 @@ static void Quit(void) {
     SDL_zero(e);
     e.type = SDL_EVENT_QUIT;
     SDL_PushEvent(&e);
+}
+
+// Restart: the same program with the same arguments, then the quit above.
+// Switch: no row (hbmenu starts the program).
+extern int g_ArgC;
+extern char** g_ArgV;
+static void Restart(void) {
+#ifndef __SWITCH__
+    static char q[32][512];
+    char* av[33];
+    int i, n = MIN(g_ArgC, 32);
+    Wide_SaveIni();
+    for (i = 0; i < n; i++) { // the Windows C runtime does not quote
+        snprintf(q[i], sizeof(q[i]), strchr(g_ArgV[i], ' ') ? "\"%s\"" : "%s",
+                 g_ArgV[i]);
+        av[i] = q[i];
+    }
+    av[n] = NULL;
+    fprintf(stderr, "[menu] restart: %s\n", n ? av[0] : "?");
+#ifdef _WIN32
+    _spawnvp(_P_NOWAIT, av[0], (const char* const*)av);
+#else
+    {
+        pid_t pid;
+        posix_spawn(&pid, "/proc/self/exe", NULL, NULL, av, environ);
+    }
+#endif
+#endif
+    Quit();
 }
 
 int PortMenu_IsOpen(void) { return is_open; }
@@ -780,21 +923,41 @@ static void Hover(int x, int y) {
 }
 #endif
 
-// The main page has one more line while the editor server is on: its
-// address, under EDITOR. Line -> item, -1 for the address line.
-static int MainLines(void) { return N_MAIN + (Editor_Status() != NULL); }
+// The main page: the rows of the category on show. In the developer page
+// one more line shows while the editor server is on: its address, under
+// EDITOR. Line -> row, -1 for the address line.
+static int MainRows(void) {
+    int n = 0;
+    while (cat_rows[cat][n] >= 0) {
+        n++;
+    }
+    return n;
+}
+static int CatItem(void) { return cat_rows[cat][MIN(sel, MainRows() - 1)]; }
+static int EditorRow(void) {
+    int i;
+    for (i = 0; Editor_Status() && cat_rows[cat][i] >= 0; i++) {
+        if (cat_rows[cat][i] == ITEM_EDITOR) {
+            return i;
+        }
+    }
+    return -1;
+}
+static int MainLines(void) { return MainRows() + (EditorRow() >= 0); }
 static int MainItemAt(int line) {
-    if (!Editor_Status() || line <= ITEM_EDITOR) {
+    int e = EditorRow();
+    if (e < 0 || line <= e) {
         return line;
     }
-    return line == ITEM_EDITOR + 1 ? -1 : line - 1;
+    return line == e + 1 ? -1 : line - 1;
 }
 static int MainLineOf(int item) {
-    return Editor_Status() && item > ITEM_EDITOR ? item + 1 : item;
+    int e = EditorRow();
+    return e >= 0 && item > e ? item + 1 : item;
 }
-// the main page scrolls: MAIN_LINES on screen (with the hint they fit the
-// stage rows 20..226), the first is main_top
-#define MAIN_LINES 14
+// the main page scrolls: MAIN_LINES on screen (with the hint and the help
+// line they fit the stage rows 20..226), the first is main_top
+#define MAIN_LINES 12
 static int main_top;
 static int MainVis(void) { return MIN(MAIN_LINES, MainLines()); }
 
@@ -1094,8 +1257,36 @@ static void OnSdlEvent(const SDL_Event* e) {
 
 // ---- pad ----------------------------------------------------------------------
 
+// the rows that are one on/off value in a variable
+static int* ToggleVar(int it) {
+    switch (it) {
+    case ITEM_CDROOMS: return &g_SkipCdRooms;
+    case ITEM_LOADING: return &g_ShowLoadingText;
+    case ITEM_EDGEFADE: return &g_RoomEdgeFade;
+    case ITEM_DIALOGSKIP: return &g_DialogSkip;
+    case ITEM_MENUFILL: return &g_MenuFill;
+    case ITEM_OVERLAY: return &g_OverlayOn;
+    case ITEM_FPS: return &g_FpsOn;
+    case ITEM_EDITOR: return &g_EditorOn;
+    case ITEM_WARPMAP: return &g_WarpMapPick;
+    case ITEM_ELEVATOR: return &g_ElevatorFront;
+    case ITEM_HD: return &g_HdTextures;
+    case ITEM_STICKDPAD: return &g_StickDpad;
+    case ITEM_PADBG: return &g_BackgroundInput;
+    case ITEM_SKIPPROLOGUE: return &g_Cheat.skipPrologue;
+    case ITEM_PROLOGUEFF: return &g_PrologueFF;
+    case ITEM_MAP100: return &g_Cheat.map;
+    case ITEM_HEROPULSE: return &g_MapHeroPulse;
+    case ITEM_HDDUMP: return &g_HdDump;
+    case ITEM_HDSTATS: return &g_HdStats;
+    case ITEM_STITCH: return &g_RoomStitch;
+    case ITEM_RELICHINT: return &g_RelicHint;
+    }
+    return NULL;
+}
+
 static void Change(int dir) {
-    int scale, lo, hi, *flag;
+    int scale, lo, hi, *flag, it = CatItem();
     if (page == PAGE_LIST) { // a page up or down, no wrap
         sel += dir * ListLines();
         sel = sel < 0 ? 0 : sel >= n_items ? n_items - 1 : sel;
@@ -1109,8 +1300,6 @@ static void Change(int dir) {
                : sel == CH_INVINCIBLE ? &g_Cheat.invincible
                : sel == CH_WALLS      ? &g_Cheat.walls
                : sel == CH_ITEMS      ? &g_Cheat.items
-               : sel == CH_SKIP       ? &g_Cheat.skipPrologue
-               : sel == CH_MAP        ? &g_Cheat.map
                                       : NULL;
         if (sel == CH_CHARACTER) {
             // only the values that work; the rest are kept for later
@@ -1120,16 +1309,15 @@ static void Change(int dir) {
         } else if (flag) {
             *flag ^= 1;
             fprintf(stderr,
-                    "[cheat] menu: refill %d invincible %d walls %d items %d "
-                    "map %d skip_prologue %d\n",
+                    "[cheat] menu: refill %d invincible %d walls %d items %d\n",
                     g_Cheat.refill, g_Cheat.invincible, g_Cheat.walls,
-                    g_Cheat.items, g_Cheat.map, g_Cheat.skipPrologue);
+                    g_Cheat.items);
             Wide_SaveIni();
         }
         return;
     }
     Wide_MenuGet(&scale, &lo, &hi);
-    if (sel == ITEM_SCALE) { // lo .. hi, then MAX
+    if (it == ITEM_SCALE) { // lo .. hi, then MAX
         scale = scale == WIDE_SCALE_MAX ? (dir < 0 ? hi : 0)
                 : scale                 ? scale + dir
                                         : (dir > 0 ? lo : hi);
@@ -1140,19 +1328,19 @@ static void Change(int dir) {
             Wide_MenuSet(scale);
         }
 #ifndef __SWITCH__
-    } else if (sel == ITEM_FULLSCREEN) {
+    } else if (it == ITEM_FULLSCREEN) {
         g_Fullscreen = !Psyz_VideoGetFullscreen();
         Psyz_VideoSetFullscreen(g_Fullscreen);
         fprintf(stderr, "[video] menu: fullscreen %d\n", g_Fullscreen);
         Wide_SaveIni();
 #endif
-    } else if (sel == ITEM_VOICE) {
+    } else if (it == ITEM_VOICE) {
         // the next spoken line uses the new set
         g_VoiceSet = (g_VoiceSet + dir + VOICE_COUNT) % VOICE_COUNT;
         fprintf(
             stderr, "[voice] menu: voice %s\n", g_VoiceSetNames[g_VoiceSet]);
         Wide_SaveIni();
-    } else if (sel == ITEM_MUSIC) {
+    } else if (it == ITEM_MUSIC) {
         if (Music_FilesAvailable()) { // the track restarts from the new source
             g_MusicFiles ^= 1;
             Music_Switched();
@@ -1160,13 +1348,13 @@ static void Change(int dir) {
                     g_MusicFiles ? "enhanced" : "original");
             Wide_SaveIni();
         }
-    } else if (sel == ITEM_LANGUAGE) {
+    } else if (it == ITEM_LANGUAGE) {
         // saved only: the language of this run is fixed at boot
         g_LangNext ^= 1;
         fprintf(stderr, "[lang] menu: language %s at the next start\n",
                 g_LangNext ? "uk" : "en");
         Wide_SaveIni();
-    } else if (sel == ITEM_BUTTONS) {
+    } else if (it == ITEM_BUTTONS) {
         // AUTO, PLAYSTATION, XBOX, NINTENDO
         static const int order[] = {-1, BUTTONS_PSX, BUTTONS_XBOX,
                                     BUTTONS_SWITCH};
@@ -1179,9 +1367,9 @@ static void Change(int dir) {
         fprintf(stderr, "[buttons] menu: buttons %s\n",
                 g_ButtonPick < 0 ? "auto" : g_ButtonSetNames[g_ButtonPick]);
         Wide_SaveIni();
-    } else if (sel == ITEM_ASPECT) {
+    } else if (it == ITEM_ASPECT) {
         Wide_SetAspect(g_Aspect + dir); // at the next vsync
-    } else if (sel == ITEM_CONFIRM) {
+    } else if (it == ITEM_CONFIRM) {
         g_MenuConfirm = (g_MenuConfirm + dir + MENU_CONFIRMS) % MENU_CONFIRMS;
         fprintf(stderr, "[pad] menu: menu_confirm %s (now %s)\n",
                 g_MenuConfirmNames[g_MenuConfirm],
@@ -1189,55 +1377,92 @@ static void Change(int dir) {
                     ? "stock"
                     : g_MenuConfirmNames[PortMenu_ConfirmMode()]);
         Wide_SaveIni();
-    } else if (sel == ITEM_WARPMAP) {
+    } else if (it == ITEM_WARPMAP) {
         g_WarpMapPick ^= 1;
         fprintf(stderr, "[warp] menu: warp_map %d\n", g_WarpMapPick);
         Wide_SaveIni();
-    } else if (sel == ITEM_CDROOMS || sel == ITEM_LOADING) {
-        flag = sel == ITEM_CDROOMS ? &g_SkipCdRooms : &g_ShowLoadingText;
+    } else if (it == ITEM_CDROOMS || it == ITEM_LOADING) {
+        flag = it == ITEM_CDROOMS ? &g_SkipCdRooms : &g_ShowLoadingText;
         *flag ^= 1;
         fprintf(stderr,
                 "[cdroom] menu: skip_cd_rooms %d show_loading_text %d\n",
                 g_SkipCdRooms, g_ShowLoadingText);
         Wide_SaveIni();
-    } else if (sel == ITEM_DIALOGSKIP) {
+    } else if (it == ITEM_DIALOGSKIP) {
         g_DialogSkip ^= 1;
         fprintf(stderr, "[dlgskip] menu: dialogue_skip %d\n", g_DialogSkip);
         Wide_SaveIni();
-    } else if (sel == ITEM_EDGEFADE) {
+    } else if (it == ITEM_MENUFILL) {
+        g_MenuFill ^= 1;
+        fprintf(stderr, "[video] menu: menu_fill_screen %d\n", g_MenuFill);
+        Wide_SaveIni();
+    } else if (it == ITEM_EDGEFADE) {
         g_RoomEdgeFade ^= 1;
         fprintf(stderr, "[video] menu: room_edge_fade %d\n", g_RoomEdgeFade);
         Wide_SaveIni();
-    } else if (sel == ITEM_OVERLAY || sel == ITEM_FPS) {
-        flag = sel == ITEM_OVERLAY ? &g_OverlayOn : &g_FpsOn;
+    } else if (it == ITEM_OVERLAY || it == ITEM_FPS) {
+        flag = it == ITEM_OVERLAY ? &g_OverlayOn : &g_FpsOn;
         *flag ^= 1;
         fprintf(stderr, "[overlay] menu: overlay %d fps %d\n", g_OverlayOn,
                 g_FpsOn);
         Wide_SaveIni();
-    } else if (sel == ITEM_EDITOR) {
+    } else if (it == ITEM_EDITOR) {
         // Editor_OnFrame opens or closes the port at the next vsync
         g_EditorOn ^= 1;
         fprintf(stderr, "[editor] menu: editor %d\n", g_EditorOn);
+        Wide_SaveIni();
+    } else if (it == ITEM_STICKDEAD || it == ITEM_LOOKDEAD) {
+        flag = it == ITEM_STICKDEAD ? &g_StickDead : &g_LookDead;
+        *flag = MAX(5, MIN(90, *flag + dir * 5));
+        Wide_SaveIni();
+    } else if (it == ITEM_LOOKRANGE) {
+        g_LookRange = MAX(0, MIN(120, g_LookRange + dir * 8));
+        Wide_SaveIni();
+    } else if (it == ITEM_RELICTOG) {
+        g_RelicToggle ^= 1;
+        Wide_SaveIni();
+    } else if (it == ITEM_JPCARDS) {
+        g_JpCards = (g_JpCards + dir + JP_CARDS_MODES) % JP_CARDS_MODES;
+        Wide_SaveIni(); // read once at the start
+    } else if ((flag = ToggleVar(it))) {
+        *flag ^= 1;
+        fprintf(stderr, "[menu] row %d = %d\n", it, *flag);
         Wide_SaveIni();
     }
 }
 
 // Cross, Circle or a tap on a line
+static void Restart(void);
 static void Activate(void) {
+    int it = page == PAGE_MAIN ? CatItem() : -1;
     if (page == PAGE_MAIN) {
-        if (sel == ITEM_CHEATS) {
+        static const s8 cat_of[] = {CAT_DISPLAY, CAT_LANG, CAT_CONTROLS,
+                                    CAT_QOL, -1, CAT_DEV};
+        if (it == ITEM_CAT_CHEATS) {
+            cat_from = sel;
             page = PAGE_CHEATS;
             sel = 0;
-        } else if (sel == ITEM_CONTROLS) {
+        } else if (it >= ITEM_CAT_DISPLAY && it <= ITEM_CAT_DEV) {
+            cat_from = sel;
+            cat = cat_of[it];
+            sel = 0;
+        } else if (it == ITEM_KEYS) {
             page = PAGE_CONTROLS;
             sel = ctl_top = 0;
-        } else if (sel == ITEM_CLOSE) {
+        } else if (it == ITEM_BACK) {
+            cat = CAT_TOP;
+            sel = cat_from;
+        } else if (it == ITEM_CLOSE) {
             Close();
-        } else if (sel == ITEM_EXIT) {
-            if (exit_armed) {
-                Quit();
+        } else if (it == ITEM_EXIT || it == ITEM_RESTART) {
+            if (exit_armed == it) {
+                if (it == ITEM_EXIT) {
+                    Quit();
+                } else {
+                    Restart();
+                }
             }
-            exit_armed = !exit_armed;
+            exit_armed = exit_armed == it ? 0 : it;
         } else {
             Change(1);
         }
@@ -1245,17 +1470,17 @@ static void Activate(void) {
         if (sel == CH_TELEPORT) {
             map_ready = 0; // the map, on the player's room
             OpenMap();
-        } else if (sel == CH_APPLY) {
+        } else if (sel == CH_CHARACTER) {
             const char* why = Cheat_ApplyCharacter();
             if (why) {
-                Message(why); // shown in the APPLY NOW line
+                Message(why); // shown in the CHARACTER line
             } else {
                 page = PAGE_MAIN;
                 Close();
             }
         } else if (sel == CH_BACK) {
             page = PAGE_MAIN;
-            sel = ITEM_CHEATS;
+            sel = cat_from;
         } else {
             Change(1);
         }
@@ -1269,7 +1494,7 @@ static void Activate(void) {
             Wide_SaveIni();
         } else {
             page = PAGE_MAIN;
-            sel = ITEM_CONTROLS;
+            sel = 0; // the KEYS row of its category
         }
     } else if (page == PAGE_CHOOSE && sel < n_owners) {
         Go(owners[sel]);
@@ -1376,6 +1601,9 @@ u16 PortMenu_Pad(u16 pressed) {
         pressed |= StickDirs();
     }
     tap = pressed & ~prev;
+    if (tap && hint_timer > 0 && hint_age > 20) {
+        hint_timer = 0; // any button closes the relic hint
+    }
 #ifndef __SWITCH__
     static int hooked;
     if (!hooked) {
@@ -1436,7 +1664,8 @@ u16 PortMenu_Pad(u16 pressed) {
         } else if (drawn > 0) {
             is_open = 1;
             page = PAGE_MAIN;
-            sel = ITEM_SCALE;
+            cat = CAT_TOP;
+            sel = cat_from = 0;
             Editor_RefreshAddress(); // the network may have changed
         }
         return 0;
@@ -1461,7 +1690,7 @@ u16 PortMenu_Pad(u16 pressed) {
         MapPad(pressed, tap);
         return 0;
     }
-    count = page == PAGE_MAIN       ? N_MAIN
+    count = page == PAGE_MAIN       ? MainRows()
             : page == PAGE_CHEATS   ? N_CHEATS
             : page == PAGE_CONTROLS ? N_CTL
             : page == PAGE_LIST     ? n_items
@@ -1483,8 +1712,11 @@ u16 PortMenu_Pad(u16 pressed) {
         Activate();
     } else if (tap & PAD_BACK) {
         if (page == PAGE_CHEATS || page == PAGE_CONTROLS) {
-            sel = page == PAGE_CHEATS ? ITEM_CHEATS : ITEM_CONTROLS;
+            sel = page == PAGE_CHEATS ? cat_from : 0;
             page = PAGE_MAIN;
+        } else if (page == PAGE_MAIN && cat != CAT_TOP) {
+            cat = CAT_TOP;
+            sel = cat_from;
         } else if (page == PAGE_CHOOSE) {
             page = PAGE_MAP;
         } else if (page == PAGE_LIST && list_boss) {
@@ -1727,6 +1959,7 @@ enum {
     P_WARP_PICK,
     P_WARP_NONE,
     P_DIALOGSKIP, // 235: DIALOGUE SKIP
+    P_MENUFILL, // 236: MENU FILL
 };
 #define LINE_MAX 64
 #define MARK_ESC 0xFE
@@ -1861,6 +2094,8 @@ static void Line(int x, int y, const char* s, u8 r, u8 g, u8 b) {
 // box lines sb_first.. show them) gets a scroll bar inside the right edge:
 // a thumb as long as the part on screen, at its place.
 static int box_mark = -1, box_min_w;
+static int help_word = -1; // the help line under the box (one frame)
+static const char* help_en;
 static int sb_first, sb_total, sb_top;
 static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     char hint[LINE_MAX];
@@ -1909,6 +2144,17 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     // the button hint under the box; beside the mini map the box lets the
     // rooms under it show through, so its frame is four lines
     Line(x + BORDER, y + h + 4, hint, 255, 255, 64);
+    if (help_en) { // one line of help, centred in the frame
+        char hl[LINE_MAX];
+        int hw, hx;
+        Clear(hl);
+        AddW(hl, help_word, help_en);
+        hw = Width(hl);
+        hx = (FbW() - hw) / 2;
+        Line(hx, y + h + LINE_H + 6, hl, 128, 200, 255);
+        Rect(hx - 4, y + h + LINE_H + 2, hw + 8, LINE_H + 2, 8, 8, 24);
+        help_en = NULL;
+    }
     for (i = 0; box_left && i < count; i++) { // under the text, on the box
         if (i == hi || i == box_mark) {
             Rect(
@@ -1936,133 +2182,179 @@ static void AddValue(char* line, int word, const char* en) {
     Add(line, " >");
 }
 
-static void DrawMain(void) {
+// The words of a value row and the value itself (the part after the label).
+static int boot_val[N_MAIN], boot_set; // the values at the first draw
+
+static void ItemValue(char* line, int it) {
     static const char* voices[VOICE_COUNT] = {"PS1 EN", "JP", "PSP EN"};
     static const char* sets[BUTTON_SETS] = {"NINTENDO", "XBOX",
                                             "PLAYSTATION"};
     static const char* short_sets[BUTTON_SETS] = {"NINTENDO", "XBOX", "PS"};
-    static const struct {
-        int word;
-        const char* en;
-    } labels[N_MAIN] = {
-        {P_SCALE, "SCALE"},
-        {P_ASPECT, "ASPECT"},
+    char tmp[40];
+    int scale, lo, hi, i, *flag = ToggleVar(it);
+    if (flag) {
+        AddValue(line, *flag ? P_ON : P_OFF, *flag ? "ON" : "OFF");
+    }
+    switch (it) {
+    case ITEM_SCALE:
+        Wide_MenuGet(&scale, &lo, &hi);
+        if (scale == WIDE_SCALE_MAX) {
+            Add(line, "< ");
+            AddW(line, P_MAX, "MAX");
+        } else if (scale) { // MAX follows hi
+            sprintf(tmp, "%c %d >", scale > lo ? '<' : ' ', scale);
+            Add(line, tmp);
+        } else {
+            Add(line, "< ");
+            AddW(line, P_AUTO, "AUTO");
+        }
+        break;
 #ifndef __SWITCH__
-        {P_FULLSCREEN, "FULLSCREEN"},
+    case ITEM_FULLSCREEN:
+        i = Psyz_VideoGetFullscreen(); // F11 and Esc change it too
+        AddValue(line, i ? P_ON : P_OFF, i ? "ON" : "OFF");
+        break;
 #endif
-        {P_VOICE, "VOICE"},     {P_MUSIC, "MUSIC"},
-        {P_LANGUAGE, "LANGUAGE"},
-        {P_BUTTONS, "BUTTONS"}, {P_CONFIRM, "MENU OK"},
-        {-1, "WARP MAP"},
-        {P_CDROOMS, "SKIP CD ROOMS"},
-        {P_LOADING, "LOADING TEXT"}, {P_EDGEFADE, "ROOM EDGE FADE"},
-        {P_DIALOGSKIP, "DIALOGUE SKIP"},
-        {P_OVERLAY, "OVERLAY"}, {-1, "FPS"},
-        {P_EDITOR, "EDITOR"},   {P_CONTROLS, "CONTROLS"},
-        {P_CHEATS, "CHEATS"},   {P_EXIT, "EXIT GAME"},
-        {P_CLOSE, "CLOSE"},
-    };
-    int on[7];
-    char lines[N_MAIN + 1][LINE_MAX], tmp[40];
-    int scale, lo, hi, i, col = 0;
-    on[0] = g_SkipCdRooms;
-    on[1] = g_ShowLoadingText;
-    on[2] = g_RoomEdgeFade;
-    on[3] = g_DialogSkip;
-    on[4] = g_OverlayOn;
-    on[5] = g_FpsOn;
-    on[6] = g_EditorOn;
-    Wide_MenuGet(&scale, &lo, &hi);
-    for (i = 0; i < N_MAIN; i++) {
+    case ITEM_VOICE:
+        AddValue(line, -1, voices[g_VoiceSet]);
+        break;
+    case ITEM_MUSIC:
+        if (Music_FilesAvailable()) {
+            AddValue(line, g_MusicFiles ? P_ENHANCED : P_ORIGINAL,
+                     g_MusicFiles ? "ENHANCED" : "ORIGINAL");
+        } else { // no files: the switch is off, the disc music plays
+            Add(line, "  ");
+            AddW(line, P_ORIGINAL, "ORIGINAL");
+            Add(line, " ");
+            AddW(line, P_NOFILES, "NO FILES");
+        }
+        break;
+    case ITEM_LANGUAGE:
+        AddValue(line, -1, g_LangNext ? "UK" : "EN");
+        if (g_LangNext != g_Lang) {
+            Add(line, " ");
+            AddW(line, P_RESTART, "RESTART");
+        }
+        break;
+    case ITEM_BUTTONS:
+        if (g_ButtonPick < 0) { // "< AUTO: XBOX >"
+            Add(line, "< ");
+            AddW(line, P_AUTO, "AUTO");
+            Add(line, ": ");
+            Add(line, short_sets[g_ButtonSet]);
+            Add(line, " >");
+        } else {
+            AddValue(line, -1, sets[g_ButtonPick]);
+        }
+        break;
+    case ITEM_ASPECT:
+        if (g_Aspect) {
+            AddValue(line, -1, g_AspectNames[g_Aspect]);
+        } else {
+            AddValue(line, P_AUTO, "AUTO");
+        }
+        break;
+    case ITEM_CONFIRM:
+        Add(line, "< "); // "< AUTO: (A) >": the mark that confirms
+        if (g_MenuConfirm == MENU_CONFIRM_AUTO) {
+            AddW(line, P_AUTO, "AUTO");
+            Add(line, ": ");
+        }
+        Add(line, HINT_OK);
+        Add(line, " >");
+        break;
+    case ITEM_STICKDEAD:
+    case ITEM_LOOKDEAD:
+        sprintf(tmp, "< %d%% >", it == ITEM_STICKDEAD ? g_StickDead : g_LookDead);
+        Add(line, tmp);
+        break;
+    case ITEM_LOOKRANGE:
+        if (g_LookRange) {
+            sprintf(tmp, "< %d >", g_LookRange);
+            Add(line, tmp);
+        } else {
+            AddValue(line, P_OFF, "OFF");
+        }
+        break;
+    case ITEM_RELICTOG:
+        AddValue(line, g_RelicToggle ? P_ORIGINAL : 262,
+                 g_RelicToggle ? "STOCK" : "MODERN");
+        break;
+    case ITEM_JPCARDS:
+        AddValue(line, g_JpCards == JP_CARDS_EXTRA ? 261
+                       : g_JpCards == JP_CARDS_OFF ? P_OFF
+                                                   : -1,
+                 g_JpCards == JP_CARDS_EXTRA ? "EXTRA"
+                 : g_JpCards == JP_CARDS_OFF ? "OFF"
+                                             : "JP");
+        break;
+    }
+    // read once at the start: a changed value waits for a restart
+    if (it == ITEM_JPCARDS || it == ITEM_HD || it == ITEM_HDDUMP ||
+        it == ITEM_HDSTATS) {
+        int now = it == ITEM_JPCARDS ? g_JpCards : *flag;
+        if (now != boot_val[it]) {
+            Add(line, " ");
+            AddW(line, P_RESTART, "RESTART");
+        }
+    }
+}
+
+static void DrawMain(void) {
+    char lines[18][LINE_MAX];
+    int n = MainRows(), i, it, col = 0, line, vis, ed = EditorRow();
+    if (!boot_set) {
+        boot_set = 1;
+        boot_val[ITEM_JPCARDS] = g_JpCards;
+        boot_val[ITEM_HD] = g_HdTextures;
+        boot_val[ITEM_HDDUMP] = g_HdDump;
+        boot_val[ITEM_HDSTATS] = g_HdStats;
+    }
+    for (i = 0; i < n; i++) {
+        it = cat_rows[cat][i];
         Clear(lines[i]);
-        if (i == ITEM_EXIT && exit_armed) {
+        if (exit_armed == it && (it == ITEM_EXIT || it == ITEM_RESTART)) {
             if (uk) {
-                AddW(lines[i], P_AGAIN, "EXIT:");
+                AddW(lines[i], it == ITEM_EXIT ? P_AGAIN : 264, "EXIT:");
                 Add(lines[i], " ");
                 Add(lines[i], HINT_OK);
             } else {
-                Add(lines[i], "EXIT: ");
+                Add(lines[i], it == ITEM_EXIT ? "EXIT: " : "RESTART: ");
                 Add(lines[i], HINT_OK);
-                Add(lines[i], " AGAIN TO QUIT");
+                Add(lines[i], it == ITEM_EXIT ? " AGAIN TO QUIT"
+                                              : " AGAIN TO RESTART");
             }
             continue;
         }
-        AddW(lines[i], labels[i].word, labels[i].en);
-        if (i < ITEM_CONTROLS && Width(lines[i]) > col) {
+        AddW(lines[i], menu_items[it].word, menu_items[it].en);
+        if (it >= ITEM_SCALE && Width(lines[i]) > col) {
             col = Width(lines[i]);
         }
     }
-    // the values in one column: en 9 cells (LANGUAGE has a gap) or one
-    // cell after a longer label (FULLSCREEN), uk one cell after the longest
-    col = uk ? col + SERIF_W : MAX(9 * CELL_W, col + CELL_W);
-    for (i = 0; i < ITEM_CONTROLS; i++) {
-        PadTo(lines[i], col);
-    }
-    if (scale == WIDE_SCALE_MAX) {
-        Add(lines[ITEM_SCALE], "< ");
-        AddW(lines[ITEM_SCALE], P_MAX, "MAX");
-    } else if (scale) { // MAX follows hi
-        sprintf(tmp, "%c %d >", scale > lo ? '<' : ' ', scale);
-        Add(lines[ITEM_SCALE], tmp);
-    } else {
-        Add(lines[ITEM_SCALE], "< ");
-        AddW(lines[ITEM_SCALE], P_AUTO, "AUTO");
-    }
-#ifndef __SWITCH__
-    i = Psyz_VideoGetFullscreen(); // F11 and Esc change it too
-    AddValue(lines[ITEM_FULLSCREEN], i ? P_ON : P_OFF, i ? "ON" : "OFF");
-#endif
-    AddValue(lines[ITEM_VOICE], -1, voices[g_VoiceSet]);
-    if (Music_FilesAvailable()) {
-        AddValue(lines[ITEM_MUSIC], g_MusicFiles ? P_ENHANCED : P_ORIGINAL,
-                 g_MusicFiles ? "ENHANCED" : "ORIGINAL");
-    } else { // no files: the switch is off, the disc music plays
-        Add(lines[ITEM_MUSIC], "  ");
-        AddW(lines[ITEM_MUSIC], P_ORIGINAL, "ORIGINAL");
-        Add(lines[ITEM_MUSIC], " ");
-        AddW(lines[ITEM_MUSIC], P_NOFILES, "NO FILES");
-    }
-    AddValue(lines[ITEM_LANGUAGE], -1, g_LangNext ? "UK" : "EN");
-    if (g_LangNext != g_Lang) {
-        Add(lines[ITEM_LANGUAGE], " ");
-        AddW(lines[ITEM_LANGUAGE], P_RESTART, "RESTART");
-    }
-    if (g_ButtonPick < 0) { // "< AUTO: XBOX >"
-        Add(lines[ITEM_BUTTONS], "< ");
-        AddW(lines[ITEM_BUTTONS], P_AUTO, "AUTO");
-        Add(lines[ITEM_BUTTONS], ": ");
-        Add(lines[ITEM_BUTTONS], short_sets[g_ButtonSet]);
-        Add(lines[ITEM_BUTTONS], " >");
-    } else {
-        AddValue(lines[ITEM_BUTTONS], -1, sets[g_ButtonPick]);
-    }
-    if (g_Aspect) {
-        AddValue(lines[ITEM_ASPECT], -1, g_AspectNames[g_Aspect]);
-    } else {
-        AddValue(lines[ITEM_ASPECT], P_AUTO, "AUTO");
-    }
-    Add(lines[ITEM_CONFIRM], "< "); // "< AUTO: (A) >": the mark that confirms
-    if (g_MenuConfirm == MENU_CONFIRM_AUTO) {
-        AddW(lines[ITEM_CONFIRM], P_AUTO, "AUTO");
-        Add(lines[ITEM_CONFIRM], ": ");
-    }
-    Add(lines[ITEM_CONFIRM], HINT_OK);
-    Add(lines[ITEM_CONFIRM], " >");
-    AddValue(lines[ITEM_WARPMAP], g_WarpMapPick ? P_ON : P_OFF,
-             g_WarpMapPick ? "ON" : "OFF");
-    for (i = 0; i < 7; i++) { // CD ROOMS, LOADING, EDGE, DIALOGUE, OVERLAY, FPS, EDITOR
-        AddValue(lines[ITEM_CDROOMS + i], on[i] ? P_ON : P_OFF,
-                 on[i] ? "ON" : "OFF");
+    col += uk ? SERIF_W : CELL_W; // the values in one column
+    for (i = 0; i < n; i++) {
+        it = cat_rows[cat][i];
+        if (it >= ITEM_SCALE) {
+            PadTo(lines[i], col);
+            ItemValue(lines[i], it);
+        }
     }
     i = -1;
-    if (Editor_Status()) {
+    if (ed >= 0) {
         // the address line goes under EDITOR; the lines after it move down
-        memmove(lines[ITEM_EDITOR + 2], lines[ITEM_EDITOR + 1],
-                sizeof(lines[0]) * (N_MAIN - ITEM_EDITOR - 1));
-        Clear(lines[ITEM_EDITOR + 1]);
+        char tmp[40];
+        memmove(lines[ed + 2], lines[ed + 1],
+                sizeof(lines[0]) * (n - ed - 1));
+        Clear(lines[ed + 1]);
         snprintf(tmp, sizeof(tmp), uk ? "%.28s" : "  %.29s", Editor_Status());
-        Add(lines[ITEM_EDITOR + 1], tmp);
-        i = ITEM_EDITOR + 1;
+        Add(lines[ed + 1], tmp);
+        i = ed + 1;
+    }
+    // the help of the selected row
+    it = CatItem();
+    if (!(exit_armed == it && (it == ITEM_EXIT || it == ITEM_RESTART))) {
+        help_word = menu_items[it].help;
+        help_en = menu_items[it].help_en;
     }
     // the lines on screen: main_top .. + MainVis(), the selected one in them
     col = MainLineOf(sel);
@@ -2074,7 +2366,9 @@ static void DrawMain(void) {
     main_top = MAX(0, MIN(main_top, MainLines() - MainVis()));
     sb_total = MainLines();
     sb_top = main_top;
-    Box(lines + main_top, MainVis(), col - main_top, i - main_top);
+    vis = MainVis();
+    line = col - main_top;
+    Box(lines + main_top, vis, line, i < 0 ? -1 : i - main_top);
 }
 
 // ASCII in capitals onto a line, at most n characters
@@ -2211,20 +2505,25 @@ static void DrawCheats(void) {
         const char* en;
     } names[] = {{P_REFILL, "HP MP HEARTS"}, {P_INVINCIBLE, "NO DAMAGE"},
                  {P_WALLS, "MIST WALLS"},    {P_ITEMS, "ALL ITEMS"},
-                 {P_SKIP, "SKIP PROLOGUE"},  {P_MAP, "100% MAP"},
                  {P_CHARACTER, "CHARACTER"}},
       chars[CHEAT_CHAR_N] = {{P_GAME, "GAME"},       {P_ALUCARD, "ALUCARD"},
                              {P_RICHTER, "RICHTER"}, {P_RICHTER, "RICHTER"},
                              {P_MARIA, "MARIA"},     {P_MARIA, "MARIA"}};
-    int flags[6];
+    static const char* const hints[N_CHEATS] = {
+        "HP MP HEARTS STAY FULL.",
+        "HITS DO NOTHING.",
+        "MIST FORM PASSES THROUGH WALLS.",
+        "YOU HAVE ALL WEAPONS, ITEMS AND RELICS.",
+        "LEFT AND RIGHT PICK. OK APPLIES AT ONCE.",
+        "OPEN THE CASTLE MAP AND WARP.",
+        "GO BACK ONE PAGE."};
+    int flags[4];
     char lines[N_CHEATS][LINE_MAX], tmp[40];
     int i, col = 0;
     flags[0] = g_Cheat.refill;
     flags[1] = g_Cheat.invincible;
     flags[2] = g_Cheat.walls;
     flags[3] = g_Cheat.items;
-    flags[4] = g_Cheat.skipPrologue;
-    flags[5] = g_Cheat.map;
     for (i = 0; i <= CH_CHARACTER; i++) {
         Clear(lines[i]);
         AddW(lines[i], names[i].word, names[i].en);
@@ -2235,24 +2534,23 @@ static void DrawCheats(void) {
         PadTo(lines[i], col);
         if (i < CH_CHARACTER) {
             AddValue(lines[i], flags[i] ? P_ON : P_OFF, flags[i] ? "ON" : "OFF");
+        } else if (msg_timer > 0) { // why the character did not change
+            msg_timer--;
+            Clear(lines[i]);
+            AddW(lines[i], P_NO, "NO:");
+            snprintf(tmp, sizeof(tmp), uk ? " %.24s" : " %.27s", msg);
+            Add(lines[i], tmp);
         } else {
             AddValue(lines[i], chars[g_Cheat.character].word,
                      chars[g_Cheat.character].en);
         }
     }
-    Clear(lines[CH_APPLY]);
-    if (msg_timer > 0) {
-        msg_timer--;
-        AddW(lines[CH_APPLY], P_NO, "NO:");
-        snprintf(tmp, sizeof(tmp), uk ? " %.24s" : " %.27s", msg);
-        Add(lines[CH_APPLY], tmp);
-    } else {
-        AddW(lines[CH_APPLY], P_APPLY, "APPLY NOW");
-    }
     Clear(lines[CH_TELEPORT]);
     AddW(lines[CH_TELEPORT], P_TELEPORT, "TELEPORT");
     Clear(lines[CH_BACK]);
     AddW(lines[CH_BACK], P_BACK, "BACK");
+    help_word = CHEAT_HELP_WORD + sel;
+    help_en = hints[sel];
     Box(lines, N_CHEATS, sel, -1);
 }
 
@@ -3000,10 +3298,9 @@ static void DrawOverlay(void) {
                 g_StageId & STAGE_INVERTEDCASTLE_FLAG ? "INVERTED" : "NORMAL");
         col[n][0] = col[n][1] = col[n][2] = 255;
         n++;
-        sprintf(lines[n], "%s%s%s%s%s%s", g_Cheat.refill ? " REFILL" : "",
+        sprintf(lines[n], "%s%s%s%s%s", g_Cheat.refill ? " REFILL" : "",
                 g_Cheat.invincible ? " INV" : "", g_Cheat.walls ? " WALLS" : "",
-                g_Cheat.items ? " ITEMS" : "",
-                g_Cheat.skipPrologue ? " SKIP" : "", g_Cheat.map ? " MAP" : "");
+                g_Cheat.items ? " ITEMS" : "", g_Cheat.map ? " MAP" : "");
         if (lines[n][0]) {
             memmove(lines[n], lines[n] + 1, strlen(lines[n])); // lead space
             col[n][0] = col[n][1] = 255;
@@ -3367,6 +3664,119 @@ static void WindowIcon(void) {
     SDL_free(w);
 }
 
+// ---- the relic hint (relic_hint) -----------------------------------------------
+// A new relic (func_800FE044 in 5D5BC.c): its name and the game's own one
+// line of what it does, in a box low in the view for a few seconds. It
+// changes nothing in the game (the pick-up banner and the game run as before)
+// and sits under the warp hint. Any button closes it. uk: the name and
+// description of the ua.json relics (port words 400.., 430..); en: the stock text in capitals (the 5x7 font has no lowercase).
+#define HINT_FRAMES 360
+extern RelicDesc g_RelicDefs[30]; // src/dra/dra.h
+static const char* const relic_en[30] = {
+    "TRANSFORM INTO BAT", "SHOOT FIREBALLS AS BAT", "USE RADAR AS BAT",
+    "ATTACK WITH RADAR WAVES", "TRANSFORM INTO WOLF", "RUN SWIFTLY AS WOLF",
+    "SPECIAL MOVE AS WOLF", "TRANSFORM INTO MIST",
+    "EXTENDS MIST TRANSFORM TIME", "TRANSFORM INTO POISONOUS CLOUD",
+    "CAUSES ITEMS TO MATERIALIZE", "SHOWS ENEMY DAMAGE",
+    "WEARER CAN JUMP HIGH", "WEARER CAN DO DOUBLE JUMP",
+    "PROTECTION WHILE UNDERWATER", "DISPLAYS ENEMY NAME",
+    "CAN OPEN LOCKED BLUE DOORS", "SUMMONS THE OARSMAN",
+    "SUMMONS BAT FAMILIAR", "SUMMONS GHOST FAMILIAR",
+    "SUMMONS FAERIE FAMILIAR", "SUMMONS DEVIL FAMILIAR",
+    "SUMMONS SWORD FAMILIAR", "SUMMONS PIXIE FAMILIAR",
+    "SUMMONS NOSE-DEVIL FAMILIAR", "1 OF 5 TREASURES. AVOID CURSE.",
+    "1 OF 5 TREASURES. STR +10", "1 OF 5 TREASURES. CON +10",
+    "1 OF 5 TREASURES. INT +10", "1 OF 5 TREASURES. LCK +10"};
+
+void PortMenu_RelicHint(int id) {
+    if (!g_RelicHint || id < 0 || id >= 30 ||
+        (JP_RELICS_HIDDEN && (id == 23 || id == 24))) {
+        return;
+    }
+    hint_relic = id;
+    hint_timer = HINT_FRAMES;
+    hint_age = 0;
+    fprintf(stderr, "[relichint] relic %d\n", id);
+}
+
+// the chars a..b of the text s onto a line (cells under uk)
+static void AddPart(char* line, const char* s, int a, int b) {
+    char* d = line + Len(line);
+    int i;
+    for (i = a; i < b && d < line + LINE_MAX - 2; i++) {
+        *d++ = s[i];
+    }
+    *d = uk ? (char)0xFF : 0;
+}
+
+static void DrawRelicHint(void) {
+    char l[3][LINE_MAX], name[40];
+    const char* nm;
+    const char* ds;
+    int x0, y0, x1, y1, vw, per, nd, cut, n = 2, i, w = 0, h, x, y;
+    int sp = uk ? CH(' ') : ' ';
+    if (hint_timer <= 0 || hint_relic < 0 || g_GameState != Game_Play ||
+        g_GameEngineStep != Engine_Normal) {
+        return; // the timer waits while a menu or a load is on
+    }
+    hint_timer--;
+    hint_age++;
+    ViewRect(&x0, &y0, &x1, &y1);
+    vw = x1 - x0 - 16;
+    nm = g_RelicDefs[hint_relic].name;
+    ds = relic_en[hint_relic];
+    if (uk) { // the uk words of the relics are port words 400.. (name), 430.. (text)
+        nm = Lang_Port(400 + hint_relic);
+        ds = Lang_Port(430 + hint_relic);
+        if (!nm || !ds) {
+            return;
+        }
+    }
+    if (!uk) {
+        for (i = 0; nm[i] == ' ' && i < 4; nm++) {
+        }
+        for (i = 0; nm[i] && i < (int)sizeof(name) - 1; i++) {
+            name[i] = nm[i] >= 'a' && nm[i] <= 'z' ? nm[i] - 32 : nm[i];
+        }
+        name[i] = 0;
+        nm = name;
+    } else {
+        while ((u8)*nm == CH(' ')) {
+            nm++; // the stock names keep a leading space
+        }
+    }
+    Clear(l[0]);
+    Clear(l[1]);
+    Clear(l[2]);
+    AddPart(l[0], nm, 0, Len(nm));
+    nd = Len(ds);
+    per = vw / (uk ? SERIF_W : CELL_W);
+    if (nd <= per) {
+        AddPart(l[1], ds, 0, nd);
+        n = 2;
+    } else { // two lines: cut at the last space that fits
+        for (cut = per; cut > 0 && (u8)ds[cut] != sp; cut--) {
+        }
+        cut = cut > 0 ? cut : per;
+        AddPart(l[1], ds, 0, cut);
+        AddPart(l[2], ds, cut + ((u8)ds[cut] == sp), nd);
+        n = 3;
+    }
+    for (i = 0; i < n; i++) {
+        w = MAX(w, Width(l[i]));
+    }
+    w += BORDER * 2;
+    h = n * LINE_H - 5 + BORDER * 2;
+    x = (x0 + x1 - w) / 2;
+    y = y1 - 3 * LINE_H - h;
+    Line(x + BORDER, y + BORDER, l[0], 255, 255, 64);
+    for (i = 1; i < n; i++) {
+        Line(x + BORDER, y + BORDER + i * LINE_H, l[i], 235, 235, 235);
+    }
+    Rect(x + 2, y + 2, w - 4, h - 4, 16, 16, 48);
+    Rect(x, y, w, h, 200, 200, 200);
+}
+
 void PortMenu_Draw(OT_TYPE* ot) {
     int i;
     WindowIcon();
@@ -3425,6 +3835,7 @@ void PortMenu_Draw(OT_TYPE* ot) {
     }
     warp_hint = 0;
     if (!is_open) {
+        DrawRelicHint();
         DrawOverlay();
         return;
     }

@@ -78,10 +78,14 @@ static void printAllowedParams(const char* allowedValues[], int n) {
     }
     printf("\n");
 }
+int g_ArgC; // the arguments of this run, for the port menu RESTART
+char** g_ArgV;
 static bool wide_set; // --wide or --ini picked the view
 static bool parseArgs(
     struct InitGameParams* outParams, int argc, char* argv[]) {
     assert(!!outParams);
+    g_ArgC = argc;
+    g_ArgV = argv;
     outParams->diskPath = NULL;
     outParams->testMode = NO_TEST;
     outParams->stage = -1;

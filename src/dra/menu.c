@@ -852,6 +852,16 @@ void DrawRelicsMenu(MenuContext* ctx) {
             u_OnOff = 0x30;
         }
         switchFadeLevel = 0;
+#ifdef PLATFORM_PSYZ
+        // an ON switch that has no focus keeps its full brightness (the peak
+        // of the pulse of the focused one); an OFF one stays dimmed
+        if (*relic & RELIC_FLAG_ACTIVE) {
+            switchFadeLevel = 6;
+        }
+#define RELIC_SWITCH_LIT (*relic & RELIC_FLAG_ACTIVE)
+#else
+#define RELIC_SWITCH_LIT 0
+#endif
         if (INDEXER == g_MenuNavigation.cursorRelic) {
             // This routine handles the fade in/fade out of the ON/OFF switch
             // when hovering
@@ -868,7 +878,9 @@ void DrawRelicsMenu(MenuContext* ctx) {
         }
         MenuDrawSprite(ctx, spriteX + 8, spriteY, 0x2F, 0xF, u_OnOff, 0x70,
                        switchFadeLevel + 0x1C8, 0x1F,
-                       INDEXER == g_MenuNavigation.cursorRelic, 0x40, 0);
+                       INDEXER == g_MenuNavigation.cursorRelic ||
+                           RELIC_SWITCH_LIT,
+                       0x40, 0);
     }
     spriteY = (g_MenuNavigation.cursorRelic / 2) * 0x13 + 0x22 + ctx_h;
     MenuDrawRect(ctx,

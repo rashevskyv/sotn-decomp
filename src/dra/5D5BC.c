@@ -410,6 +410,11 @@ s32 func_800FE044(s32 amount, s32 type) {
 
     // Collect a relic. "amount" here isn't an amount, it's the relic ID.
     if (type == 0x2000) {
+#ifdef PLATFORM_PSYZ
+        if (!(g_Status.relics[amount] & RELIC_FLAG_FOUND)) {
+            PortMenu_RelicHint(amount); // relic_hint: a new relic
+        }
+#endif
         g_Status.relics[amount] = 3;
         if (g_RelicDefs[amount].unk0C) {
             g_Status.relics[amount] = 1;

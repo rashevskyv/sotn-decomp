@@ -28,7 +28,7 @@ static int cfg_scale; // 0: off, the psyz default output (PC)
 static const char* ini_path; // NULL: settings are not saved (PC)
 char g_IniSpawn[48];
 static PsyzSize last_disp;
-static int last_fbw, last_fbh, last_rows;
+static int last_fbw, last_fbh, last_rows, last_fill;
 
 int Wide_GetScale(void) { return cfg_scale; }
 
@@ -132,7 +132,7 @@ int g_StickDpad = 1;  // stick_dpad in sotn.ini
 int g_StickDead = 35;  // stick_dead: percent of the left stick
 int g_LookRange = 48;  // look_stick_range_px: about the player height
 int g_MapHeroPulse = 1, g_MapHeroPeriod = 47; // sotn.ini, game.h
-int g_DialogSkip = 0, g_PrologueFF = 1;        // sotn.ini, game.h
+int g_DialogSkip = 0, g_PrologueFF = 1, g_MenuFill = 1, g_RelicHint = 1;        // sotn.ini, game.h
 int g_LookDead = 20;   // look_stick_dead: percent of the right stick
 static const char ini_buttons[] =
     "\n"
@@ -275,6 +275,8 @@ static const struct {
     {"show_loading_text", &g_ShowLoadingText},
     {"dialogue_skip", &g_DialogSkip},
     {"prologue_fast_forward", &g_PrologueFF},
+    {"menu_fill_screen", &g_MenuFill},
+    {"relic_hint", &g_RelicHint},
     {"room_edge_fade", &g_RoomEdgeFade},
     {"elevator_front_ornaments", &g_ElevatorFront},
 };
@@ -366,6 +368,9 @@ void Wide_SaveIni(void) {
     fprintf(f, "jp_cards = %s\n", g_JpCardsNames[g_JpCards]);
     fputs(ini_relic_toggle, f);
     fprintf(f, "relic_toggle = %s\n", relic_toggle_names[g_RelicToggle]);
+    fputs("; relic_hint: 1 = a short note about the relic shows for a few seconds\n"
+          "; when you pick up a new relic. Any button closes it.\n", f);
+    fprintf(f, "relic_hint = %d\n", g_RelicHint);
     fputs(ini_spawn, f);
     fprintf(f, "spawn = %s\n", g_IniSpawn);
     fputs(ini_cheats, f);
@@ -395,9 +400,12 @@ void Wide_SaveIni(void) {
           "; rest of the box, the next one goes to the next box (and stops its\n"
           "; voice line). Start does not pause while a dialogue shows.\n"
           "; prologue_fast_forward: 1 = hold Cross (B on the Switch) to run the\n"
-          "; prologue text scroll 4 times faster.\n", f);
-    fprintf(f, "dialogue_skip = %d\nprologue_fast_forward = %d\n", g_DialogSkip,
-            g_PrologueFF);
+          "; prologue text scroll 4 times faster.\n"
+          "; menu_fill_screen: 1 = the pause, status and equip menus fill a wide\n"
+          "; screen (rows 20..226 at one scale), 0 = the whole frame at the\n"
+          "; largest integer scale, with black margins.\n", f);
+    fprintf(f, "dialogue_skip = %d\nprologue_fast_forward = %d\nmenu_fill_screen = %d\n",
+            g_DialogSkip, g_PrologueFF, g_MenuFill);
     fclose(f);
 }
 
@@ -681,7 +689,7 @@ int Wide_Canvas(int* x0, int* y0, int* x1, int* y1) {
 // Called on every vsync. Follows dock changes and display mode changes.
 void Wide_OnFrame(void) {
     PsyzSize d, req;
-    int fbw, fbh, k, s, lo, hi, rows, keep, prologue = 0;
+    int fbw, fbh, k, s, lo, hi, rows, keep, mfill, prologue = 0;
     RECT* clip = &g_GpuBuffers[0].draw.clip;
 
     if (!cfg_scale) {
@@ -704,18 +712,22 @@ void Wide_OnFrame(void) {
              (g_GameStep < Gameover_6 || g_GameStep >= Gameover_Alt)));
     if (d.w <= 0 || d.h <= 0 ||
         (d.w == last_disp.w && d.h == last_disp.h && fbw == last_fbw &&
-         fbh == last_fbh && rows == last_rows)) {
+         fbh == last_fbh && rows == last_rows && g_MenuFill == last_fill)) {
         return;
     }
     last_disp = d;
     last_fbw = fbw;
     last_fbh = fbh;
     last_rows = rows;
+    last_fill = g_MenuFill;
 
     req = StageRect(d);
     ScaleRange(req, &lo, &hi);
     k = Clamp(cfg_scale, lo, hi);
     keep = rows && fbw == DISP_STAGE_W && fbh == DISP_STAGE_H;
+    // pause, status and equip menus: only rows 20..226 hold the picture, so
+    // they fill a wide screen at one scale (menu_fill_screen)
+    mfill = g_MenuFill && fbw == DISP_MENU_W && fbh == DISP_MENU_H;
     if (!keep) {
         k = MIN(k, MAX(req.h / DISP_STAGE_H, 1)); // all 240 rows must fit
         if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H &&
@@ -726,7 +738,8 @@ void Wide_OnFrame(void) {
     }
     req.w = MIN(req.w, WIDE_VIEW_MAX * k); // pillars past the view budget
     g_WideX = (Wide_ViewW(req.w, k) - DISP_STAGE_W) / 2;
-    Psyz_VideoSetKeepRows(keep ? CLIP_TOP : 0, keep ? CLIP_BOTTOM : 0);
+    Psyz_VideoSetKeepRows((keep || mfill) ? CLIP_TOP : 0,
+                          (keep || mfill) ? CLIP_BOTTOM : 0);
 
     if (fbw == DISP_STAGE_W && fbh == DISP_STAGE_H) {
         s = k;
@@ -753,6 +766,9 @@ void Wide_OnFrame(void) {
             // the whole display is the canvas, so the uk relic window may
             // reach past the frame (RELIC_WIN_X in src/dra/menu.c)
             req = d;
+            if (mfill) {
+                s = MAX(MIN(d.w / fbw, d.h / (CLIP_BOTTOM - CLIP_TOP)), 1);
+            }
         }
     }
     canvas_zoom = 0;
