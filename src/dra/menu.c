@@ -80,7 +80,9 @@ extern s32 g_PrevEquippedWeapons[2];
 // The Pocket is not a row of the list: the overview draws it top right, next
 // to the two hands (name under its label). The cursor visits it after the
 // last accessory and Up on the first row; the stock rows stay as they were.
-#define POCKET_X 246
+#define POCKET_X 228
+// the count column of the item list (right column: x + 128, last digit)
+#define POCKET_COUNT_X 332
 #define EQ_TEXT_Y(r) (30 + (r) * 13)
 #define EQ_ICON_Y(r) (0x1A + (r) * 13)
 #define EQ_CURSOR_Y(r) ((r) * 13 + 0x1C)
@@ -799,6 +801,19 @@ static void RelicInfoBar(int wide) {
     bar->cursorW = bar->unk1.w =
         wide ? RELIC_WIN_W : g_MenuInit[MENU_DG_INFO_BAR].cursorW;
 }
+// the item name of the Pocket, cut to the room before the count (8 px a cell)
+static void PocketName(const char* name, MenuContext* ctx) {
+    u8 buf[24];
+    s32 room = (POCKET_COUNT_X - 8 * (g_QuickItem &&
+                g_Status.equipHandCount[g_QuickItem] > 8) - POCKET_X - 24) / 8;
+    s32 i;
+    const u8* n = (const u8*)LANG_CELL(name);
+    for (i = 0; i < room && n[i] != 0xFF; i++) {
+        buf[i] = n[i];
+    }
+    buf[i] = 0xFF;
+    MenuDrawStr((const char*)buf, POCKET_X + 16, EQ_TEXT_Y(1), ctx);
+}
 // the label of the Pocket (uk: Кишеня)
 static const char* PocketLabel(void) {
     const char* t = Lang_Port(300);
@@ -1104,7 +1119,7 @@ void func_800F6618(s32 menuDialogue, s32 bColorMode) {
     }
 #ifdef PLATFORM_PSYZ
     if (IS_QUICK_SLOT()) {
-        MenuDrawRect(context, POCKET_X - 4, EQ_CURSOR_Y(1), 96, 0xB, r, 0, 0);
+        MenuDrawRect(context, POCKET_X - 4, EQ_CURSOR_Y(1), 120, 0xB, r, 0, 0);
         return;
     }
 #endif
@@ -2738,6 +2753,13 @@ void DrawConsumableCount(s32 itemId, s32 hand, MenuContext* ctx) {
     if (!g_EquipDefs[itemId].isConsumable) {
         return;
     }
+#ifdef PLATFORM_PSYZ
+    if (hand == QUICK_SLOT) { // the Pocket: the number only, like the list
+        MenuDrawInt(g_Status.equipHandCount[itemId] + 1, POCKET_COUNT_X,
+                    EQ_TEXT_Y(1), ctx);
+        return;
+    }
+#endif
     ptr = buf;
     displayCount = g_Status.equipHandCount[itemId] + 1;
     // First character in the string is the (
@@ -2763,17 +2785,6 @@ void DrawConsumableCount(s32 itemId, s32 hand, MenuContext* ctx) {
 #endif
     *ptr++ = '\0';
     // Draw it after the item name. X=224, Y = 30 + 13*hand
-#ifdef PLATFORM_PSYZ
-    if (hand == QUICK_SLOT) { // the Pocket: after the item name, 8 px a cell
-        const char* n = LANG_CELL(g_EquipDefs[itemId].name);
-        s32 x = POCKET_X + 16 + 8;
-        for (; (u8)*n != 0xFF; n++) {
-            x += 8;
-        }
-        MenuDrawStr(buf, x, EQ_TEXT_Y(1), ctx);
-        return;
-    }
-#endif
     MenuDrawStr(buf, 224, EQ_TEXT_Y(hand), ctx);
 }
 
@@ -2972,8 +2983,8 @@ void MenuDraw(void) {
             }
 #ifdef PLATFORM_PSYZ
             equip = &g_EquipDefs[g_QuickItem];
-            MenuDrawStr(PocketLabel(), POCKET_X, EQ_TEXT_Y(0), menu);
-            MenuDrawStr(equip->name, POCKET_X + 16, EQ_TEXT_Y(1), menu);
+            MenuDrawStr(PocketLabel(), POCKET_X + 16, EQ_TEXT_Y(0), menu);
+            PocketName(equip->name, menu);
             if (g_QuickItem) {
                 DrawConsumableCount(g_QuickItem, QUICK_SLOT, menu);
             }
