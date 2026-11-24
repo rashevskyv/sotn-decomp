@@ -80,7 +80,7 @@ extern s32 g_PrevEquippedWeapons[2];
 // The Pocket is not a row of the list: the overview draws it top right, next
 // to the two hands (name under its label). The cursor visits it after the
 // last accessory and Up on the first row; the stock rows stay as they were.
-#define POCKET_X 262
+#define POCKET_X 246
 #define EQ_TEXT_Y(r) (30 + (r) * 13)
 #define EQ_ICON_Y(r) (0x1A + (r) * 13)
 #define EQ_CURSOR_Y(r) ((r) * 13 + 0x1C)
@@ -2764,8 +2764,13 @@ void DrawConsumableCount(s32 itemId, s32 hand, MenuContext* ctx) {
     *ptr++ = '\0';
     // Draw it after the item name. X=224, Y = 30 + 13*hand
 #ifdef PLATFORM_PSYZ
-    if (hand == QUICK_SLOT) { // the Pocket: beside its label
-        MenuDrawStr(buf, POCKET_X + 60, EQ_TEXT_Y(0), ctx);
+    if (hand == QUICK_SLOT) { // the Pocket: after the item name, 8 px a cell
+        const char* n = LANG_CELL(g_EquipDefs[itemId].name);
+        s32 x = POCKET_X + 16 + 8;
+        for (; (u8)*n != 0xFF; n++) {
+            x += 8;
+        }
+        MenuDrawStr(buf, x, EQ_TEXT_Y(1), ctx);
         return;
     }
 #endif
@@ -2968,7 +2973,7 @@ void MenuDraw(void) {
 #ifdef PLATFORM_PSYZ
             equip = &g_EquipDefs[g_QuickItem];
             MenuDrawStr(PocketLabel(), POCKET_X, EQ_TEXT_Y(0), menu);
-            MenuDrawStr(equip->name, POCKET_X + 18, EQ_TEXT_Y(1), menu);
+            MenuDrawStr(equip->name, POCKET_X + 16, EQ_TEXT_Y(1), menu);
             if (g_QuickItem) {
                 DrawConsumableCount(g_QuickItem, QUICK_SLOT, menu);
             }
