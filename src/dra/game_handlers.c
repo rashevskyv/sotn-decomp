@@ -1070,15 +1070,10 @@ void HandleGameOver(void) {
         g_GameStep++;
         break;
     case Gameover_5:
-        func_800E5358();
-        prim = &g_PrimBuf[D_8013640C];
-        prim->p1--;
-        if (prim->p1) {
-            break;
-        }
 #ifdef PLATFORM_PSYZ
         // the picture has 240 rows: open the stage clip (rows 20..226) to the
-        // whole frame, the wide view fits all of them (src/pc/wide.c)
+        // whole frame when the melt starts: the picture quads draw with it
+        // and would be cut to those rows (src/pc/wide.c)
         for (i = 0; i < 2; i++) {
             if (g_GpuBuffers[i].draw.clip.h == 0xCF) {
                 g_GpuBuffers[i].draw.clip.y -= 0x14;
@@ -1086,6 +1081,12 @@ void HandleGameOver(void) {
             }
         }
 #endif
+        func_800E5358();
+        prim = &g_PrimBuf[D_8013640C];
+        prim->p1--;
+        if (prim->p1) {
+            break;
+        }
         g_GameStep++;
         break;
     case Gameover_6:

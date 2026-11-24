@@ -9,7 +9,6 @@ gameover_uk different names by design: uk gameover_uk, en gameover_en (same rect
 gameover_uk_169 different names by design: uk gameover_uk_169, en gameover_en_169 (same rect 640,0)
 gameover_en different names by design: uk gameover_uk, en gameover_en (same rect 640,0; the stock pictures differ)
 gameover_en_169 different names by design: uk gameover_uk_169, en gameover_en_169 (same rect 640,0)
-gameover_letters no English HD redraw yet: English shows the 1x stock letters (hash c460abc2; uk has own letters)
 prologue_title no English HD redraw yet: English shows the 1x stock picture
 gothic_uk different sheets by design: uk gothic_uk, en gothic_digits (same rect 832,256)
 gothic_digits different sheets by design: uk gothic_uk, en gothic_digits (same rect 832,256)
