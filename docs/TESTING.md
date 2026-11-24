@@ -88,7 +88,7 @@ Without `--version` it takes `SOTN_VERSION` from `CMakeLists.txt`.
 | 4 | Rumble is in the NRO | `strings -a sotn.nro | grep -ci rumble` is not 0 (4 in 0.8.55 and 0.8.57) |
 | 5 | Windows exe is one file | `objdump -p sotn.exe | grep "DLL Name"` lists no libgcc and no libwinpthread; subsystem is Windows GUI |
 | 6 | Windows exe starts | Start it hidden in a private copy; `[boot]` appears; no `[crash]` line after 30 s |
-| 7 | No stock data in the release | The release folder holds no `data/`, `voice/`, `music/`, `data/textures/`, `lang/en/`; `sotn_lang.py guard` is clean |
+| 7 | No stock data in the release | The release folder holds no `data/` (except `data/textures/uk`, `en` and `common`), no `voice/`, `music/`, `lang/en/`; `sotn_lang.py guard` is clean. The owner decided (2026-11-24): the HD packs in `tools/lang/textures/{uk,en,common}` are part of the repository and may ship, byte for byte as in git. Any other file in `data/textures/` (`dump/`, `play/`, `_bak_*`) stays out. |
 | 8 | SHA-1 of both files is in the build report | `sha1sum sotn.exe sotn.nro` |
 | 9 | Windows install | Back up the `sotn.exe` of the owner's Windows play folder, then copy. Skip if the game runs. |
 | 10 | Switch deploy | Upload, read back, compare SHA-1. The owner tests on the console. |

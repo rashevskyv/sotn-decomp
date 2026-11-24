@@ -7,6 +7,10 @@ The port adds content from the Sega Saturn and PSP versions and a Ukrainian tran
 
 Українською: [README.uk.md](README.uk.md). The upstream README: [README.upstream.md](README.upstream.md).
 
+**Install guide:** [README_INSTALL.md](README_INSTALL.md) (step by step, Windows and Switch, in
+[Ukrainian](README_INSTALL.uk.md)). The HD picture packs for uk, en and both languages are in
+`tools/lang/textures/`. The build copies them to `data/textures/`.
+
 **No game data is in this repository.** You need your own, legally obtained discs.
 The build reads them from your disk and makes the game files on your machine.
 

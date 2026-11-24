@@ -38,6 +38,25 @@ foreach(source_file IN LISTS SOTN_US_DISK_FILES)
         VERBATIM)
     list(APPEND SOTN_RUNTIME_DATA_FILES "${runtime_file}")
 endforeach()
+# The HD picture packs of the repository (tools/lang/textures/{uk,en,common})
+# go to data/textures/<lang>. Same folder for PC, Windows and Switch builds.
+set(SOTN_TEXTURES_DIR "${CMAKE_SOURCE_DIR}/tools/lang/textures")
+file(GLOB_RECURSE SOTN_TEXTURE_FILES CONFIGURE_DEPENDS
+    LIST_DIRECTORIES false
+    "${SOTN_TEXTURES_DIR}/*")
+foreach(source_file IN LISTS SOTN_TEXTURE_FILES)
+    file(RELATIVE_PATH relative_file "${SOTN_TEXTURES_DIR}" "${source_file}")
+    set(runtime_file "${SOTN_RUNTIME_DATA_DIR}/textures/${relative_file}")
+    get_filename_component(runtime_directory "${runtime_file}" DIRECTORY)
+    file(MAKE_DIRECTORY "${runtime_directory}")
+    add_custom_command(
+        OUTPUT "${runtime_file}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${source_file}" "${runtime_file}"
+        DEPENDS "${source_file}"
+        VERBATIM)
+    list(APPEND SOTN_RUNTIME_DATA_FILES "${runtime_file}")
+endforeach()
 add_custom_target(sotn_runtime_data ALL DEPENDS ${SOTN_RUNTIME_DATA_FILES})
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")

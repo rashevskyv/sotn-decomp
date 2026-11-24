@@ -7,6 +7,10 @@
 
 English: [README.md](README.md). README оригінального проєкту: [README.upstream.md](README.upstream.md).
 
+**Посібник зі встановлення:** [README_INSTALL.uk.md](README_INSTALL.uk.md) (крок за кроком, Windows і Switch,
+[English](README_INSTALL.md)). HD-пакети картинок для uk, en і для обох мов лежать у
+`tools/lang/textures/`. Збірка копіює їх у `data/textures/`.
+
 **У цьому репозиторії немає даних гри.** Потрібні ваші власні, легально придбані диски.
 Збирання читає їх із вашого диска і створює файли гри на вашому комп'ютері.
 

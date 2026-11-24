@@ -23,7 +23,7 @@ flowchart LR
     B --> DATA[data/]
     B -. PLANNED .-> VOICE[voice/jp, voice/psp]
     B -. PLANNED .-> MUSIC[music/]
-    B -. PLANNED .-> TEX[data/textures/uk, en, common]
+    GIT --> TEX[data/textures/uk, en, common]
     B -. PLANNED .-> LANG[lang/en/script_psp.bin]
 ```
 
@@ -124,7 +124,8 @@ Without a file the disc music plays. `music_files = 0` always plays the disc mus
 Loader name: `<free text>__<x>_<y>_<w>x<h>_<bpp>_<hash8>[_c<clut8>].png` (see `tools/lang/FORMAT.md`).
 Search order: `data/textures/uk/` or `data/textures/en/` first, then `data/textures/common/`.
 Rule: a picture with words goes to `uk/` and `en/`. A picture without words goes to `common/`.
-All HD pictures are made from or after stock art: local, never in git, never in a release.
+The HD packs are in git: `tools/lang/textures/{uk,en,common}` (PNG and `.hdt`). The build copies them to `data/textures/<lang>/` (CMake, next to `sotn_runtime_data`). The owner decided that this art (including upscales of stock art) ships with the repository.
+Other files in `data/textures/` (`dump/` from HD DUMP, `play/`, `_bak_*`) are local and never in git.
 Packed form: `python3 tools/hdtex_pack.py <png folder> <out folder>` writes a `.hdt` next to each name.
 A `.hdt` holds BC1 or BC3 blocks with mipmaps (LZ4). The GPU takes it as is: no decode, about 1/4 of the memory.
 The loader takes the `.hdt` before the `.png` of the same name. The `.png` stays the source and the fallback (no S3TC).
