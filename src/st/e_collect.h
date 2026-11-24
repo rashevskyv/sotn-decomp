@@ -1481,7 +1481,7 @@ void EntityRelicOrb(Entity* self) {
             }
         }
 #else
-    msg = g_RelicOrbTexts[0];
+    msg = LANG_SJIS(g_RelicOrbTexts[0]);
     chPix = g_Pix[0];
     var_v0_5 = (u8*)chPix;
     for (i = 0; i < 0xC00; i++) {
@@ -1568,6 +1568,20 @@ void EntityRelicOrb(Entity* self) {
             }
             prim = prim->next;
         }
+#ifdef RELIC_DESC
+        if (s_DescW[0]) { // the lower edge of both boxes holds the description
+            i = (12 * (s_DescW[1] ? 2 : 1) + 2) * (orbUnk7C + 1) / 8;
+            prim = g_PrimBuf[self->primIndex].next;
+            for (iconSlot = 0; iconSlot < 2; iconSlot++) {
+                if (prim->y0 >= prim->y2) {
+                    prim->y0 = prim->y1 += i;
+                } else {
+                    prim->y2 = prim->y3 += i;
+                }
+                prim = prim->next;
+            }
+        }
+#endif
 
         if (++self->ext.relicOrb.unk7C == 8) {
             self->step++;
@@ -1814,6 +1828,35 @@ void EntityMessageBox(Entity* self) {
         self->ext.messageBox.width = *str++;
         self->ext.messageBox.height = *str++;
         self->ext.messageBox.label += 2;
+#ifdef PLATFORM_PSYZ
+        // The port font is wider than the PSX BIOS font, so the text can be
+        // wider than the box. BlitChar then wraps its last letters into the
+        // next row, over the first letter. Widen the box to the text.
+        {
+            u16 lineW = 0;
+            u16 maxW = 0;
+
+            str = self->ext.messageBox.label;
+            while (*str) {
+                if (*str == 1) {
+                    str++;
+                    lineW = 0;
+                } else {
+                    if (lineW + 6 > maxW) {
+                        maxW = lineW + 6; // BlitChar copies 6 bytes per row
+                    }
+                    str = BlitChar(str, &lineW, (u8*)g_Pix[0], 126);
+                }
+            }
+            maxW = (maxW * 2 + 3) & ~3; // pixels, a multiple of 4
+            if (maxW > 252) {
+                maxW = 252;
+            }
+            if (maxW > self->ext.messageBox.width) {
+                self->ext.messageBox.width = maxW;
+            }
+        }
+#endif
         break;
     case 1:
         rect.x = 0;
