@@ -1040,6 +1040,12 @@ bool QuickItem_Eligible(u32 id);
 bool UseQuickItem(void);
 void* QuickItem_Table(Entity* e);
 void QuickItem_Draw(void);
+void QuickItem_Restore(void);
+// A line of menu cells in the field x..x+w (clipped to it). Too long for w: it
+// waits 1 s, slides left 1 px per 3 frames to the end, waits, and starts over.
+// frame counts from 0 while the field is shown.
+void Marquee_Str(const char* str, s32 x, s32 y, s32 w, MenuContext* ctx,
+                 u32 frame);
 // Serif menu cell (Lang_MenuCellAny), its 11 rows from x, y, in colour rgb.
 void PortMenu_Cell(int x, int y, int cell, u32 rgb);
 // The stat bonus colours of the status page, the Librarian's compare window.

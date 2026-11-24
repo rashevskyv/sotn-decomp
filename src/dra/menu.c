@@ -76,13 +76,16 @@ extern s32 g_PrevEquippedWeapons[2];
 // list holds the foods, medicines and the Library card you own (D_801375D8,
 // g_QuickListN) and "Empty hand". g_QuickMode: func_800FD6C4 counts that list.
 #define QUICK_SLOT NUM_ITEM_SLOTS
-#define EQUIP_ROWS (NUM_ITEM_SLOTS + 1)
+#define EQUIP_ROWS (NUM_ITEM_SLOTS + !!g_QuickEnabled) // quick_item = 0: no row
 // The Pocket is not a row of the list: the overview draws it top right, next
 // to the two hands (name under its label). The cursor visits it after the
 // last accessory and Up on the first row; the stock rows stay as they were.
-#define POCKET_X 228
-// the count column of the item list (right column: x + 128, last digit)
-#define POCKET_COUNT_X 332
+// The Equip windows are 400 wide while the Pocket is on (the 16:9 canvas ends
+// at 405): its block starts after the stock hand count "(NN)" (x 224..256),
+// the longest uk name (14 cells) fits before the count, which is right-aligned.
+#define POCKET_X 256
+#define POCKET_COUNT_X 384
+#define EQUIP_WIN_W 400
 #define EQ_TEXT_Y(r) (30 + (r) * 13)
 #define EQ_ICON_Y(r) (0x1A + (r) * 13)
 #define EQ_CURSOR_Y(r) ((r) * 13 + 0x1C)
@@ -801,22 +804,31 @@ static void RelicInfoBar(int wide) {
     bar->cursorW = bar->unk1.w =
         wide ? RELIC_WIN_W : g_MenuInit[MENU_DG_INFO_BAR].cursorW;
 }
-// the item name of the Pocket, cut to the room before the count (8 px a cell)
+// the item name of the Pocket: the field before the count, a marquee when long
+static s32 s_PocketT;
 static void PocketName(const char* name, MenuContext* ctx) {
-    u8 buf[24];
-    s32 room = (POCKET_COUNT_X - 8 * (g_QuickItem &&
-                g_Status.equipHandCount[g_QuickItem] > 8) - POCKET_X - 24) / 8;
-    s32 i;
-    const u8* n = (const u8*)LANG_CELL(name);
-    for (i = 0; i < room && n[i] != 0xFF; i++) {
-        buf[i] = n[i];
+    static const char* last;
+    s32 cnt = g_Status.equipHandCount[g_QuickItem] + 1;
+    s32 w = POCKET_COUNT_X - 8 * (cnt > 9) - 8 * (cnt > 99) - 8 - POCKET_X - 16;
+    if (name != last) {
+        last = name;
+        s_PocketT = 0;
     }
-    buf[i] = 0xFF;
-    MenuDrawStr((const char*)buf, POCKET_X + 16, EQ_TEXT_Y(1), ctx);
+    Marquee_Str(name, POCKET_X + 16, EQ_TEXT_Y(1), w, ctx, s_PocketT++);
+}
+// the Equip windows: 400 wide with the Pocket, the stock width otherwise
+static void EquipWide(int on) {
+    static const u8 id[] = {MENU_DG_EQUIP_OVERVIEW, MENU_DG_EQUIP_SELECTOR,
+                            MENU_DG_INFO_BAR};
+    int i;
+    for (i = 0; i < 3; i++) {
+        g_Menus[id[i]].cursorW = g_Menus[id[i]].unk1.w =
+            on ? EQUIP_WIN_W : g_MenuInit[id[i]].cursorW;
+    }
 }
 // the label of the Pocket (uk: Кишеня)
 static const char* PocketLabel(void) {
-    const char* t = Lang_Port(300);
+    const char* t = Lang_Port(380);
     return t ? t : _S("Pocket");
 }
 // the list step of the Pocket: as MENU_STEP_EQUIP_HAND, on its own list
@@ -1119,7 +1131,7 @@ void func_800F6618(s32 menuDialogue, s32 bColorMode) {
     }
 #ifdef PLATFORM_PSYZ
     if (IS_QUICK_SLOT()) {
-        MenuDrawRect(context, POCKET_X - 4, EQ_CURSOR_Y(1), 120, 0xB, r, 0, 0);
+        MenuDrawRect(context, POCKET_X - 4, EQ_CURSOR_Y(1), EQUIP_WIN_W - POCKET_X, 0xB, r, 0, 0);
         return;
     }
 #endif
@@ -2982,13 +2994,16 @@ void MenuDraw(void) {
                 LoadEquipIcon(acc->icon, acc->iconPalette, j + 0x12);
             }
 #ifdef PLATFORM_PSYZ
-            equip = &g_EquipDefs[g_QuickItem];
-            MenuDrawStr(PocketLabel(), POCKET_X + 16, EQ_TEXT_Y(0), menu);
-            PocketName(equip->name, menu);
-            if (g_QuickItem) {
-                DrawConsumableCount(g_QuickItem, QUICK_SLOT, menu);
+            if (g_QuickEnabled) {
+                equip = &g_EquipDefs[g_QuickItem];
+                MenuDrawStr(PocketLabel(), POCKET_X, EQ_TEXT_Y(0), menu);
+                PocketName(equip->name, menu);
+                if (g_QuickItem) {
+                    DrawConsumableCount(g_QuickItem, QUICK_SLOT, menu);
+                }
+                LoadEquipIcon(equip->icon, equip->iconPalette,
+                              0x10 + QUICK_SLOT);
             }
-            LoadEquipIcon(equip->icon, equip->iconPalette, 0x10 + QUICK_SLOT);
 #endif
 
             for (j = 0; j < EQUIP_ROWS; j++) {
@@ -3768,6 +3783,11 @@ void MenuEquipHandlePageScroll(s32 arg0) {
 
     if (D_801375CC == EQUIP_HAND) {
         cursorIndex = &g_MenuNavigation.cursorHandEquipType;
+#ifdef PLATFORM_PSYZ
+        if (g_QuickMode) {
+            cursorIndex = &s_QuickNav; // the Pocket's own list
+        }
+#endif
     } else {
         cursorIndex = &g_MenuNavigation.cursorEquipType[D_801375D4];
     }
@@ -3996,9 +4016,15 @@ void func_800FADC0(void) {
 
 #ifdef PLATFORM_PSYZ
     if (IS_QUICK_SLOT()) {
-        const char* hint = Lang_Port(301);
+#ifdef __SWITCH__
+        const char* hint = Lang_Port(382);
+#define POCKET_HINT _S("Pocket: food, medicine or Library card on ZL")
+#else
+        const char* hint = Lang_Port(381);
+#define POCKET_HINT _S("Pocket: food, medicine or Library card on L2")
+#endif
         func_800FAD34(g_QuickItem ? g_EquipDefs[g_QuickItem].description
-                      : hint ? hint : _S("Pocket: food or medicine on L2"),
+                      : hint ? hint : POCKET_HINT,
                       g_QuickItem != 0,
                       g_EquipDefs[g_QuickItem].icon,
                       g_EquipDefs[g_QuickItem].iconPalette);
@@ -4841,6 +4867,9 @@ block_4:
         if (g_pads[0].tapped & PAD_MENU_CONFIRM) {
             switch (g_MenuNavigation.cursorMain) {
             case 0:
+#ifdef PLATFORM_PSYZ
+                EquipWide(g_QuickEnabled);
+#endif
                 MenuShow(MENU_DG_EQUIP_OVERVIEW);
                 func_800FB0FC();
                 func_800FADC0();
@@ -5333,6 +5362,7 @@ block_4:
             MenuHide(MENU_DG_INFO_BAR);
 #ifdef PLATFORM_PSYZ
             g_QuickMode = 0;
+            EquipWide(0);
 #endif
             MenuShow(MENU_DG_MAIN);
             MenuShow(MENU_DG_BG);

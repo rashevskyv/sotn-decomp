@@ -22,11 +22,14 @@ void Saturn_QuickSaveTest(void);
 void LoadEquipIcon(s32 equipIcon, s32 palette, s32 index);
 void func_800F892C(s32 index, s32 x, s32 y, void* ctx);
 
+void MenuDrawStr(const char* str, s32 x, s32 y, MenuContext* ctx);
+
 u32 g_QuickItem;
 int g_QuickEnabled = 1;
 int g_QuickUse;
 Weapon g_QuickWeapon;
 static int s_prg, s_gfx;
+static void *s_bank0, *s_bank1; // hand 1 sprite banks 0x12, 0x13 before a food
 
 static int IsFood(u32 id) {
     const Equipment* e = &g_EquipDefs[id];
@@ -47,10 +50,29 @@ bool QuickItem_Eligible(u32 id) {
            IsFood(id);
 }
 
+void Marquee_Str(const char* str, s32 x, s32 y, s32 w, MenuContext* ctx,
+                 u32 frame) {
+    MenuContext c = *ctx; // the window's clip rect becomes the field
+    const char* s = LANG_CELL(str);
+    s32 n = 0, over, ph, off = 0;
+
+    while ((u8)s[n] != 0xFF) {
+        n++;
+    }
+    over = n * 8 - w;
+    if (over > 0) {
+        ph = frame % (120 + 3 * over);
+        off = ph < 60 ? 0 : ph < 60 + 3 * over ? (ph - 60) / 3 : over;
+    }
+    c.unk1.x = x;
+    c.unk1.w = w;
+    MenuDrawStr(s, x - off, y, &c);
+}
+
 // the dispatch of a new hand 1 weapon entity (src/dra/7879C.c)
 void* QuickItem_Table(Entity* e) {
     u32 id = e->ext.weapon.equipId;
-    if (id > 0 && id < NUM_HAND_ITEMS && g_EquippedWeaponIds[1] != 21 &&
+    if (s_prg && id > 0 && id < NUM_HAND_ITEMS && g_EquippedWeaponIds[1] != 21 &&
         IsFood(id)) {
         return &g_QuickWeapon;
     }
@@ -65,6 +87,10 @@ static void FoodGfx(u32 id) {
         s_prg = 1;
         HandleWeaponPrg(2, 21);
     }
+    if (!s_gfx) { // the food program overwrites the hand 1 banks
+        s_bank0 = ((void**)g_api.o.spriteBanks)[0x12];
+        s_bank1 = ((void**)g_api.o.spriteBanks)[0x13];
+    }
     HandleWeaponChr(1, 21);
     g_QuickWeapon.LoadWeaponPalette(g_EquipDefs[id].palette);
     s_gfx = 1;
@@ -74,11 +100,19 @@ static void FoodGfx(u32 id) {
 static void RestoreGfx(void) {
     u32 id = g_Status.equipment[1];
     s_gfx = 0;
+    ((void**)g_api.o.spriteBanks)[0x12] = s_bank0;
+    ((void**)g_api.o.spriteBanks)[0x13] = s_bank1;
     if (g_Status.equipment[ARMOR_SLOT] == ITEM_AXE_LORD_ARMOR) {
         id = 0xD8;
     }
     HandleWeaponChr(1, g_EquippedWeaponIds[1]);
     D_8017D000.LoadWeaponPalette(g_EquipDefs[id].palette);
+}
+
+void QuickItem_Restore(void) {
+    if (s_gfx) {
+        RestoreGfx();
+    }
 }
 
 bool UseQuickItem(void) {
@@ -123,17 +157,23 @@ static void Cells(int x, int y, const char* s, int shade, u32 rgb) {
 // every frame of the Alucard HUD (DrawHudSubweapon)
 void QuickItem_Draw(void) {
     static int last = -1, frame;
-    const char* e = getenv("SOTN_TEST_QUICK"); // id:count, play frame 300
     u32 id = g_QuickItem;
     int count = id ? g_Status.equipHandCount[id] + 1 : 0;
-    char num[5];
+    char num[6];
     int i, n, shade;
 
+#ifdef QUICK_TEST
+    const char* e = getenv("SOTN_TEST_QUICK"); // id:count, play frame 300
     if (e && ++frame == 300 && sscanf(e, "%u:%d", &id, &count) == 2) {
         g_QuickItem = id;
         g_Status.equipHandCount[id] = count - 1;
         g_Status.hp = 10;
         fprintf(stderr, "[quick] test: item %u x%d\n", id, count);
+    }
+    if (e && frame == 300 && getenv("SOTN_TEST_HAND")) { // a food in hand 1
+        id = atoi(getenv("SOTN_TEST_HAND"));
+        g_Status.equipment[1] = id;
+        g_Status.equipHandCount[id] = 4;
     }
     if (e && frame == 340) {
         Saturn_QuickSaveTest();
@@ -143,6 +183,7 @@ void QuickItem_Draw(void) {
                 (int)g_Status.hp, (unsigned)g_QuickItem,
                 g_QuickItem ? g_Status.equipHandCount[g_QuickItem] + 1 : 0);
     }
+#endif
     if (s_gfx) { // no food of the third hand left: the held weapon's pictures
         for (i = 4; i < 64; i++) {
             if (g_Entities[i].entityId >= 0xF0 &&
@@ -173,6 +214,9 @@ void QuickItem_Draw(void) {
     Cells(128, 21, g_EquipDefs[id].name, shade, 0xE0E0E0);
     n = 0;
     num[n++] = CH('x');
+    if (count > 99) {
+        num[n++] = CH('0' + count / 100 % 10);
+    }
     if (count > 9) {
         num[n++] = CH('0' + count / 10 % 10);
     }

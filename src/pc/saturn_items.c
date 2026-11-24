@@ -132,6 +132,7 @@ void Status_FromPs1(
 // test (SOTN_TEST_QUICK, quick_item.c): the third hand through a save, and
 // through a save of 0.8.112 (zero tail), of the PS1 (no tail) and of an older
 // build that saved over it (its count differs)
+#ifdef QUICK_TEST
 void Saturn_QuickSaveTest(void) {
     static u8 buf[0x2000];
     PlayerStatusPs1 ps1;
@@ -159,3 +160,4 @@ void Saturn_QuickSaveTest(void) {
             (unsigned)g_QuickItem, out.equipHandCount[q]);
     g_QuickItem = q;
 }
+#endif

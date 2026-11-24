@@ -208,6 +208,7 @@ void InitStatsAndGear(bool isDeathTakingItems) {
         g_Status.equipHandCount[ITEM_ASTRAL_DAGGER + i] = 0;
         g_Status.equipHandOrder[NUM_HAND_ITEMS + i] = ITEM_ASTRAL_DAGGER + i;
     }
+    g_QuickItem = 0; // the Pocket goes with the stock counts
 #endif
 
     for (i = 0; i < 90; i++) {

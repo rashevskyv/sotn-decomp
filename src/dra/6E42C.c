@@ -396,6 +396,9 @@ int func_8010EDB8(void) {
         g_Player.D_80072EF8 = PAD_CIRCLE;
         equipped_id = g_Status.equipment[hand];
         equipped_item = &g_EquipDefs[equipped_id];
+        if (CheckChainLimit(equipped_id, hand) < 0) {
+            return false;
+        }
         goto block_45;
     }
 #endif
@@ -509,6 +512,11 @@ block_32:
         }
     }
 block_45:
+#ifdef PLATFORM_PSYZ
+    if (hand == 1 && !g_QuickUse) { // a real hand 1 attack: its pictures back
+        QuickItem_Restore();
+    }
+#endif
     if (equipped_id) {
         if (equipped_item->unk13 == 55) {     // Medicines
             if (equipped_item->unk14 == 20) { // Library card!

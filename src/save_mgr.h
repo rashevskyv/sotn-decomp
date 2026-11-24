@@ -663,6 +663,11 @@ void StoreSaveData(SaveData* save, s32 block, s32 cardIcon) {
 #endif
 #endif
     *dstNav = g_MenuNavigation;
+#ifdef PLATFORM_PSYZ
+    if (dstNav->cursorEquip >= NUM_ITEM_SLOTS) { // the Pocket row: not in old saves
+        dstNav->cursorEquip = 0;
+    }
+#endif
     *dstSettings = g_Settings;
 
     for (i = 0; i < LEN(g_CastleFlags); i++) {
