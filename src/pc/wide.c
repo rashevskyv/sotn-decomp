@@ -710,8 +710,8 @@ void Wide_OnFrame(void) {
     }
     // the stage clip (a Saturn band is inside it): only the rows 20..226
     // must fit, so docked shows the stage at scale 5 (384x216). Game over
-    // from Gameover_6 (the melt ends; it opens the clip there) and the
-    // loading screen are full 240-row pictures: all rows fit.
+    // opens the clip when the melt starts (Gameover_5, game_handlers.c), and
+    // the loading screen is a full 240-row picture: all rows fit then.
     rows = clip->y >= CLIP_TOP && clip->y + clip->h <= CLIP_BOTTOM &&
            (g_GameState == Game_Play ||
             (g_GameState == Game_GameOver &&
