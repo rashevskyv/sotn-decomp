@@ -1237,6 +1237,196 @@ bool StatusPause(s32 arg0) {
     return true;
 }
 
+#ifdef PLATFORM_PSYZ
+// Alucard HUD, the owner's layout of 2026-11-24 (mockup preset "Ваш макет"):
+// the frame holds two bars (red HP on top, blue MP below), small HP and MP
+// numbers above and below the frame, a big hearts number with a heart icon
+// under the sub-weapon. The left orb is blank: it is kept for the
+// third-hand item (HUD_THIRD_HAND). Hud_PatchVram makes the art.
+// The chain draws in order, and psyz keeps an HD number only when no later
+// primitive overlaps it (sdl3_gl.c Hd_OverHide): the bar and icons come
+// first, the numbers last.
+#define HUD_HP_BAR 6
+#define HUD_HEART 7
+#define HUD_THIRD_HAND 8    // hidden for now
+#define HUD_HP_DIGITS 9     // 9..12
+#define HUD_HEART_DIGITS 13 // 13..16
+#define HUD_MP_DIGITS 17    // 17..20
+#define HUD_ALL (HUD_NUM_SPRITES + 7)
+// the whole HUD 3 px lower than the mockup: rows 0..19 of the screen are
+// clipped, and the HP number starts at row 17 in the mockup
+#define HUD_DY 3
+// the third-hand item: 16x16 in the centre of the left orb
+#define HUD_THIRD_HAND_X 10
+#define HUD_THIRD_HAND_Y (27 + HUD_DY)
+// free 8x6 spot in tpage 0x1F for the heart icon (moved out of the frame)
+#define HUD_HEART_U 0xF0
+#define HUD_HEART_V 0xF0
+
+#define HUD_PIX(b, u, v) (((b)[(v) * 32 + (u) / 4] >> ((u) % 4 * 4)) & 15)
+static void Hud_SetPix(u16* b, s32 u, s32 v, s32 c) {
+    u16* hw = &b[v * 32 + u / 4];
+    *hw = (*hw & ~(15 << (u % 4 * 4))) | (c << (u % 4 * 4));
+}
+
+// Called right after F_GAME is loaded to VRAM (src/pc/sim_pc.c), so the
+// source pixels are always the original ones. Richter's HUD uses tpage
+// 0x1B, so F_GAME2 is safe to patch too.
+void Hud_PatchVram(void) {
+    static u16 vram[32 * 32], orig[32 * 32];
+    static u16 heart[2 * 6];
+    static const u8 track2[5] = {6, 7, 8, 9, 11};
+    RECT r = {960, 256, 32, 32}; // tpage 0x1F u 0..127, v 0..31
+    RECT rh = {960 + HUD_HEART_U / 4, 256 + HUD_HEART_V, 2, 6};
+    s32 i, u, v, c;
+
+    DrawSync(0);
+    StoreImage(&r, (u_long*)vram);
+    DrawSync(0);
+    for (i = 0; i < LEN(vram); i++) {
+        orig[i] = vram[i];
+    }
+    // heart icon: frame rows 12..17, cols 16..23 (u 0x30..0x37)
+    for (v = 0; v < 6; v++) {
+        heart[v * 2] = orig[(12 + v) * 32 + 0x30 / 4];
+        heart[v * 2 + 1] = orig[(12 + v) * 32 + 0x30 / 4 + 1];
+    }
+    LoadImage(&rh, (u_long*)heart);
+    // frame (u 0x20): second bar track in rows 11..17 from the first one,
+    // with its orange end cap
+    for (u = 0x20; u < 0x20 + 51; u++) {
+        if (u < 0x20 + 45) {
+            Hud_SetPix(vram, u, 11, HUD_PIX(orig, u, 6));
+            Hud_SetPix(vram, u, 12, HUD_PIX(orig, u, 5));
+        }
+        for (v = 0; v < 5; v++) {
+            Hud_SetPix(vram, u, 13 + v, HUD_PIX(orig, u, track2[v]));
+        }
+    }
+    // orb (u 0): blank centre without the "HP" label and marks
+    for (v = 6; v < 26; v++) {
+        for (u = 5; u < 26; u++) {
+            c = HUD_PIX(orig, u, v);
+            if (c == 0xA || c == 1) {
+                Hud_SetPix(vram, u, v, 9);
+            }
+        }
+    }
+    LoadImage(&r, (u_long*)vram);
+    DrawSync(0);
+}
+
+static void Hud_Quad(
+    Primitive* p, s32 x0, s32 y0, s32 x1, s32 y1, s32 u, s32 v, s32 w, s32 h) {
+    p->x0 = p->x2 = x0;
+    p->x1 = p->x3 = x1;
+    p->y0 = p->y1 = y0;
+    p->y2 = p->y3 = y1;
+    p->u0 = p->u2 = u;
+    p->u1 = p->u3 = u + w;
+    p->v0 = p->v1 = v;
+    p->v2 = p->v3 = v + h;
+}
+
+// The bar strip (u 0x70, loaded full) is drawn turned: its rows run along x
+// from the left, so the fill shows rows 0..len-1.
+static void Hud_Bar(Primitive* p, s32 x, s32 y, s32 len, u16 mode) {
+    len = CLAMP(len, 0, 50);
+    p->x0 = p->x1 = x;
+    p->x2 = p->x3 = x + len;
+    p->y0 = p->y2 = y + 8;
+    p->y1 = p->y3 = y;
+    p->u0 = p->u2 = 0x70;
+    p->u1 = p->u3 = 0x78;
+    p->v0 = p->v1 = 0;
+    p->v2 = p->v3 = len;
+    p->drawMode = len ? mode : DRAW_HIDE;
+}
+
+// A number in 4 prims. q = scale in quarters (4 = 1x), step = digit step at
+// 1x, align: -1 = x is the left edge, 0 = the centre, 1 = the right edge.
+static void Hud_Number(Primitive** p, s32 value, s32 x, s32 y, s32 align,
+                       bool big, s32 q, s32 step, u16 clut) {
+    s32 nd, div, k, w4, h;
+
+    for (nd = 1, div = 10; nd < 4 && value >= div; nd++, div *= 10) {
+    }
+    if (value >= div) {
+        value = div - 1;
+    }
+    h = big ? 16 : 8;
+    w4 = ((nd - 1) * step + 8) * q;
+    x = x * 4 - (align > 0 ? w4 : align == 0 ? w4 / 2 : 0);
+    for (k = 0; k < 4; k++) {
+        if (k >= nd) {
+            p[k]->drawMode = DRAW_HIDE;
+            continue;
+        }
+        div /= 10;
+        Hud_Quad(p[k], (x + k * step * q + 2) >> 2, y,
+                 (x + (k * step + 8) * q + 2) >> 2, y + (h * q + 2) / 4,
+                 0x20 + (value / div) % 10 * 8, big ? 0x20 : 0x18, 8, h);
+        p[k]->clut = clut;
+        p[k]->drawMode = DRAW_ABSPOS;
+    }
+}
+
+static void Hud_Layout(void) {
+    Primitive* p[HUD_ALL];
+    Primitive* prim;
+    SubweaponDef subwpn;
+    s32 i;
+    u16 clut;
+
+    for (i = 0, prim = &g_PrimBuf[g_PlayerHud.primIndex1];
+         prim != NULL && i < HUD_ALL; i++, prim = prim->next) {
+        p[i] = prim;
+    }
+    if (i < HUD_ALL) {
+        return;
+    }
+    // sub-weapon icon, its sparkle and dot (y 23 in the mockup), the frame
+    // and the orb
+    for (i = 0; i < 5; i++) {
+        p[i]->y0 = p[i]->y1 = (i < 3 ? 23 : g_HudSpriteY[i]) + HUD_DY;
+        p[i]->y2 = p[i]->y3 = p[i]->y0 + g_HudSpriteH[i];
+    }
+    // HP bar: the MP strip tinted red
+    prim = p[HUD_HP_BAR];
+    prim->clut = 0x196;
+    prim->r0 = prim->r1 = prim->r2 = prim->r3 = 200;
+    prim->g0 = prim->g1 = prim->g2 = prim->g3 = 40;
+    prim->b0 = prim->b1 = prim->b2 = prim->b3 = 40;
+    Hud_Bar(prim, 31, 26 + HUD_DY,
+            g_PlayerHud.displayHP * 50 / MAX(1, g_Status.hpMax),
+            DRAW_ABSPOS | DRAW_COLORS);
+    Hud_Bar(p[5], 31, 33 + HUD_DY, g_Status.mp * 50 / MAX(1, g_Status.mpMax),
+            DRAW_ABSPOS);
+    // numbers: data/textures/common has the stock digits made bigger for
+    // them (tools/hud_digits.py): even pixels at 3/4 and 5/4 scale
+    Hud_Number(&p[HUD_HP_DIGITS], g_PlayerHud.displayHP, 43, 17 + HUD_DY, 1,
+               false, 5, 4, 0x196);
+    Hud_Number(
+        &p[HUD_MP_DIGITS], g_Status.mp, 40, 41 + HUD_DY, 1, false, 5, 4, 0x196);
+    // hearts: the stock flicker when the sub-weapon can be used
+    clut = 0x196;
+    if (func_800FE3C4(&subwpn, 0, false) && !(g_Timer & 2)) {
+        clut = 0x193;
+    }
+    Hud_Number(&p[HUD_HEART_DIGITS], g_Status.hearts, 101, 38 + HUD_DY, 0, true,
+               3, 7, clut);
+    prim = p[HUD_HEART];
+    Hud_Quad(
+        prim, 88, 44 + HUD_DY, 94, 48 + HUD_DY, HUD_HEART_U, HUD_HEART_V, 8, 6);
+    prim->clut = 0x172;
+    prim->drawMode = DRAW_ABSPOS;
+    // the third-hand item goes here: set tpage, clut, u/v of its icon,
+    // Hud_Quad(prim, HUD_THIRD_HAND_X, HUD_THIRD_HAND_Y, +16, +16, ...) and
+    // DRAW_ABSPOS. Until then the orb stays empty.
+    p[HUD_THIRD_HAND]->drawMode = DRAW_HIDE;
+}
+#endif
+
 // original name: status_disp_init
 void DrawHud(void) {
     Primitive* prim;
@@ -1251,10 +1441,22 @@ void DrawHud(void) {
         return;
     }
 
+#ifdef PLATFORM_PSYZ
+    g_PlayerHud.primIndex1 = AllocPrimitivesReverse(PRIM_GT4, HUD_ALL);
+#else
     g_PlayerHud.primIndex1 = AllocPrimitivesReverse(PRIM_GT4, HUD_NUM_SPRITES);
+#endif
     prim = &g_PrimBuf[g_PlayerHud.primIndex1];
 
     for (i = 0; prim != NULL; i++, prim = prim->next) {
+#ifdef PLATFORM_PSYZ
+        if (i >= HUD_NUM_SPRITES) { // placed by Hud_Layout every frame
+            prim->tpage = 0x1F;
+            prim->priority = 0x1F0;
+            prim->drawMode = DRAW_HIDE;
+            continue;
+        }
+#endif
         SetTexturedPrimRect(
             prim, g_HudSpriteX[i], g_HudSpriteY[i], g_HudSpriteW[i],
             g_HudSpriteH[i], g_HudSpriteU[i], g_HudSpriteV[i]);
@@ -1385,8 +1587,13 @@ void DrawHudSubweapon() {
 
     // Represents MP fill level in fraction of 50 (2% each)
     mpFillSteps = (g_Status.mp * 50) / g_Status.mpMax;
+#ifdef PLATFORM_PSYZ
+    // the full strip: the HP and MP bars both cut it to their length
+    LoadTPage((u_long*)(D_800C52F8[10] + 4), 0, 0, 0x3DC, 0x100, 8, 50);
+#else
     LoadTPage(
         (u_long*)(D_800C52F8[10] + 4), 0, 0, 0x3DC, 0x100, 8, mpFillSteps);
+#endif
     // Use one clut if MP is full, otherwise a different one
     if (mpFillSteps == 50) {
         prim->clut = PAL_CC_MAGIC_HUD_EFFECT;
@@ -1421,6 +1628,9 @@ void DrawHudSubweapon() {
         func_800EA5E4(1); // Normal health display
     }
 
+#ifdef PLATFORM_PSYZ
+    Hud_Layout();
+#else
     if (g_PlayerHud.displayHP > 999) {
         leading_zeros = 0;
         digitSpacing = 6;
@@ -1565,4 +1775,5 @@ void DrawHudSubweapon() {
     prim->x0 = prim->x2 = statXPos + 12;
     prim->x1 = prim->x3 = prim->x0 + 8;
     prim->clut = clut;
+#endif
 }

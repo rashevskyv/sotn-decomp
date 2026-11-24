@@ -1000,6 +1000,9 @@ void Wide_OnFrame(void);
 void Wide_Tile(TILE* tile);
 // Player HUD prim chains (src/dra/5F60C.c), -1 when none.
 void Hud_GetPrims(s32* index1, s32* index2);
+// Draws the two-bar frame, the blank left orb and the heart icon into VRAM
+// right after F_GAME is loaded (src/dra/5F60C.c).
+void Hud_PatchVram(void);
 // Port menu (src/pc/port_menu.c): L3+R3 opens it.
 u16 PortMenu_Pad(u16 pressed);
 // The right stick of the pad whose stick is out the most, -32768..32767

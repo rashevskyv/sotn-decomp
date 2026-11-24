@@ -311,6 +311,7 @@ s32 LoadFileSimToMem(SimKind kind) {
     case SIM_1:
         LoadStageTileset(STAGE_PRG_PTR, 0, 0x100);
         Lang_PaintFont8(); // F_GAME and F_GAME2 only, not the prologue picture
+        Hud_PatchVram();
         DrawSync(0);
         LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         LoadImage(&g_Vram.D_800ACDA8, 0x801C0000);
@@ -402,6 +403,7 @@ bool LoadFilePc(const struct FileUseContent* file) {
         // F_GAME: 32 tile blocks, then the CLUTs at 0x40000 (loaded below)
         LoadStageTileset(sim->addr, MIN(file->length, 0x40000), 0x100);
         Lang_PaintFont8(); // the font sheet at 896,256 (language = uk only)
+        Hud_PatchVram();
         LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         LoadImage(&g_Vram.D_800ACDA8, (u8*)sim->addr + 0x40000);
         StoreImage(&g_Vram.D_800ACDA8, g_Clut[1]);

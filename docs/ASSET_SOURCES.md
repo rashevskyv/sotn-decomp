@@ -139,6 +139,7 @@ The loader takes the `.hdt` before the `.png` of the same name. The `.png` stays
 | uk: title background, logo, PRESS START, loading, game over, prologue title | 9 | `tools/lang/uk/hd_textures.py` from `tools/lang/uk/local/` | steps before 98 |
 | uk and en: stage banners (13 x 2 CLUT files) and the ST0 card | 27 each | Monotype Corsiva at 8x | step 103 |
 | uk and en: file select windows (2), five labels, gothic sheet, 1792 card | 9 each | redraws | step 103 (en windows: step 109) |
+| common: HUD digits (stock pixels at 8x, no smoothing; hearts flicker CLUT) | 2 | `tools/hud_digits.py <F_GAME.BIN> <game>/data/textures/common` | hud branch |
 
 The hash in a uk name belongs to one `art.bin`. A changed label needs a new hash.
 UNKNOWN: the portrait keys were confirmed on Linux only (step 98 report).
