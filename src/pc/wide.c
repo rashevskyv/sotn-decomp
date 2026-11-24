@@ -775,9 +775,10 @@ void Wide_OnFrame(void) {
             // reach past the frame (RELIC_WIN_X in src/dra/menu.c)
             req = d;
             if (mfill) {
-                // the relic page is 416 wide (menu.c RELIC_WIN_W): all of it
-                // must fit, so that page takes the width of 416
-                s = MAX(MIN(d.w / (g_RelicPage ? 416 : fbw),
+                // the relic page (RELIC_WIN_W) and the Equip windows with the
+                // Pocket count (POCKET_COUNT_X + 8, menu.c) reach x 416: all
+                // of it must fit at any window size
+                s = MAX(MIN(d.w / 416,
                             d.h / (CLIP_BOTTOM - CLIP_TOP)),
                         1);
             }

@@ -2222,15 +2222,36 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     // the button hint under the box; beside the mini map the box lets the
     // rooms under it show through, so its frame is four lines
     Line(x + BORDER, y + h + 4, hint, 255, 255, 64);
-    if (help_en) { // one line of help, centred in the frame
-        char hl[LINE_MAX];
-        int hw, hx, fw = FbW() - 8;
-        Clear(hl);
-        AddW(hl, help_word, help_en);
-        hw = MIN(Width(hl), fw); // a line wider than the frame scrolls
-        hx = (FbW() - hw) / 2;
-        Marquee(hx, y + h + LINE_H + 6, hw, hl, 128, 200, 255, 1);
-        Rect(hx - 4, y + h + LINE_H + 2, hw + 8, LINE_H + 2, 8, 8, 24);
+    if (help_en) { // the help, centred in the frame
+        // wider than the frame (uk: 32 cells = 256): two lines, split at the
+        // last space that fits; a line still too wide scrolls (Marquee)
+        char hl[2][LINE_MAX];
+        int hw, hx, fw = FbW() - 8, n, k = -1, l;
+        char sp = uk ? CH(' ') : ' ', end = uk ? (char)0xFF : 0;
+        Clear(hl[0]);
+        AddW(hl[0], help_word, help_en);
+        Clear(hl[1]);
+        n = Len(hl[0]);
+        for (i = 1; i < n; i++) {
+            if (hl[0][i] == sp) {
+                hl[0][i] = end;
+                k = Width(hl[0]) <= fw ? i : k;
+                hl[0][i] = sp;
+            }
+        }
+        if (Width(hl[0]) > fw && k > 0) {
+            memcpy(hl[1], hl[0] + k + 1, n - k - 1);
+            hl[1][n - k - 1] = end;
+            hl[0][k] = end;
+        }
+        for (l = 0; l < 2 && Len(hl[l]); l++) {
+            hw = MIN(Width(hl[l]), fw);
+            hx = (FbW() - hw) / 2;
+            Marquee(hx, y + h + (l + 1) * LINE_H + 6, hw, hl[l], 128, 200, 255,
+                    1);
+            Rect(hx - 4, y + h + (l + 1) * LINE_H + 2, hw + 8, LINE_H + 2, 8, 8,
+                 24);
+        }
         help_en = NULL;
     }
     for (i = 0; box_left && i < count; i++) { // under the text, on the box

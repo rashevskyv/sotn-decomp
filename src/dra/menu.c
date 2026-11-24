@@ -89,6 +89,10 @@ extern s32 g_PrevEquippedWeapons[2];
 #define EQ_TEXT_Y(r) (30 + (r) * 13)
 #define EQ_ICON_Y(r) (0x1A + (r) * 13)
 #define EQ_CURSOR_Y(r) ((r) * 13 + 0x1C)
+// the stat compare (MenuStatChangesDraw) uses the area of the Pocket block
+#define POCKET_SHOWN() \
+    (g_QuickEnabled && \
+     (g_Menus[MENU_DG_EQUIP_SELECTOR].unk1C || !D_80137948))
 #define IS_QUICK_SLOT() (g_MenuNavigation.cursorEquip == QUICK_SLOT)
 s32 g_QuickMode, g_QuickListN;
 static s32 s_QuickNav, s_QuickFrom;
@@ -3009,7 +3013,7 @@ void MenuDraw(void) {
                 LoadEquipIcon(acc->icon, acc->iconPalette, j + 0x12);
             }
 #ifdef PLATFORM_PSYZ
-            if (g_QuickEnabled) {
+            if (POCKET_SHOWN()) {
                 equip = &g_EquipDefs[g_QuickItem];
                 MenuDrawStr(PocketLabel(), POCKET_X, EQ_TEXT_Y(0), menu);
                 PocketName(equip->name, menu);
@@ -3028,7 +3032,9 @@ void MenuDraw(void) {
                     }
 #ifdef PLATFORM_PSYZ
                 } else if (j == QUICK_SLOT) {
-                    func_800F892C(j + 0x10, POCKET_X, EQ_ICON_Y(1), menu);
+                    if (POCKET_SHOWN()) {
+                        func_800F892C(j + 0x10, POCKET_X, EQ_ICON_Y(1), menu);
+                    }
 #endif
                 } else {
                     func_800F892C(j + 0x10, 0x5E, EQ_ICON_Y(j), menu);
