@@ -976,8 +976,9 @@ static int MainLineOf(int item) {
     int e = EditorRow();
     return e >= 0 && item > e ? item + 1 : item;
 }
-// the main page scrolls: MAIN_LINES on screen (with the hint and the help
-// line they fit the stage rows 20..226), the first is main_top
+// the main page scrolls: MAIN_LINES on screen (with the hint and one or two
+// help lines, Box centres them together, they fit the stage rows 20..226),
+// the first is main_top
 #define MAIN_LINES 12
 static int main_top;
 static int MainVis(void) { return MIN(MAIN_LINES, MainLines()); }
@@ -2174,6 +2175,10 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     int i, x, y, w, h, lit, vis = count - sb_first, ty, th, tl;
     int bar = sb_total > vis && vis > 0;
     u8 c;
+    // the help: wider than the frame (uk: 32 cells = 256 px) it is two lines,
+    // split at the last space that fits; a still wider line scrolls (Marquee)
+    char hl[2][LINE_MAX];
+    int fw = FbW() - 8, help_h = 0;
     Clear(hint);
     Add(hint, HINT_OK);
     Add(hint, ": ");
@@ -2192,8 +2197,29 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
         w = MIN(w, FbW() - 8); // a wider line scrolls (Marquee)
     }
     h = count * LINE_H - 5 + BORDER * 2;
+    if (help_en) {
+        int n, k = -1;
+        char sp = uk ? CH(' ') : ' ', end = uk ? (char)0xFF : 0;
+        Clear(hl[0]);
+        AddW(hl[0], help_word, help_en);
+        Clear(hl[1]);
+        n = Len(hl[0]);
+        for (i = 1; i < n; i++) {
+            if (hl[0][i] == sp) {
+                hl[0][i] = end;
+                k = Width(hl[0]) <= fw ? i : k;
+                hl[0][i] = sp;
+            }
+        }
+        if (Width(hl[0]) > fw && k > 0) {
+            memcpy(hl[1], hl[0] + k + 1, n - k - 1);
+            hl[1][n - k - 1] = end;
+            hl[0][k] = end;
+        }
+        help_h = Len(hl[1]) ? LINE_H : 0;
+    }
     x = box_left ? box_x : (FbW() - w) / 2;
-    y = box_left ? box_y : (FbH() - h) / 2;
+    y = box_left ? box_y : (FbH() - h - help_h) / 2;
     box_x = x;
     box_y = y;
     box_w = w;
@@ -2222,28 +2248,8 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     // the button hint under the box; beside the mini map the box lets the
     // rooms under it show through, so its frame is four lines
     Line(x + BORDER, y + h + 4, hint, 255, 255, 64);
-    if (help_en) { // the help, centred in the frame
-        // wider than the frame (uk: 32 cells = 256): two lines, split at the
-        // last space that fits; a line still too wide scrolls (Marquee)
-        char hl[2][LINE_MAX];
-        int hw, hx, fw = FbW() - 8, n, k = -1, l;
-        char sp = uk ? CH(' ') : ' ', end = uk ? (char)0xFF : 0;
-        Clear(hl[0]);
-        AddW(hl[0], help_word, help_en);
-        Clear(hl[1]);
-        n = Len(hl[0]);
-        for (i = 1; i < n; i++) {
-            if (hl[0][i] == sp) {
-                hl[0][i] = end;
-                k = Width(hl[0]) <= fw ? i : k;
-                hl[0][i] = sp;
-            }
-        }
-        if (Width(hl[0]) > fw && k > 0) {
-            memcpy(hl[1], hl[0] + k + 1, n - k - 1);
-            hl[1][n - k - 1] = end;
-            hl[0][k] = end;
-        }
+    if (help_en) { // the help, centred in the frame (split above)
+        int hw, hx, l;
         for (l = 0; l < 2 && Len(hl[l]); l++) {
             hw = MIN(Width(hl[l]), fw);
             hx = (FbW() - hw) / 2;

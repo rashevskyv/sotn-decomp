@@ -80,12 +80,13 @@ extern s32 g_PrevEquippedWeapons[2];
 // The Pocket is not a row of the list: the overview draws it top right, next
 // to the two hands (name under its label). Right moves the cursor to it, Left
 // back to the row it came from; Up and Down stay on the stock rows.
-// The Equip windows are 400 wide while the Pocket is on (the 16:9 canvas ends
-// at 405): its block starts after the stock hand count "(NN)" (x 224..256),
-// the longest uk name (14 cells) fits before the count, which is right-aligned.
+// The Equip windows are 384 wide while the Pocket is on (the frame is 384, so
+// the menu keeps its scale at 1920x1080): its block starts after the stock
+// hand count "(NN)" (x 224..256). The count is right-aligned at the window
+// edge (units digit at x 376, "99" ends at 384); a longer name scrolls.
 #define POCKET_X 256
-#define POCKET_COUNT_X 384
-#define EQUIP_WIN_W 400
+#define POCKET_COUNT_X 376
+#define EQUIP_WIN_W 384
 #define EQ_TEXT_Y(r) (30 + (r) * 13)
 #define EQ_ICON_Y(r) (0x1A + (r) * 13)
 #define EQ_CURSOR_Y(r) ((r) * 13 + 0x1C)
@@ -803,7 +804,7 @@ void func_800F5E68(MenuContext* ctx, s32 cursorIdx, s32 x, s32 y, s32 w, s32 h,
                                  : 0x78)
 // the info bar as wide as the relic window while the relic page is up
 extern MenuContextInit g_MenuInit[NUM_MENU];
-int g_RelicPage; // read by Wide_OnFrame: the menu scale fits 416 columns
+int g_RelicPage; // read by Wide_OnFrame: the relic page needs 416 columns, so the scale fits them
 static void RelicInfoBar(int wide) {
     MenuContext* bar = &g_Menus[MENU_DG_INFO_BAR];
     g_RelicPage = wide;
