@@ -1296,6 +1296,9 @@ void DrawHudSubweapon() {
         DrawRichterHudSubweapon();
         return;
     }
+#ifdef PLATFORM_PSYZ
+    QuickItem_Draw();
+#endif
     func_800EB4F8(D_800C52F8[g_Status.subWeapon], 0, 0x3C0, 0x120);
     prim = &g_PrimBuf[g_PlayerHud.primIndex1];
     if (g_Status.subWeapon != 0) {

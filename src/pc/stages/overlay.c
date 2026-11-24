@@ -47,7 +47,7 @@ bool LoadServantOverlay(const char* name, ServantDesc* o) {
     return LoadOverlay(&CurrentServantOverlay, name, o);
 }
 
-static PsyzModule CurrentWeaponOverlay[2];
+static PsyzModule CurrentWeaponOverlay[3]; // 2: the third hand
 bool LoadWeaponOverlay(const char* name, unsigned handId, Weapon* o) {
     if (handId >= LEN(CurrentWeaponOverlay)) {
         ERRORF("hand ID %d not valid", handId);

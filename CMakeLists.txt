@@ -251,6 +251,7 @@ set(SOURCE_FILES_PC
     src/pc/servant_pc.c
     src/pc/stages/overlay.c
     src/pc/weapon_pc.c
+    src/pc/quick_item.c
     src/pc/wide.c
     src/pc/port_menu.c
     src/pc/buttons.c

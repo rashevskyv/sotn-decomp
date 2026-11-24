@@ -1032,6 +1032,14 @@ void PortMenu_Draw(OT_TYPE* ot);
 // Mark b of the button set (PS index), its 11 rows from x, y, drawn this frame
 // over the game (the Librarian's compare window).
 void PortMenu_Mark(int x, int y, int b);
+// the Pocket (src/pc/quick_item.c): a food, medicine or Library card
+// (item id, 0 = none) used on L2; sotn.ini quick_item = 0|1 (1).
+extern u32 g_QuickItem;
+extern int g_QuickEnabled, g_QuickUse; // g_QuickUse: func_8010EDB8 uses hand 1
+bool QuickItem_Eligible(u32 id);
+bool UseQuickItem(void);
+void* QuickItem_Table(Entity* e);
+void QuickItem_Draw(void);
 // Serif menu cell (Lang_MenuCellAny), its 11 rows from x, y, in colour rgb.
 void PortMenu_Cell(int x, int y, int cell, u32 rgb);
 // The stat bonus colours of the status page, the Librarian's compare window.

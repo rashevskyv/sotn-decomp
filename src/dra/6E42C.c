@@ -390,6 +390,15 @@ int func_8010EDB8(void) {
     if (g_Player.vram_flag & IN_AIR_OR_EDGE) {
         atLedge = true;
     }
+#ifdef PLATFORM_PSYZ
+    if (g_QuickUse) { // the third hand: UseQuickItem put its item in hand 1
+        hand = 1;
+        g_Player.D_80072EF8 = PAD_CIRCLE;
+        equipped_id = g_Status.equipment[hand];
+        equipped_item = &g_EquipDefs[equipped_id];
+        goto block_45;
+    }
+#endif
     attBtnsPressed = g_Player.padTapped & (PAD_SQUARE | PAD_CIRCLE);
 
     if (attBtnsPressed != 0 && func_8010EB5C() == 0) {

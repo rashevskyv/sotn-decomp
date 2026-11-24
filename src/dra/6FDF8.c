@@ -112,6 +112,11 @@ bool func_8010FDF8(s32 branchFlags) {
         g_Player.padPressed & (PAD_SQUARE | PAD_CIRCLE) && func_8010EDB8()) {
         return 1;
     }
+#ifdef PLATFORM_PSYZ
+    if (branchFlags & 0x1000 && g_Player.padTapped & PAD_L2 && UseQuickItem()) {
+        return 1;
+    }
+#endif
 
     if (!(g_Player.unk46 & 0x8000)) {
         if (branchFlags & 0x10 && g_Player.padTapped & PAD_CROSS) {

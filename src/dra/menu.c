@@ -71,6 +71,29 @@ static u32 g_MenuTint;
 
 extern s32 g_PrevEquippedWeapons[2];
 
+#ifdef PLATFORM_PSYZ
+// The Pocket of the Equip screen (the third hand) (src/pc/quick_item.c). Its
+// list holds the foods, medicines and the Library card you own (D_801375D8,
+// g_QuickListN) and "Empty hand". g_QuickMode: func_800FD6C4 counts that list.
+#define QUICK_SLOT NUM_ITEM_SLOTS
+#define EQUIP_ROWS (NUM_ITEM_SLOTS + 1)
+// The Pocket is not a row of the list: the overview draws it top right, next
+// to the two hands (name under its label). The cursor visits it after the
+// last accessory and Up on the first row; the stock rows stay as they were.
+#define POCKET_X 262
+#define EQ_TEXT_Y(r) (30 + (r) * 13)
+#define EQ_ICON_Y(r) (0x1A + (r) * 13)
+#define EQ_CURSOR_Y(r) ((r) * 13 + 0x1C)
+#define IS_QUICK_SLOT() (g_MenuNavigation.cursorEquip == QUICK_SLOT)
+s32 g_QuickMode, g_QuickListN;
+static s32 s_QuickNav;
+#else
+#define EQUIP_ROWS NUM_ITEM_SLOTS
+#define EQ_TEXT_Y(r) (30 + (r) * 13)
+#define EQ_ICON_Y(r) (0x1A + (r) * 13)
+#define EQ_CURSOR_Y(r) ((r) * 13 + 0x1C)
+#endif
+
 const char* D_800A2D48[] = {
 #if REGION != REGION_JP
     "？？？？？",
@@ -776,6 +799,44 @@ static void RelicInfoBar(int wide) {
     bar->cursorW = bar->unk1.w =
         wide ? RELIC_WIN_W : g_MenuInit[MENU_DG_INFO_BAR].cursorW;
 }
+// the label of the Pocket (uk: Кишеня)
+static const char* PocketLabel(void) {
+    const char* t = Lang_Port(300);
+    return t ? t : _S("Pocket");
+}
+// the list step of the Pocket: as MENU_STEP_EQUIP_HAND, on its own list
+// and cursor. 1: L2 or R2 moved the row, 2: the item under the cursor changed.
+static s32 QuickHandStep(bool init) {
+    s32 id, i;
+    s32 ret;
+
+    if (init) {
+        for (i = 0; i < g_QuickListN; i++) {
+            if (g_Status.equipHandOrder[D_801375D8[i]] == g_QuickItem) {
+                s_QuickNav = i;
+                break;
+            }
+        }
+        if (s_QuickNav >= g_QuickListN) {
+            s_QuickNav = 0;
+        }
+        id = g_Status.equipHandOrder[D_801375D8[s_QuickNav]];
+        func_800FAEC4(&s_QuickNav, g_Status.equipHandCount[id],
+                      g_EquipDefs[id].description, g_EquipDefs[id].icon,
+                      g_EquipDefs[id].iconPalette);
+        func_800FAF44(false);
+    }
+    ret = func_800FB23C(&s_QuickNav, g_Status.equipHandOrder,
+                        g_Status.equipHandCount, &g_QuickItem);
+    D_80137948 = 0; // no stat changes: a food does not change any
+    if (ret == 2) {
+        id = g_Status.equipHandOrder[D_801375D8[s_QuickNav]];
+        func_800FAD34(g_EquipDefs[id].description,
+                      g_Status.equipHandCount[id], g_EquipDefs[id].icon,
+                      g_EquipDefs[id].iconPalette);
+    }
+    return ret;
+}
 // the relic under the cursor (jp_cards = off skips relics 23 and 24)
 #if SKIP_JP_RELICS
 #define RELIC_CUR                                                              \
@@ -1041,7 +1102,13 @@ void func_800F6618(s32 menuDialogue, s32 bColorMode) {
             r = 0x5F - (g_Timer & 0x1F);
         }
     }
-    MenuDrawRect(context, 0x70, g_MenuNavigation.cursorEquip * 13 + 0x1C, 0x71,
+#ifdef PLATFORM_PSYZ
+    if (IS_QUICK_SLOT()) {
+        MenuDrawRect(context, POCKET_X - 4, EQ_CURSOR_Y(1), 96, 0xB, r, 0, 0);
+        return;
+    }
+#endif
+    MenuDrawRect(context, 0x70, EQ_CURSOR_Y(g_MenuNavigation.cursorEquip), 0x71,
                  0xB, r, 0, 0);
 }
 
@@ -1967,6 +2034,11 @@ void MenuDrawStats(s32 menuDialogue) {
         y = 120;
     } else {
 #if REGION != REGION_JP
+#ifdef PLATFORM_PSYZ
+        if (IS_QUICK_SLOT()) {
+            MenuDrawStr(PocketLabel(), 8, 40, ctx);
+        } else
+#endif
         MenuDrawStr(g_MenuStr[g_MenuNavigation.cursorEquip + 85], 8, 40, ctx);
 #elif TARGET == TARGET_PSP
         func_800F66BC(
@@ -2691,7 +2763,13 @@ void DrawConsumableCount(s32 itemId, s32 hand, MenuContext* ctx) {
 #endif
     *ptr++ = '\0';
     // Draw it after the item name. X=224, Y = 30 + 13*hand
-    MenuDrawStr(buf, 224, 30 + (hand * 13), ctx);
+#ifdef PLATFORM_PSYZ
+    if (hand == QUICK_SLOT) { // the Pocket: beside its label
+        MenuDrawStr(buf, POCKET_X + 60, EQ_TEXT_Y(0), ctx);
+        return;
+    }
+#endif
+    MenuDrawStr(buf, 224, EQ_TEXT_Y(hand), ctx);
 }
 
 u8 D_800A2D80[] = {0x00, 0x20, 0x30, 0x40, 0x50, 0x60, 0x69, 0x70, 0x75,
@@ -2871,30 +2949,43 @@ void MenuDraw(void) {
             MenuDrawStats(2);
             equipIndex = g_Status.equipment[LEFT_HAND_SLOT];
             equip = &g_EquipDefs[equipIndex];
-            MenuDrawStr(equip->name, 112, 30, menu);
+            MenuDrawStr(equip->name, 112, EQ_TEXT_Y(0), menu);
             DrawConsumableCount(equipIndex, LEFT_HAND_SLOT, menu);
             LoadEquipIcon(equip->icon, equip->iconPalette, 0x10);
 
             equipIndex = g_Status.equipment[RIGHT_HAND_SLOT];
             equip = &g_EquipDefs[equipIndex];
-            MenuDrawStr(equip->name, 112, 43, menu);
+            MenuDrawStr(equip->name, 112, EQ_TEXT_Y(1), menu);
             DrawConsumableCount(equipIndex, RIGHT_HAND_SLOT, menu);
             flag = equip->itemCategory == 5;
             LoadEquipIcon(equip->icon, equip->iconPalette, 0x11);
 
             for (j = 0; j < 5; j++) {
                 acc = &g_AccessoryDefs[g_Status.equipment[j + 2]];
-                MenuDrawStr(acc->name, 112, 56 + j * 13, menu);
+                MenuDrawStr(acc->name, 112, EQ_TEXT_Y(j + 2), menu);
                 LoadEquipIcon(acc->icon, acc->iconPalette, j + 0x12);
             }
+#ifdef PLATFORM_PSYZ
+            equip = &g_EquipDefs[g_QuickItem];
+            MenuDrawStr(PocketLabel(), POCKET_X, EQ_TEXT_Y(0), menu);
+            MenuDrawStr(equip->name, POCKET_X + 18, EQ_TEXT_Y(1), menu);
+            if (g_QuickItem) {
+                DrawConsumableCount(g_QuickItem, QUICK_SLOT, menu);
+            }
+            LoadEquipIcon(equip->icon, equip->iconPalette, 0x10 + QUICK_SLOT);
+#endif
 
-            for (j = 0; j < 7; j++) {
+            for (j = 0; j < EQUIP_ROWS; j++) {
                 if ((j == 0 || j == 1) && flag) {
                     if (j == 0) {
-                        func_800F892C(j + 0x10, 0x5E, 0x20 + j * 13, menu);
+                        func_800F892C(j + 0x10, 0x5E, EQ_ICON_Y(j) + 6, menu);
                     }
+#ifdef PLATFORM_PSYZ
+                } else if (j == QUICK_SLOT) {
+                    func_800F892C(j + 0x10, POCKET_X, EQ_ICON_Y(1), menu);
+#endif
                 } else {
-                    func_800F892C(j + 0x10, 0x5E, 0x1A + j * 13, menu);
+                    func_800F892C(j + 0x10, 0x5E, EQ_ICON_Y(j), menu);
                 }
             }
             func_800F6618(i, g_MenuStep != 0x40);
@@ -3857,7 +3948,7 @@ void func_800FAC98(void) { func_800F9808(2); }
 bool func_800FACB8(void) {
     if (g_pads[0].tapped & PAD_R2) {
         g_MenuNavigation.cursorEquip++;
-        if (g_MenuNavigation.cursorEquip == 7) {
+        if (g_MenuNavigation.cursorEquip == EQUIP_ROWS) {
             g_MenuNavigation.cursorEquip = 0;
         }
         return true;
@@ -3865,7 +3956,7 @@ bool func_800FACB8(void) {
     if (g_pads[0].tapped & PAD_L2) {
         g_MenuNavigation.cursorEquip--;
         if (g_MenuNavigation.cursorEquip == -1) {
-            g_MenuNavigation.cursorEquip = 6;
+            g_MenuNavigation.cursorEquip = EQUIP_ROWS - 1;
         }
         return true;
     }
@@ -3887,6 +3978,17 @@ void func_800FAD34(const char* str, u8 count, u16 equipIcon, u16 palette) {
 void func_800FADC0(void) {
     s32 cursorEquip;
 
+#ifdef PLATFORM_PSYZ
+    if (IS_QUICK_SLOT()) {
+        const char* hint = Lang_Port(301);
+        func_800FAD34(g_QuickItem ? g_EquipDefs[g_QuickItem].description
+                      : hint ? hint : _S("Pocket: food or medicine on L2"),
+                      g_QuickItem != 0,
+                      g_EquipDefs[g_QuickItem].icon,
+                      g_EquipDefs[g_QuickItem].iconPalette);
+        return;
+    }
+#endif
     if (g_MenuNavigation.cursorEquip < 2) {
         cursorEquip = g_Status.equipment[g_MenuNavigation.cursorEquip];
         func_800FAD34(g_EquipDefs[cursorEquip].description, 1,
@@ -3920,7 +4022,27 @@ void func_800FAF44(bool isAccessory) {
     D_801375D8 = g_Pix[3];
     ptr = g_Pix[3];
 
+#ifdef PLATFORM_PSYZ
+    g_QuickMode = 0;
+#endif
     if (!isAccessory) {
+#ifdef PLATFORM_PSYZ
+        if (IS_QUICK_SLOT()) {
+            for (i = 0; i < NUM_HAND_ORDER; i++) {
+                s32 id = g_Status.equipHandOrder[i];
+                if (id == 0 || (QuickItem_Eligible(id) &&
+                                (g_Status.equipHandCount[id] ||
+                                 id == g_QuickItem))) {
+                    *ptr++ = i;
+                }
+            }
+            g_QuickMode = 1;
+            g_QuickListN = ptr - (s32*)g_Pix[3];
+            g_Menus[MENU_DG_EQUIP_SELECTOR].h =
+                g_Menus[MENU_DG_EQUIP_SELECTOR].unk16 = 0;
+            return;
+        }
+#endif
         for (i = 0; i < NUM_HAND_ORDER; i++) {
             *ptr++ = i;
         }
@@ -3970,6 +4092,9 @@ EquipMenuHelper g_EquipMenuHelper[] = {
     {EQUIP_CAPE, 2, true},      // CAPE_SLOT
     {EQUIP_ACCESSORY, 3, true}, // ACCESSORY_1_SLOT
     {EQUIP_ACCESSORY, 3, true}, // ACCESSORY_2_SLOT
+#ifdef PLATFORM_PSYZ
+    {EQUIP_HAND, 0, false}, // QUICK_SLOT
+#endif
 };
 
 // original name : PSX_id_init
@@ -5174,13 +5299,14 @@ block_4:
         D_80137948 = 0;
         func_800FB0FC();
         var_s1 = g_MenuNavigation.cursorEquip;
-        MenuHandleCursorInput(&g_MenuNavigation.cursorEquip, NUM_ITEM_SLOTS, 0);
+        MenuHandleCursorInput(&g_MenuNavigation.cursorEquip, EQUIP_ROWS, 0);
         MenuEquipHandlePageScroll(1);
         func_800FB0FC();
         if (var_s1 != g_MenuNavigation.cursorEquip) {
             func_800FADC0();
         }
-        if (g_pads[0].tapped & PAD_MENU_SORT && D_801375CC == EQUIP_HAND) {
+        if (g_pads[0].tapped & PAD_MENU_SORT && D_801375CC == EQUIP_HAND &&
+            !g_QuickMode) {
             PlaySfx(SFX_UI_CONFIRM);
             MenuShow(MENU_DG_EQUIP_SORT);
             g_MenuStep = MENU_STEP_EQUIP_SORT;
@@ -5189,6 +5315,9 @@ block_4:
             MenuHide(MENU_DG_EQUIP_OVERVIEW);
             MenuHide(MENU_DG_EQUIP_SELECTOR);
             MenuHide(MENU_DG_INFO_BAR);
+#ifdef PLATFORM_PSYZ
+            g_QuickMode = 0;
+#endif
             MenuShow(MENU_DG_MAIN);
             MenuShow(MENU_DG_BG);
             D_80137844[0] = 0;
@@ -5199,7 +5328,11 @@ block_4:
             PlaySfx(SFX_UI_CONFIRM);
         block_191:
             func_800FB0FC();
-            if (g_MenuNavigation.cursorEquip < HEAD_SLOT) {
+            if (g_MenuNavigation.cursorEquip < HEAD_SLOT
+#ifdef PLATFORM_PSYZ
+                || IS_QUICK_SLOT()
+#endif
+            ) {
                 g_MenuStep = MENU_STEP_EQUIP_HAND_INIT;
             } else {
                 g_MenuStep = MENU_STEP_EQUIP_ACC_INIT;
@@ -5226,6 +5359,12 @@ block_4:
         }
         break;
     case MENU_STEP_EQUIP_HAND_INIT:
+#ifdef PLATFORM_PSYZ
+        if (IS_QUICK_SLOT()) {
+            QuickHandStep(true);
+            break;
+        }
+#endif
         equipId = g_Status.equipHandOrder[g_MenuNavigation.cursorHandEquipType];
         func_800FAEC4(
             &g_MenuNavigation.cursorHandEquipType,
@@ -5233,6 +5372,14 @@ block_4:
             g_EquipDefs[equipId].icon, g_EquipDefs[equipId].iconPalette);
         func_800FAF44(false);
     case MENU_STEP_EQUIP_HAND:
+#ifdef PLATFORM_PSYZ
+        if (IS_QUICK_SLOT()) {
+            if (QuickHandStep(false) == 1) {
+                goto block_191;
+            }
+            break;
+        }
+#endif
         if (g_MenuNavigation.cursorEquip == LEFT_HAND_SLOT) {
             D_801375D0 = LEFT_HAND_SLOT;
         } else {

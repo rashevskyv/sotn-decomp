@@ -1665,8 +1665,13 @@ void UpdatePlayerEntities(void) {
                 entity->pfnUpdate = g_DraEntityTbl[15];
             } else if (entity->entityId >= 0xF0) {
                 // Objects F0-FC
+#ifdef PLATFORM_PSYZ
+                entity->pfnUpdate = ((PfnEntityUpdate*)QuickItem_Table(
+                    entity))[entity->entityId - 0xF0];
+#else
                 entity->pfnUpdate =
                     ((PfnEntityUpdate*)&D_8017D000)[entity->entityId - 0xF0];
+#endif
             } else {
                 // Objects E0-EC
                 entity->pfnUpdate =

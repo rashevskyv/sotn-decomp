@@ -272,6 +272,7 @@ static const struct {
     {"fullscreen", &g_Fullscreen},
     {"room_stitch", &g_RoomStitch},
     {"skip_cd_rooms", &g_SkipCdRooms},
+    {"quick_item", &g_QuickEnabled},
     {"show_loading_text", &g_ShowLoadingText},
     {"dialogue_skip", &g_DialogSkip},
     {"prologue_fast_forward", &g_PrologueFF},
@@ -296,7 +297,9 @@ static const char ini_loading[] =
     "; skip_cd_rooms: 1 = a door into a CD loading room (the corridor between\n"
     "; two areas) goes on to the next area at once. 0 = walk through it.\n"
     "; show_loading_text: 1 = the NOW LOADING word and logo show while a stage\n"
-    "; loads. 0 = the screen stays black.\n";
+    "; loads. 0 = the screen stays black.\n"
+    "; quick_item: 1 = the Pocket: a food, medicine or the Library card,\n"
+    "; picked on the Equip screen, is used with L2 (ZL, key W). 0 = off.\n";
 
 static const char ini_overlay[] =
     "\n"
@@ -391,6 +394,7 @@ void Wide_SaveIni(void) {
     fputs(ini_loading, f);
     fprintf(f, "skip_cd_rooms = %d\nshow_loading_text = %d\n", g_SkipCdRooms,
             g_ShowLoadingText);
+    fprintf(f, "quick_item = %d\n", g_QuickEnabled);
     fputs("; dialogue_skip: 1 = Start skips dialogues: the first press types the\n"
           "; rest of the box, the next one goes to the next box (and stops its\n"
           "; voice line). Start does not pause while a dialogue shows.\n"
