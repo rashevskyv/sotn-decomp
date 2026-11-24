@@ -23,7 +23,8 @@ static void LogToStderr(void* userdata, int category, SDL_LogPriority priority,
 }
 
 // Called first in main(). Puts --disk sotn-xa.cue --ini sotn.ini before
-// the user's arguments when those files are there, as run.sh does on Linux.
+// the user's arguments (--disk only when the cue is there), as run.sh does on
+// Linux.
 void Win_Init(int* argc, char*** argv) {
     _fmode = _O_BINARY; // fopen without b must not touch the bytes
     const char* base = SDL_GetBasePath(); // the folder of sotn.exe
@@ -51,10 +52,9 @@ void Win_Init(int* argc, char*** argv) {
         args[n++] = "--disk";
         args[n++] = "sotn-xa.cue";
     }
-    if (FileExists("sotn.ini")) {
-        args[n++] = "--ini";
-        args[n++] = "sotn.ini";
-    }
+    // always: Wide_LoadIni writes the defaults when sotn.ini is missing
+    args[n++] = "--ini";
+    args[n++] = "sotn.ini";
     for (int i = 1; i < *argc && n < 63; i++) {
         args[n++] = (*argv)[i];
     }
