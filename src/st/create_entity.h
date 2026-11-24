@@ -94,18 +94,32 @@ static u16 g_LayoutOriginY[TOTAL_ENTITY_COUNT];
 // Case 0xA000 ("always create") overwrites its slot. The wide spawn window is
 // wider than the distance between two entries of one slot, so the overwrite
 // can hit a live entity that is still on screen (the left clock glint). Then
-// the new entity goes to a free spare slot. The same entry coming back still
-// resets its own entity, as on PS1.
+// the new entity goes to a free spare slot (searched from 191 down, so it
+// meets the 160-up allocations of bones and drops late). The same entry coming
+// back resets its own entity, as on PS1, also when that entity is in a spare.
 static Entity* LayoutSlotAlways(Entity* slot, LayoutEntity* obj) {
+    Entity* e;
     s32 i = slot - g_Entities;
     s32 sx = slot->posX.i.hi;
+    s32 sy = slot->posY.i.hi;
 
-    if (WIDE_X > 0 && slot->entityId && sx > -WIDE_X - 32 &&
-        sx < 256 + WIDE_X + 32 &&
+    if (WIDE_X <= 0) {
+        return slot;
+    }
+    for (e = &g_Entities[191]; e >= &g_Entities[160]; e--) {
+        if (e->entityId == (obj->entityId & 0x3FF) &&
+            g_LayoutOriginX[e - g_Entities] == obj->posX &&
+            g_LayoutOriginY[e - g_Entities] == obj->posY) {
+            return e;
+        }
+    }
+    if (slot->entityId && sx > -WIDE_X - 32 && sx < 256 + WIDE_X + 32 &&
+        sy > -WIDE_Y - 32 && sy < 240 + WIDE_Y + 32 &&
         (g_LayoutOriginX[i] != obj->posX || g_LayoutOriginY[i] != obj->posY)) {
-        Entity* spare = AllocEntity(&g_Entities[160], &g_Entities[192]);
-        if (spare) {
-            return spare;
+        for (e = &g_Entities[191]; e >= &g_Entities[160]; e--) {
+            if (!e->entityId) {
+                return e;
+            }
         }
     }
     return slot;
