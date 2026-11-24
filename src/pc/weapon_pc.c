@@ -29,20 +29,16 @@ void func_ptr_80170028Dummy(Entity* self) { NOT_IMPLEMENTED; }
 
 Weapon D_8017A000 = DUMMY_WEAPON;
 Weapon D_8017D000 = DUMMY_WEAPON;
-extern Weapon g_QuickWeapon; // quick_item.c
 
 void HandleWeaponPrg(unsigned handId, unsigned weaponId) {
     char name[16];
 
-    if (handId > 2) {
+    if (handId >= 2) {
         ERRORF("hand ID %d not valid", handId);
         return;
     }
-    // hand 2: the third hand's own table of a hand 1 program (quick_item.c)
-    snprintf(name, sizeof(name), "w%d_%03d", handId == 2 ? 1 : handId,
-             weaponId);
-    Weapon* w =
-        handId == 2 ? &g_QuickWeapon : handId ? &D_8017D000 : &D_8017A000;
+    snprintf(name, sizeof(name), "w%d_%03d", handId, weaponId);
+    Weapon* w = handId ? &D_8017D000 : &D_8017A000;
     if (!LoadWeaponOverlay(name, handId, w)) {
         // all 59 weapons link; this is only for a module that is missing.
         // Do not abort the game: the hand gets the dummy table.

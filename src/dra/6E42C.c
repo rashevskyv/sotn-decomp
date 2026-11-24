@@ -512,11 +512,6 @@ block_32:
         }
     }
 block_45:
-#ifdef PLATFORM_PSYZ
-    if (hand == 1 && !g_QuickUse) { // a real hand 1 attack: its pictures back
-        QuickItem_Restore();
-    }
-#endif
     if (equipped_id) {
         if (equipped_item->unk13 == 55) {     // Medicines
             if (equipped_item->unk14 == 20) { // Library card!
@@ -545,6 +540,10 @@ block_45:
             // Blueprint 57, child 31. EntityPlayerOutline
             CreateEntFactoryFromEntity(g_CurrentEntity, FACTORY(BP_57, 1), 0);
             goto block_70;
+#ifdef PLATFORM_PSYZ
+        } else if (g_QuickUse && equipped_item->unk13 == 50) {
+            ent6C = QuickItem_SpawnFood(equipped_id); // not a hand 1 program
+#endif
         } else if (!var_s7) {
             ent6C = CreateEntFactoryFromEntity(
                 g_CurrentEntity,

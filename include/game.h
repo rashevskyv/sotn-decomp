@@ -1038,9 +1038,10 @@ extern u32 g_QuickItem;
 extern int g_QuickEnabled, g_QuickUse; // g_QuickUse: func_8010EDB8 uses hand 1
 bool QuickItem_Eligible(u32 id);
 bool UseQuickItem(void);
-void* QuickItem_Table(Entity* e);
 void QuickItem_Draw(void);
-void QuickItem_Restore(void);
+void EntityPocketFood(Entity* self);
+Entity* QuickItem_SpawnFood(u32 equipId);
+#define E_POCKET_FOOD 68 // the last of g_DraEntityTbl
 // A line of menu cells in the field x..x+w (clipped to it). Too long for w: it
 // waits 1 s, slides left 1 px per 3 frames to the end, waits, and starts over.
 // frame counts from 0 while the field is shown.

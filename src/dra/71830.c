@@ -1198,8 +1198,8 @@ void func_80113F7C(void) {
     s16 playerHitboxOffX;
     s16 posX;
 
-#if TARGET == TARGET_PSP
-    if (other == NULL) {
+#if TARGET == TARGET_PSP || defined(PLATFORM_PSYZ)
+    if (other == NULL) { // the Toadstool kills with no attacker
         return;
     }
 #endif
