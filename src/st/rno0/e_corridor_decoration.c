@@ -9,9 +9,18 @@ extern EInit g_EInitSpawner;
 
 void EntityBackgroundPillar(Entity* self);
 
+// The 4:3 view has 4 pillars that wrap after 0x180 px. A wide view is longer
+// than that, so the port has 12 pillars that wrap after 0x480 px and cover
+// the widest view (WIDE_VIEW_MAX 960: 0x160 px more on each side). The pillars
+// after the fourth go to the spare entity range 192..223.
+#define PILLAR_COUNT WIDE_POOL(4, 12)
+#define PILLAR_PERIOD (PILLAR_COUNT * 0x60)
+#define PILLAR_EDGE WIDE_POOL(0, 0x160)
+
 void EntityCorridorDecorator(Entity* self) {
     Entity* pillar;
     s16 i;
+    s16 k;
     Primitive* prim;
     s32 primIndex;
 
@@ -23,12 +32,12 @@ void EntityCorridorDecorator(Entity* self) {
     // This loop creates a mottled dark green and white background
     // which is in the farthest back layer (priority 0).
     // It can be seen sporadically through the windows.
-    primIndex = g_api.AllocPrimitives(PRIM_GT4, 9);
+    primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(9, 33));
     if (primIndex != -1) {
         self->primIndex = primIndex;
         prim = &g_PrimBuf[primIndex];
         self->flags |= FLAG_HAS_PRIMS;
-        for (i = -0x10; prim != NULL; i += 0x1E) {
+        for (i = -0x10 - PILLAR_EDGE; prim != NULL; i += 0x1E) {
             prim->tpage = 0xF;
             prim->clut = 0x2A;
             prim->u0 = prim->u2 = 0xE0;
@@ -45,12 +54,35 @@ void EntityCorridorDecorator(Entity* self) {
         }
     }
 
-    for (pillar = self + 1, i = -0x10; i < 0x130; pillar++, i += 0x60) {
+    pillar = self + 1;
+#ifdef PLATFORM_PSYZ
+    // this spawner can run again in the same room: drop the old extra pillars
+    for (pillar = &g_Entities[192]; pillar < &g_Entities[224]; pillar++) {
+        if (pillar->entityId == E_BG_PILLAR) {
+            DestroyEntity(pillar);
+        }
+    }
+    pillar = self + 1;
+#endif
+    for (k = 0; k < PILLAR_COUNT; k++) {
+        i = -0x10 + k * 0x60;
+        if (i > 0x140 + PILLAR_EDGE) {
+            i -= PILLAR_PERIOD;
+        }
+#ifdef PLATFORM_PSYZ
+        if (k >= 4) {
+            pillar = AllocEntity(&g_Entities[192], &g_Entities[224]);
+            if (pillar == NULL) {
+                break;
+            }
+        }
+#endif
         DestroyEntity(pillar);
         pillar->entityId = E_BG_PILLAR;
         pillar->pfnUpdate = EntityBackgroundPillar;
         pillar->posY.i.hi = 0x6A;
         pillar->posX.i.hi = i;
+        pillar++;
     }
 }
 
@@ -67,12 +99,12 @@ void EntityBackgroundPillar(Entity* self) {
 
     // Clever "loading seam" thing - pillars get shuffled to stay
     // on screen as they pass out of view.
-    if (self->posX.i.hi < -0x40) {
-        self->posX.i.hi += 0x180;
+    if (self->posX.i.hi < -0x40 - PILLAR_EDGE) {
+        self->posX.i.hi += PILLAR_PERIOD;
     }
 
-    if (self->posX.i.hi > 0x140) {
-        self->posX.i.hi -= 0x180;
+    if (self->posX.i.hi > 0x140 + PILLAR_EDGE) {
+        self->posX.i.hi -= PILLAR_PERIOD;
     }
 }
 

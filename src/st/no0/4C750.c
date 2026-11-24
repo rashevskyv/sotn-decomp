@@ -6,9 +6,19 @@ static s16 D_us_80181C24[] = {0x90, 0x93, 0x9C, 0xA5, 0xA8, 0xA5, 0x9C, 0x93};
 
 void func_us_801CC8F8(Entity*);
 
+// The 4:3 view has 4 columns that wrap after 0x180 px. A wide view is longer
+// than that, so the port has 12 columns that wrap after 0x480 px and cover
+// the widest view (WIDE_VIEW_MAX 960: 0x160 px more on each side). The columns
+// after the fourth are not in the layout slots (those hold other entities of
+// the room), they go to the spare range 192..223.
+#define COL_COUNT WIDE_POOL(4, 12)
+#define COL_PERIOD (COL_COUNT * 0x60)
+#define COL_EDGE WIDE_POOL(0, 0x160)
+
 void func_us_801CC750(Entity* self) {
     Entity* entityPtr;
     s16 i;
+    s16 k;
     Primitive* prim;
     s32 primIndex;
 
@@ -17,12 +27,12 @@ void func_us_801CC750(Entity* self) {
     }
 
     InitializeEntity(D_us_80180A88);
-    primIndex = g_api.AllocPrimitives(PRIM_GT4, 9);
+    primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(9, 33));
     if (primIndex != -1) {
         self->primIndex = primIndex;
         prim = &g_PrimBuf[primIndex];
         self->flags |= FLAG_HAS_PRIMS;
-        for (i = -0x10; prim != NULL; i += 0x1E) {
+        for (i = -0x10 - COL_EDGE; prim != NULL; i += 0x1E) {
             prim->tpage = 0xF;
             prim->clut = 0x2A;
             prim->u0 = prim->u2 = 0xC0;
@@ -41,7 +51,29 @@ void func_us_801CC750(Entity* self) {
 
     entityPtr = self + 1;
 
-    for (i = -0x10; i < 0x130; i += 0x60) {
+#ifdef PLATFORM_PSYZ
+    // this spawner can run again in the same room: drop the old extra columns
+    for (entityPtr = &g_Entities[192]; entityPtr < &g_Entities[224];
+         entityPtr++) {
+        if (entityPtr->entityId == E_ID_16) {
+            DestroyEntity(entityPtr);
+        }
+    }
+    entityPtr = self + 1;
+#endif
+    for (k = 0; k < COL_COUNT; k++) {
+        i = -0x10 + k * 0x60;
+        if (i > 0x140 + COL_EDGE) {
+            i -= COL_PERIOD;
+        }
+#ifdef PLATFORM_PSYZ
+        if (k >= 4) {
+            entityPtr = AllocEntity(&g_Entities[192], &g_Entities[224]);
+            if (entityPtr == NULL) {
+                break;
+            }
+        }
+#endif
         DestroyEntity(entityPtr);
         entityPtr->entityId = E_ID_16;
         entityPtr->pfnUpdate = func_us_801CC8F8;
@@ -62,12 +94,12 @@ void func_us_801CC8F8(Entity* self) {
         return;
     }
 
-    if (self->posX.i.hi < -0x40) {
-        self->posX.i.hi += 0x180;
+    if (self->posX.i.hi < -0x40 - COL_EDGE) {
+        self->posX.i.hi += COL_PERIOD;
     }
 
-    if (self->posX.i.hi > 0x140) {
-        self->posX.i.hi -= 0x180;
+    if (self->posX.i.hi > 0x140 + COL_EDGE) {
+        self->posX.i.hi -= COL_PERIOD;
     }
 }
 
