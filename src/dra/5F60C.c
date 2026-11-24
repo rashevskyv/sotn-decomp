@@ -1385,7 +1385,7 @@ static void Hud_Layout(void) {
     Primitive* p[HUD_ALL];
     Primitive* prim;
     SubweaponDef subwpn;
-    s32 i;
+    s32 i, k;
     u16 clut;
 
     for (i = 0, prim = &g_PrimBuf[g_PlayerHud.primIndex1];
@@ -1416,6 +1416,20 @@ static void Hud_Layout(void) {
     // them (tools/hud_digits.py): even pixels at 3/4 and 5/4 scale
     Hud_Number(&p[HUD_HP_DIGITS], g_PlayerHud.displayHP, 43, 17 + HUD_DY, 1,
                false, 5, 4, 0x196);
+    // HP below 30 % yellow, below 10 % red (owner, 2026-11-24)
+    i = g_PlayerHud.displayHP * 10 < g_Status.hpMax       ? 2
+        : g_PlayerHud.displayHP * 10 < g_Status.hpMax * 3 ? 1
+                                                          : 0;
+    for (k = 0; i && k < 4; k++) {
+        prim = p[HUD_HP_DIGITS + k];
+        if (prim->drawMode == DRAW_HIDE) {
+            continue;
+        }
+        prim->r0 = prim->r1 = prim->r2 = prim->r3 = 128;
+        prim->g0 = prim->g1 = prim->g2 = prim->g3 = i == 2 ? 32 : 112;
+        prim->b0 = prim->b1 = prim->b2 = prim->b3 = i == 2 ? 24 : 0;
+        prim->drawMode = DRAW_ABSPOS | DRAW_COLORS;
+    }
     Hud_Number(
         &p[HUD_MP_DIGITS], g_Status.mp, 40, 41 + HUD_DY, 1, false, 5, 4, 0x196);
     // hearts: the stock flicker when the sub-weapon can be used
@@ -1425,9 +1439,10 @@ static void Hud_Layout(void) {
     }
     Hud_Number(&p[HUD_HEART_DIGITS], g_Status.hearts, 101, 38 + HUD_DY, 0, true,
                3, 7, clut);
+    // heart icon at 2x, left of a 4-digit hearts number (owner, 2026-11-24)
     prim = p[HUD_HEART];
     Hud_Quad(
-        prim, 88, 44 + HUD_DY, 94, 48 + HUD_DY, HUD_HEART_U, HUD_HEART_V, 8, 6);
+        prim, 73, 38 + HUD_DY, 89, 50 + HUD_DY, HUD_HEART_U, HUD_HEART_V, 8, 6);
     prim->clut = 0x172;
     prim->drawMode = DRAW_ABSPOS;
     // the third-hand item goes here: set tpage, clut, u/v of its icon,
