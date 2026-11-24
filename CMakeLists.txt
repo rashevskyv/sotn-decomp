@@ -3346,5 +3346,12 @@ if(NINTENDO_SWITCH)
         NAME "Castlevania: SOTN"
         AUTHOR "sotn-decomp"
         VERSION "${SOTN_VERSION}")
-    nx_create_nro(${PROJECT_NAME} NACP sotn.nacp)
+    # Optional NRO icon: -DSOTN_NRO_ICON=<256x256 .jpg>, a local file like
+    # SOTN_ICON; without it libnx puts its default icon.
+    set(SOTN_NRO_ICON "" CACHE FILEPATH "Optional 256x256 .jpg for the NRO")
+    if(SOTN_NRO_ICON AND EXISTS "${SOTN_NRO_ICON}")
+        nx_create_nro(${PROJECT_NAME} NACP sotn.nacp ICON "${SOTN_NRO_ICON}")
+    else()
+        nx_create_nro(${PROJECT_NAME} NACP sotn.nacp)
+    endif()
 endif()
