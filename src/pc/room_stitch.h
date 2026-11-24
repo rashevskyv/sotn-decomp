@@ -3,6 +3,7 @@
 #define ROOM_STITCH_H
 #include <game.h>
 
+extern int g_RoomStitchUsed;
 extern int g_RoomStitch; // sotn.ini room_stitch, 0 = off
 
 // after a stage overlay load: merge the table pairs of this stage

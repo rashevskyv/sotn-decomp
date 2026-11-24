@@ -46,6 +46,7 @@
 #include <process.h>
 #else
 #include <spawn.h>
+#include <unistd.h>
 extern char** environ;
 #endif
 #endif
@@ -141,7 +142,7 @@ static const struct {
     [ITEM_MENUFILL] = {236, "MENU FILL", 314, "PAUSE MENUS FILL A WIDE SCREEN."},
     [ITEM_EDGEFADE] = {218, "ROOM EDGE FADE", 315, "BLACK PAST THE ROOM EDGE, THE EDGE FADES."},
     [ITEM_LOADING] = {217, "LOADING TEXT", 316, "SHOW NOW LOADING WHILE A STAGE LOADS."},
-    [ITEM_ELEVATOR] = {242, "ELEVATOR ORNAMENTS", 317, "CLOCK TOWER LATTICE DRAWS IN FRONT."},
+    [ITEM_ELEVATOR] = {242, "ELEVATOR ORNAMENTS", 317, "THE LABORATORY ELEVATOR LATTICE DRAWS IN FRONT."},
     [ITEM_HD] = {243, "HD TEXTURES", 318, "PNG TEXTURE PACKS. APPLIES AT THE NEXT START."},
     [ITEM_LANGUAGE] = {22, "LANGUAGE", 319, "GAME LANGUAGE. APPLIES AT THE NEXT START."},
     [ITEM_VOICE] = {259, "VOICE SET", 320, "VOICE AND THE MATCHING DIALOGUE SCRIPT."},
@@ -199,7 +200,6 @@ static const s8 cat_rows[][16] = {
 };
 static int cat;      // the category on the main page
 static int cat_from; // the line of the top page that opened a page
-static int hint_relic = -1, hint_timer, hint_age; // the relic hint
 extern int g_HdTextures, g_HdDump, g_HdStats, g_BackgroundInput;
 enum {
     CH_REFILL,
@@ -241,6 +241,7 @@ static const struct CastleRoom* owners[MAX_OWNERS];
 static int n_owners;
 static char msg[48];
 static int msg_timer;
+static int click_act; // Activate runs for a mouse click
 static int exit_armed; // EXIT was pressed once: the next press quits
 
 // the Controls page: one line per PS button (bit of the pad word), then
@@ -497,27 +498,47 @@ static void Quit(void) {
 // Switch: no row (hbmenu starts the program).
 extern int g_ArgC;
 extern char** g_ArgV;
+static void Message(const char* s);
+// g_ArgV: the arguments as the user gave them (main.c saves them before
+// Win_Init adds --disk and --ini). The new process waits for this one to end
+// (SOTN_RESTART_PID: win.c waits for the log file, main.c for the pid); Quit
+// then saves sotn.ini. If it cannot start, the menu stays open and says so.
+// ponytail: an argument with a quote inside is not escaped on Windows
 static void Restart(void) {
 #ifndef __SWITCH__
-    static char q[32][512];
-    char* av[33];
-    int i, n = MIN(g_ArgC, 32);
-    Wide_SaveIni();
-    for (i = 0; i < n; i++) { // the Windows C runtime does not quote
-        snprintf(q[i], sizeof(q[i]), strchr(g_ArgV[i], ' ') ? "\"%s\"" : "%s",
-                 g_ArgV[i]);
-        av[i] = q[i];
+    char** av = calloc(g_ArgC + 1, sizeof(char*));
+    char pid[16];
+    int i, rc;
+    if (!av || g_ArgC < 1) {
+        Message("cannot start");
+        return;
     }
-    av[n] = NULL;
-    fprintf(stderr, "[menu] restart: %s\n", n ? av[0] : "?");
+    for (i = 0; i < g_ArgC; i++) {
+        av[i] = g_ArgV[i];
 #ifdef _WIN32
-    _spawnvp(_P_NOWAIT, av[0], (const char* const*)av);
+        if (strchr(av[i], ' ')) { // the C runtime does not quote
+            av[i] = malloc(strlen(g_ArgV[i]) + 3);
+            sprintf(av[i], "\"%s\"", g_ArgV[i]);
+        }
+#endif
+    }
+    fprintf(stderr, "[menu] restart\n");
+#ifdef _WIN32
+    snprintf(pid, sizeof(pid), "%d", _getpid());
+    _putenv_s("SOTN_RESTART_PID", pid);
+    rc = _spawnv(_P_NOWAIT, _pgmptr, (const char* const*)av) == -1;
 #else
     {
-        pid_t pid;
-        posix_spawn(&pid, "/proc/self/exe", NULL, NULL, av, environ);
+        pid_t p;
+        snprintf(pid, sizeof(pid), "%d", (int)getpid());
+        setenv("SOTN_RESTART_PID", pid, 1);
+        rc = posix_spawn(&p, "/proc/self/exe", NULL, NULL, av, environ);
     }
 #endif
+    if (rc) {
+        Message("cannot start");
+        return;
+    }
 #endif
     Quit();
 }
@@ -1047,7 +1068,9 @@ static void Tap(int x, int y) {
         return;
     }
     sel = i;
+    click_act = 1; // a click on CHARACTER picks the next one, it does not apply
     Activate();
+    click_act = 0;
 }
 
 static int WarpPointer(int n, const int* x, const int* y);
@@ -1470,6 +1493,8 @@ static void Activate(void) {
         if (sel == CH_TELEPORT) {
             map_ready = 0; // the map, on the player's room
             OpenMap();
+        } else if (sel == CH_CHARACTER && click_act) {
+            Change(1);
         } else if (sel == CH_CHARACTER) {
             const char* why = Cheat_ApplyCharacter();
             if (why) {
@@ -1601,9 +1626,6 @@ u16 PortMenu_Pad(u16 pressed) {
         pressed |= StickDirs();
     }
     tap = pressed & ~prev;
-    if (tap && hint_timer > 0 && hint_age > 20) {
-        hint_timer = 0; // any button closes the relic hint
-    }
 #ifndef __SWITCH__
     static int hooked;
     if (!hooked) {
@@ -1807,8 +1829,17 @@ static int semi;         // 1: the next tiles are half transparent
 static float px_a = 1;
 static int px_cx;
 
+static int clip_x0, clip_x1; // Rect keeps to [x0, x1) while x1 > x0 (Marquee)
+
 static void Rect(int x, int y, int w, int h, u8 r, u8 g, u8 b) {
     TILE* t;
+    if (clip_x1 > clip_x0) {
+        if (x < clip_x0) {
+            w -= clip_x0 - x;
+            x = clip_x0;
+        }
+        w = MIN(w, clip_x1 - x);
+    }
     if (tile_count >= MAX_TILES || w <= 0 || h <= 0) {
         return;
     }
@@ -2085,6 +2116,47 @@ static void Line(int x, int y, const char* s, u8 r, u8 g, u8 b) {
     }
 }
 
+// A line in a field w px wide. A line that fits is drawn as it is. A longer one
+// is cut to the field; with run it also scrolls: 1 s still, one pixel per 3
+// frames to its end, 1 s still, again (the time starts when the text appears).
+static int mq_now; // frames drawn
+static struct {
+    unsigned hash;
+    int t0, seen;
+} mq[6];
+static void Marquee(int x, int y, int w, const char* s, u8 r, u8 g, u8 b,
+                    int run) {
+    int over = Width(s) - w, i, t = 0, off = 0, n = Len(s);
+    unsigned h = 5381;
+    if (over <= 0) {
+        Line(x, y, s, r, g, b);
+        return;
+    }
+    if (run) {
+        for (i = 0; i < n; i++) {
+            h = h * 33 + (u8)s[i];
+        }
+        for (i = 0; i < 6 && mq[i].hash != h; i++) {
+        }
+        if (i == 6 || mq[i].seen < mq_now - 1) { // new: the oldest slot
+            if (i == 6) { // the slot not seen for the longest time
+                for (i = 0, t = 1; t < 6; t++) {
+                    i = mq[t].seen < mq[i].seen ? t : i;
+                }
+            }
+            mq[i].hash = h;
+            mq[i].t0 = mq_now;
+        }
+        mq[i].seen = mq_now;
+        t = (mq_now - mq[i].t0) % (120 + over * 3);
+        off = t < 60 ? 0 : MIN(over, (t - 60) / 3);
+    }
+    clip_x0 = x;
+    clip_x1 = x + w;
+    Line(x - off, y, s, r, g, b);
+    clip_x0 = clip_x1 = 0;
+}
+
 // A centred box of text lines. The OT draws prims in insertion order
 // inside one index (LIFO), so the text goes in first and the box last.
 // Line hi is the selected one; a line in info (or -1) is light blue. The
@@ -2116,6 +2188,9 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
         w = Width(lines[i]) > w ? Width(lines[i]) : w;
     }
     w += BORDER * 2 + (bar ? 6 : 0);
+    if (!box_left) {
+        w = MIN(w, FbW() - 8); // a wider line scrolls (Marquee)
+    }
     h = count * LINE_H - 5 + BORDER * 2;
     x = box_left ? box_x : (FbW() - w) / 2;
     y = box_left ? box_y : (FbH() - h) / 2;
@@ -2127,10 +2202,13 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
         lit = i == hi || (box_left && i == box_mark);
         c = lit ? 255 : 160;
         if (i == info && !lit) {
-            Line(x + BORDER, y + BORDER + i * LINE_H, lines[i], 128, 200, 255);
+            Marquee(x + BORDER, y + BORDER + i * LINE_H,
+                    w - BORDER * 2 - (bar ? 6 : 0), lines[i], 128, 200, 255, 0);
             continue;
         }
-        Line(x + BORDER, y + BORDER + i * LINE_H, lines[i], c, c, lit ? 64 : c);
+        Marquee(x + BORDER, y + BORDER + i * LINE_H,
+                w - BORDER * 2 - (bar ? 6 : 0), lines[i], c, c, lit ? 64 : c,
+                i == hi);
     }
     if (bar) { // the thumb, then the track under it, over the red band
         ty = y + BORDER + sb_first * LINE_H - 2;
@@ -2146,12 +2224,12 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     Line(x + BORDER, y + h + 4, hint, 255, 255, 64);
     if (help_en) { // one line of help, centred in the frame
         char hl[LINE_MAX];
-        int hw, hx;
+        int hw, hx, fw = FbW() - 8;
         Clear(hl);
         AddW(hl, help_word, help_en);
-        hw = Width(hl);
+        hw = MIN(Width(hl), fw); // a line wider than the frame scrolls
         hx = (FbW() - hw) / 2;
-        Line(hx, y + h + LINE_H + 6, hl, 128, 200, 255);
+        Marquee(hx, y + h + LINE_H + 6, hw, hl, 128, 200, 255, 1);
         Rect(hx - 4, y + h + LINE_H + 2, hw + 8, LINE_H + 2, 8, 8, 24);
         help_en = NULL;
     }
@@ -2289,6 +2367,12 @@ static void ItemValue(char* line, int it) {
                                              : "JP");
         break;
     }
+    // room stitch is read when a stage loads
+    if (it == ITEM_STITCH && g_RoomStitchUsed >= 0 &&
+        g_RoomStitchUsed != g_RoomStitch) {
+        Add(line, " ");
+        AddW(line, 265, "NEXT STAGE");
+    }
     // read once at the start: a changed value waits for a restart
     if (it == ITEM_JPCARDS || it == ITEM_HD || it == ITEM_HDDUMP ||
         it == ITEM_HDSTATS) {
@@ -2313,6 +2397,13 @@ static void DrawMain(void) {
     for (i = 0; i < n; i++) {
         it = cat_rows[cat][i];
         Clear(lines[i]);
+        if (it == ITEM_RESTART && msg_timer > 0) { // the restart did not start
+            msg_timer--;
+            AddW(lines[i], P_NO, "NO:");
+            Add(lines[i], " ");
+            Add(lines[i], msg);
+            continue;
+        }
         if (exit_armed == it && (it == ITEM_EXIT || it == ITEM_RESTART)) {
             if (uk) {
                 AddW(lines[i], it == ITEM_EXIT ? P_AGAIN : 264, "EXIT:");
@@ -3664,123 +3755,11 @@ static void WindowIcon(void) {
     SDL_free(w);
 }
 
-// ---- the relic hint (relic_hint) -----------------------------------------------
-// A new relic (func_800FE044 in 5D5BC.c): its name and the game's own one
-// line of what it does, in a box low in the view for a few seconds. It
-// changes nothing in the game (the pick-up banner and the game run as before)
-// and sits under the warp hint. Any button closes it. uk: the name and
-// description of the ua.json relics (port words 400.., 430..); en: the stock text in capitals (the 5x7 font has no lowercase).
-#define HINT_FRAMES 360
-extern RelicDesc g_RelicDefs[30]; // src/dra/dra.h
-static const char* const relic_en[30] = {
-    "TRANSFORM INTO BAT", "SHOOT FIREBALLS AS BAT", "USE RADAR AS BAT",
-    "ATTACK WITH RADAR WAVES", "TRANSFORM INTO WOLF", "RUN SWIFTLY AS WOLF",
-    "SPECIAL MOVE AS WOLF", "TRANSFORM INTO MIST",
-    "EXTENDS MIST TRANSFORM TIME", "TRANSFORM INTO POISONOUS CLOUD",
-    "CAUSES ITEMS TO MATERIALIZE", "SHOWS ENEMY DAMAGE",
-    "WEARER CAN JUMP HIGH", "WEARER CAN DO DOUBLE JUMP",
-    "PROTECTION WHILE UNDERWATER", "DISPLAYS ENEMY NAME",
-    "CAN OPEN LOCKED BLUE DOORS", "SUMMONS THE OARSMAN",
-    "SUMMONS BAT FAMILIAR", "SUMMONS GHOST FAMILIAR",
-    "SUMMONS FAERIE FAMILIAR", "SUMMONS DEVIL FAMILIAR",
-    "SUMMONS SWORD FAMILIAR", "SUMMONS PIXIE FAMILIAR",
-    "SUMMONS NOSE-DEVIL FAMILIAR", "1 OF 5 TREASURES. AVOID CURSE.",
-    "1 OF 5 TREASURES. STR +10", "1 OF 5 TREASURES. CON +10",
-    "1 OF 5 TREASURES. INT +10", "1 OF 5 TREASURES. LCK +10"};
-
-void PortMenu_RelicHint(int id) {
-    if (!g_RelicHint || id < 0 || id >= 30 ||
-        (JP_RELICS_HIDDEN && (id == 23 || id == 24))) {
-        return;
-    }
-    hint_relic = id;
-    hint_timer = HINT_FRAMES;
-    hint_age = 0;
-    fprintf(stderr, "[relichint] relic %d\n", id);
-}
-
-// the chars a..b of the text s onto a line (cells under uk)
-static void AddPart(char* line, const char* s, int a, int b) {
-    char* d = line + Len(line);
-    int i;
-    for (i = a; i < b && d < line + LINE_MAX - 2; i++) {
-        *d++ = s[i];
-    }
-    *d = uk ? (char)0xFF : 0;
-}
-
-static void DrawRelicHint(void) {
-    char l[3][LINE_MAX], name[40];
-    const char* nm;
-    const char* ds;
-    int x0, y0, x1, y1, vw, per, nd, cut, n = 2, i, w = 0, h, x, y;
-    int sp = uk ? CH(' ') : ' ';
-    if (hint_timer <= 0 || hint_relic < 0 || g_GameState != Game_Play ||
-        g_GameEngineStep != Engine_Normal) {
-        return; // the timer waits while a menu or a load is on
-    }
-    hint_timer--;
-    hint_age++;
-    ViewRect(&x0, &y0, &x1, &y1);
-    vw = x1 - x0 - 16;
-    nm = g_RelicDefs[hint_relic].name;
-    ds = relic_en[hint_relic];
-    if (uk) { // the uk words of the relics are port words 400.. (name), 430.. (text)
-        nm = Lang_Port(400 + hint_relic);
-        ds = Lang_Port(430 + hint_relic);
-        if (!nm || !ds) {
-            return;
-        }
-    }
-    if (!uk) {
-        for (i = 0; nm[i] == ' ' && i < 4; nm++) {
-        }
-        for (i = 0; nm[i] && i < (int)sizeof(name) - 1; i++) {
-            name[i] = nm[i] >= 'a' && nm[i] <= 'z' ? nm[i] - 32 : nm[i];
-        }
-        name[i] = 0;
-        nm = name;
-    } else {
-        while ((u8)*nm == CH(' ')) {
-            nm++; // the stock names keep a leading space
-        }
-    }
-    Clear(l[0]);
-    Clear(l[1]);
-    Clear(l[2]);
-    AddPart(l[0], nm, 0, Len(nm));
-    nd = Len(ds);
-    per = vw / (uk ? SERIF_W : CELL_W);
-    if (nd <= per) {
-        AddPart(l[1], ds, 0, nd);
-        n = 2;
-    } else { // two lines: cut at the last space that fits
-        for (cut = per; cut > 0 && (u8)ds[cut] != sp; cut--) {
-        }
-        cut = cut > 0 ? cut : per;
-        AddPart(l[1], ds, 0, cut);
-        AddPart(l[2], ds, cut + ((u8)ds[cut] == sp), nd);
-        n = 3;
-    }
-    for (i = 0; i < n; i++) {
-        w = MAX(w, Width(l[i]));
-    }
-    w += BORDER * 2;
-    h = n * LINE_H - 5 + BORDER * 2;
-    x = (x0 + x1 - w) / 2;
-    y = y1 - 3 * LINE_H - h;
-    Line(x + BORDER, y + BORDER, l[0], 255, 255, 64);
-    for (i = 1; i < n; i++) {
-        Line(x + BORDER, y + BORDER + i * LINE_H, l[i], 235, 235, 235);
-    }
-    Rect(x + 2, y + 2, w - 4, h - 4, 16, 16, 48);
-    Rect(x, y, w, h, 200, 200, 200);
-}
-
 void PortMenu_Draw(OT_TYPE* ot) {
     int i;
     WindowIcon();
     drawn = 30;
+    mq_now++;
     // Closed: the head of slot 0x1FF, as the game's own prims. Open: after
     // the last prim of that slot, so the menu covers the game's 0x1FF prims
     // too (dialogue text, speaker names). ClearOTag links the slot to a
@@ -3835,7 +3814,6 @@ void PortMenu_Draw(OT_TYPE* ot) {
     }
     warp_hint = 0;
     if (!is_open) {
-        DrawRelicHint();
         DrawOverlay();
         return;
     }

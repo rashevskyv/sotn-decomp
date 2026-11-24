@@ -28,7 +28,8 @@ static int cfg_scale; // 0: off, the psyz default output (PC)
 static const char* ini_path; // NULL: settings are not saved (PC)
 char g_IniSpawn[48];
 static PsyzSize last_disp;
-static int last_fbw, last_fbh, last_rows, last_fill;
+static int last_fbw, last_fbh, last_rows, last_fill, last_relic;
+extern int g_RelicPage; // 1 while the relic page is up (src/dra/menu.c)
 
 int Wide_GetScale(void) { return cfg_scale; }
 
@@ -290,7 +291,7 @@ static const char ini_stitch[] =
     "; its outer 8 pixels. 0 = the old fill (the next room, a mirror image)\n"
     "; under a wide dark gradient.\n"
     "; elevator_front_ornaments: 1 = the gold lattice around the elevator\n"
-    "; shaft of the Clock Tower draws in front of the elevator, its chain and\n"
+    "; shaft of the Alchemy Laboratory draws in front of the elevator, its chain and\n"
     "; you. 0 = the original order (the lattice behind them).\n";
 
 static const char ini_loading[] =
@@ -368,8 +369,9 @@ void Wide_SaveIni(void) {
     fprintf(f, "jp_cards = %s\n", g_JpCardsNames[g_JpCards]);
     fputs(ini_relic_toggle, f);
     fprintf(f, "relic_toggle = %s\n", relic_toggle_names[g_RelicToggle]);
-    fputs("; relic_hint: 1 = a short note about the relic shows for a few seconds\n"
-          "; when you pick up a new relic. Any button closes it.\n", f);
+    fputs("; relic_hint: 1 = the pick-up banner of a new relic also shows what the\n"
+          "; relic does, in one or two smaller lines under its name (same font,\n"
+          "; fade and time as the banner). 0 = the stock banner only.\n", f);
     fprintf(f, "relic_hint = %d\n", g_RelicHint);
     fputs(ini_spawn, f);
     fprintf(f, "spawn = %s\n", g_IniSpawn);
@@ -712,9 +714,11 @@ void Wide_OnFrame(void) {
              (g_GameStep < Gameover_6 || g_GameStep >= Gameover_Alt)));
     if (d.w <= 0 || d.h <= 0 ||
         (d.w == last_disp.w && d.h == last_disp.h && fbw == last_fbw &&
-         fbh == last_fbh && rows == last_rows && g_MenuFill == last_fill)) {
+         fbh == last_fbh && rows == last_rows && g_MenuFill == last_fill &&
+         g_RelicPage == last_relic)) {
         return;
     }
+    last_relic = g_RelicPage;
     last_disp = d;
     last_fbw = fbw;
     last_fbh = fbh;
@@ -767,7 +771,11 @@ void Wide_OnFrame(void) {
             // reach past the frame (RELIC_WIN_X in src/dra/menu.c)
             req = d;
             if (mfill) {
-                s = MAX(MIN(d.w / fbw, d.h / (CLIP_BOTTOM - CLIP_TOP)), 1);
+                // the relic page is 416 wide (menu.c RELIC_WIN_W): all of it
+                // must fit, so that page takes the width of 416
+                s = MAX(MIN(d.w / (g_RelicPage ? 416 : fbw),
+                            d.h / (CLIP_BOTTOM - CLIP_TOP)),
+                        1);
             }
         }
     }
@@ -794,10 +802,11 @@ void Wide_OnFrame(void) {
     fprintf(stderr,
             "[video] output %dx%d scale %d (asked %d) "
             "frame %dx%d internal %dx%d margin x %d y %d keep rows %d "
-            "aspect %s state %d step %d\n",
+            "aspect %s state %d step %d relic page %d\n",
             d.w, d.h, s, cfg_scale, fbw, fbh, req.w / s & ~1,
             req.h / s & ~1, (int)g_WideX, (int)g_WideY, keep,
-            g_AspectNames[g_Aspect], (int)g_GameState, (int)g_GameStep);
+            g_AspectNames[g_Aspect], (int)g_GameState, (int)g_GameStep,
+            g_RelicPage);
 }
 
 // Port menu state.

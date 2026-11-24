@@ -32,7 +32,13 @@ void Win_Init(int* argc, char*** argv) {
     }
     // a GUI program has no console: the log goes to sotn.log beside it
     remove("sotn.prev.log");
-    rename("sotn.log", "sotn.prev.log");
+    // after a port menu RESTART the old process still holds sotn.log (and the
+    // editor port) until it ends: wait for the rename, at most 6 s
+    for (int t = 0; rename("sotn.log", "sotn.prev.log") != 0 &&
+                    getenv("SOTN_RESTART_PID") && FileExists("sotn.log") && t < 60;
+         t++) {
+        SDL_Delay(100);
+    }
     freopen("sotn.log", "w", stderr);
     freopen("sotn.out.log", "w", stdout);
     setvbuf(stdout, NULL, _IONBF, 0);

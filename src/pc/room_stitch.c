@@ -20,6 +20,7 @@
 #include <string.h>
 
 int g_RoomStitch;
+int g_RoomStitchUsed = -1; // the value the loaded stage took (-1: none yet)
 
 // stage overlay name, the left room, the right room (room table indexes)
 static const struct {
@@ -201,6 +202,7 @@ void RoomStitch_HookOverlay(const char* name, Overlay* o) {
 
     FreeAll();
     snprintf(s_Stage, sizeof(s_Stage), "%s", name);
+    g_RoomStitchUsed = g_RoomStitch; // the port menu shows a change as pending
     if (!g_RoomStitch || !o->rooms || !o->tileLayers) {
         return;
     }

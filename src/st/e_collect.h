@@ -1001,10 +1001,203 @@ s16 g_RelicOrbSparkleY[] = {-2, 2, 4, -3, 0, 2, -4, 3};
 
 extern u16 msgBoxTpage[0x600];
 
+#if defined(PLATFORM_PSYZ) && STAGE != STAGE_ST0 && VERSION >= VER_BETA_MAD && \
+    REGION != REGION_JP
+// relic_hint: the description of the relic under the banner "Obtained NAME",
+// in the same font (BlitChar) at 3/4 size, one or two lines, as part of the
+// banner: the same entity, prims and lifetime. The textures go under the
+// name's one in VRAM (y 0x110 and 0x120), the prims 7 and 8 are scaled quads.
+// The description is the game's own text (g_api.relicDefs[].desc; uk: the
+// swapped Shift-JIS text); ASCII digits and marks of the en text become the
+// full width ones, which the font has.
+#define RELIC_DESC 1
+#define RELIC_DESC_PRIMS 9
+#define RELIC_ANIM_PRIMS 7  // the sparkle loop at the end of the entity
+#define RELIC_DESC_SRC 0xFA  // the text at full size: bytes of 2 px per row
+#define RELIC_DESC_LINE 0x98 // a line at full size (228 px shrunk)
+#define RELIC_DESC_ROW 0x80  // the line textures: bytes per row
+#define RELIC_LETTER(c)                                                        \
+    (((c) >= 'a' && (c) <= 'z') || ((c) >= 'A' && (c) <= 'Z'))
+static u16 s_DescW[2]; // the width of each line in px (shrunk), 0 = none
+
+// the text as the codes BlitChar reads: letters and space are one byte, all
+// the rest two (Shift-JIS; the digits and marks of ASCII become full width)
+static void RelicDescCodes(const char* s, char* out, int max) {
+    int n = 0;
+    u8 c;
+    for (; *s && n < max - 2; s++) {
+        c = *s;
+        if (RELIC_LETTER(c) || c == ' ') {
+            out[n++] = c;
+        } else if (c >= 0x81) {
+            if (!s[1]) {
+                break;
+            }
+            out[n++] = c;
+            out[n++] = *++s;
+        } else if (c >= '0' && c <= '9') {
+            out[n++] = 0x82;
+            out[n++] = 0x4F + (c - '0');
+        } else {
+            out[n++] = 0x81;
+            out[n++] = c == '.'    ? 0x44
+                       : c == ','  ? 0x43
+                       : c == '-'  ? 0x5D
+                       : c == '\'' ? 0x66
+                       : c == '+'  ? 0x7B
+                       : c == '!'  ? 0x49
+                       : c == '?'  ? 0x48
+                       : c == ':'  ? 0x46
+                                   : 0x45;
+        }
+    }
+    out[n] = 0;
+}
+
+// Blits the codes into pix (stride 0x100). The spaces are noted: the place
+// before (spx) and after (spe) them, in bytes of 2 px. Returns the width.
+static u16 RelicDescBlit(const char* a, const char* b, u8* pix, const char** sp,
+                         u16* spx, u16* spe, int* n) {
+    u16 x = 0;
+    char tmp[2];
+    while (a < b && x < RELIC_DESC_SRC) {
+        if (*a == ' ') {
+            if (*n < 24) {
+                sp[*n] = a;
+                spx[*n] = x;
+            }
+            a = BlitChar(a, &x, pix, 0x100);
+            if (*n < 24) {
+                spe[(*n)++] = x;
+            }
+        } else {
+            tmp[0] = a[0];
+            tmp[1] = a[1];
+            BlitChar(tmp, &x, pix, 0x100);
+            a += RELIC_LETTER(*a) ? 1 : 2;
+        }
+    }
+    return x;
+}
+
+// The columns x0..x1 (bytes) of the 16 rows in src, shrunk to 3/4 into the 12
+// rows of dst: a pixel of dst is the mean of the 1 or 2 by 1 or 2 source pixels
+// it covers (a plain pick of every 4th would lose the thin strokes).
+// Returns the width in px.
+static u16 RelicDescShrink(const u8* src, u16 x0, u16 x1, u8* dst) {
+    u16 w = (x1 - x0) * 2, ow = w * 3 / 4, ox, oy, sx, sy, a, b, c, d, v, m;
+    if (ow > RELIC_DESC_ROW * 2 - 2) {
+        ow = RELIC_DESC_ROW * 2 - 2;
+    }
+    for (oy = 0; oy < 12; oy++) {
+        c = (oy * 4 + 2) / 3;
+        d = ((oy + 1) * 4 + 2) / 3 - 1;
+        for (ox = 0; ox < ow; ox++) {
+            a = (ox * 4 + 2) / 3;
+            b = ((ox + 1) * 4 + 2) / 3 - 1;
+            m = 0;
+            for (sy = c; sy <= d; sy++) {
+                for (sx = a; sx <= b; sx++) {
+                    v = src[sy * 0x100 + x0 + sx / 2];
+                    m += (sx & 1) ? v >> 4 : v & 15;
+                }
+            }
+            v = (d - c + 1) * (b - a + 1); // the source pixels of this one
+            sy = m;
+            m = (m + v / 2) / v;
+            if (!m && sy) {
+                m = 1;
+            }
+            if (ox & 1) {
+                dst[oy * RELIC_DESC_ROW + ox / 2] |= m << 4;
+            } else {
+                dst[oy * RELIC_DESC_ROW + ox / 2] = m;
+            }
+        }
+    }
+    return ow;
+}
+
+// Builds the textures of the lines (VRAM y 0x110, 0x120). The name texture is
+// in the VRAM already, so g_Pix[0] is free: the text goes full size into the
+// first 0x1000 bytes, the lines (shrunk) after them.
+static void RelicDescBuild(const char* desc) {
+    char codes[96];
+    const char* sp[24];
+    u16 spx[24], spe[24], total, mid;
+    int n = 0, i, best = 0;
+    u8* scr = g_Pix[0];
+    u8* l1 = g_Pix[0] + 0x1000;
+    u8* l2 = g_Pix[0] + 0x1800;
+    const char* end;
+
+    s_DescW[0] = s_DescW[1] = 0;
+    if (!desc || !*desc) {
+        return;
+    }
+    RelicDescCodes(desc, codes, sizeof(codes));
+    end = codes + strlen(codes);
+    for (i = 0; i < 0x2000; i++) {
+        scr[i] = 0;
+    }
+    total = RelicDescBlit(codes, end, scr, sp, spx, spe, &n);
+    if (total <= RELIC_DESC_LINE || n == 0) {
+        s_DescW[0] = RelicDescShrink(scr, 0, total, l1);
+    } else { // two lines: cut at the space nearest to the middle
+        mid = total / 2;
+        for (i = 1; i < n; i++) {
+            if (abs((int)spx[i] - mid) < abs((int)spx[best] - mid)) {
+                best = i;
+            }
+        }
+        s_DescW[0] = RelicDescShrink(scr, 0, spx[best], l1);
+        s_DescW[1] = RelicDescShrink(scr, spe[best], total, l2);
+    }
+    LoadTPage((u_long*)l1, 0, 0, 0, 0x110, RELIC_DESC_ROW * 2, 12);
+    if (s_DescW[1]) {
+        LoadTPage((u_long*)l2, 0, 0, 0, 0x120, RELIC_DESC_ROW * 2, 12);
+    }
+}
+
+// The quads of the lines (the 8th and the 9th prim): centred under the
+// banner, hidden until the banner shows (step 9).
+static void RelicDescPrims(Primitive* prim) {
+    int i, k, w, x, y;
+    for (i = 0; i < 7; i++) {
+        prim = prim->next;
+    }
+    for (k = 0; k < 2; k++, prim = prim->next) {
+        prim->drawMode = DRAW_HIDE;
+        if (!s_DescW[k]) {
+            continue;
+        }
+        w = s_DescW[k];
+        x = 0x80 - w / 2;
+        y = 0xB3 + k * 12;
+        prim->tpage = 0x10;
+        prim->clut = PAL_UNK_1A1;
+        prim->u0 = prim->u2 = 0;
+        prim->u1 = prim->u3 = w - 1;
+        prim->v0 = prim->v1 = 0x10 + k * 0x10;
+        prim->v2 = prim->v3 = prim->v0 + 11;
+        prim->x0 = prim->x2 = x;
+        prim->x1 = prim->x3 = x + w;
+        prim->y0 = prim->y1 = y;
+        prim->y2 = prim->y3 = y + 12;
+        PCOL(prim) = 0x80;
+        prim->priority = 0x1FE;
+    }
+}
+#else
+#define RELIC_ANIM_PRIMS 0x7FFF
+#endif
+
 // params: (& 0x7FFF) Relic ID
 void EntityRelicOrb(Entity* self) {
 #if STAGE == STAGE_ST0 || VERSION < VER_BETA_MAD
     const int PrimCount = 3;
+#elif defined(RELIC_DESC)
+    const int PrimCount = RELIC_DESC_PRIMS;
 #else
     const int PrimCount = 7;
 #endif
@@ -1309,6 +1502,10 @@ void EntityRelicOrb(Entity* self) {
     }
 
     LoadTPage(chPix, 0, 0, 0, 0x100, 0x180, 0x10);
+#ifdef RELIC_DESC
+    RelicDescBuild(g_RelicHint ? g_api.relicDefs[relicId].desc : NULL);
+    RelicDescPrims(&g_PrimBuf[self->primIndex]);
+#endif
 #endif
         self->ext.relicOrb.unk7E = msgLen;
         self->ext.relicOrb.unk7C = 0;
@@ -1386,6 +1583,17 @@ void EntityRelicOrb(Entity* self) {
         prim->x0 = 0x80 - self->ext.relicOrb.unk7E * 6;
 #endif
         prim->drawMode = DRAW_DEFAULT;
+#ifdef RELIC_DESC
+        for (i = 0; i < 2; i++) { // the description under the name
+            prim = &g_PrimBuf[self->primIndex];
+            for (iconSlot = 0; iconSlot < 7 + i; iconSlot++) {
+                prim = prim->next;
+            }
+            if (s_DescW[i]) {
+                prim->drawMode = DRAW_DEFAULT;
+            }
+        }
+#endif
         self->ext.relicOrb.unk7C++;
 #if STAGE == STAGE_ST0
         if (self->ext.relicOrb.unk7C > 0x100) {
@@ -1473,7 +1681,7 @@ void EntityRelicOrb(Entity* self) {
         prim = prim->next;
     }
 
-    while (prim != NULL) {
+    for (i = 3; prim != NULL && i < RELIC_ANIM_PRIMS; i++) {
         if (prim->drawMode != DRAW_HIDE) {
             if (prim->p1 & 3) {
                 prim->y0 = prim->y1--;

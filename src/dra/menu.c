@@ -761,6 +761,8 @@ void func_800F5E68(MenuContext* ctx, s32 cursorIdx, s32 x, s32 y, s32 w, s32 h,
 #define RELIC_WIN_X (-16)
 #define RELIC_WIN_W 416
 #define RELIC_X0 RELIC_WIN_X
+#define RELIC_SWITCH_LIT                                                       \
+    (g_RelicToggle == RELIC_TOGGLE_MODERN && (*relic & RELIC_FLAG_ACTIVE))
 #define RELIC_COL 224
 #define RELIC_U 0x84
 #define RELIC_W(i)                                                             \
@@ -769,8 +771,10 @@ void func_800F5E68(MenuContext* ctx, s32 cursorIdx, s32 x, s32 y, s32 w, s32 h,
                                  : 0x78)
 // the info bar as wide as the relic window while the relic page is up
 extern MenuContextInit g_MenuInit[NUM_MENU];
+int g_RelicPage; // read by Wide_OnFrame: the menu scale fits 416 columns
 static void RelicInfoBar(int wide) {
     MenuContext* bar = &g_Menus[MENU_DG_INFO_BAR];
+    g_RelicPage = wide;
     bar->cursorX = bar->unk1.x =
         wide ? RELIC_WIN_X : g_MenuInit[MENU_DG_INFO_BAR].cursorX;
     bar->cursorW = bar->unk1.w =
@@ -787,6 +791,7 @@ static void RelicInfoBar(int wide) {
 #else
 #define RELIC_CUR g_MenuNavigation.cursorRelic
 #define RELIC_X0 0
+#define RELIC_SWITCH_LIT 0
 #define RELIC_COL 0xB0
 #define RELIC_U 0x78
 #define RELIC_W(i) 0x78
@@ -855,12 +860,10 @@ void DrawRelicsMenu(MenuContext* ctx) {
 #ifdef PLATFORM_PSYZ
         // an ON switch that has no focus keeps its full brightness (the peak
         // of the pulse of the focused one); an OFF one stays dimmed
-        if (*relic & RELIC_FLAG_ACTIVE) {
+        // (the modern switch only: the stock one keeps the PS1 look)
+        if (RELIC_SWITCH_LIT) {
             switchFadeLevel = 6;
         }
-#define RELIC_SWITCH_LIT (*relic & RELIC_FLAG_ACTIVE)
-#else
-#define RELIC_SWITCH_LIT 0
 #endif
         if (INDEXER == g_MenuNavigation.cursorRelic) {
             // This routine handles the fade in/fade out of the ON/OFF switch

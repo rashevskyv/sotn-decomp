@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if !defined(__SWITCH__) && !defined(_WIN32)
+#include <signal.h>
+#include <unistd.h>
+#endif
 
 static const char* allowed_players[] = {"alu", "ric", "mar"};
 static const char* allowed_tests[] = {"sndlib"};
@@ -84,8 +88,6 @@ static bool wide_set; // --wide or --ini picked the view
 static bool parseArgs(
     struct InitGameParams* outParams, int argc, char* argv[]) {
     assert(!!outParams);
-    g_ArgC = argc;
-    g_ArgV = argv;
     outParams->diskPath = NULL;
     outParams->testMode = NO_TEST;
     outParams->stage = -1;
@@ -185,6 +187,16 @@ static bool parseArgs(
 
 int Main(int argc, char* argv[]) {
     struct InitGameParams params;
+    g_ArgC = argc; // as given: Win_Init adds --disk and --ini to its own copy
+    g_ArgV = argv;
+#if !defined(__SWITCH__) && !defined(_WIN32)
+    if (getenv("SOTN_RESTART_PID")) { // port menu RESTART: the old process ends first
+        int i, pid = atoi(getenv("SOTN_RESTART_PID"));
+        for (i = 0; i < 50 && pid > 0 && kill(pid, 0) == 0; i++) {
+            usleep(100000);
+        }
+    }
+#endif
 #ifdef __SWITCH__
     const char* Switch_Init(void);
     const char* cue = Switch_Init();

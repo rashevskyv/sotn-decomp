@@ -86,7 +86,7 @@ Tables: 0 MENU (g_MenuStr), 1 EQUIP_NAME, 2 EQUIP_DESC, 3 ACC_NAME, 4 ACC_DESC, 
 6 SPELL_NAME, 7 SPELL_DESC, 8 RELIC_NAME, 9 RELIC_DESC, 10 HELP (D_800A2D48), 11 STATUS (D_800A2D68),
 12 SEL_AREA (stage_names), 13 ACTOR, 14 BESTIARY (LIB D_us_80180FB4), 15 OTHER_CELL (any other `_S`),
 16 OTHER_SJIS, 17 ZONE (area names as menu cells, hash 0, index = stage id; the port's teleport
-map and list draw them with mfont.bin), 18 PORT (menu cells, hash 0, index from `ua_port.json`, and 100 + g_MenuStr row for the status page words). A relic name keeps the leading space of its stock name.
+map and list draw them with mfont.bin), 18 PORT (menu cells, hash 0, index from `ua_port.json` (ids 0-235 the first port screens, 236-264 the new menu words and labels, 265 the NEXT STAGE mark, 300-360 the help line of each row, 400-429 the relic names and 430-459 the relic texts of the relic hint, copied from `ua.json` `relics:N`, full-width marks turned to ASCII), and 100 + g_MenuStr row for the status page words). A relic name keeps the leading space of its stock name.
 
 ## dialogue.bin, dialogue_psp.bin
 

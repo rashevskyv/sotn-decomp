@@ -1015,7 +1015,6 @@ extern int g_MapHeroPulse, g_MapHeroPeriod;
 // (src/pc/voice.c). prologue_fast_forward = 0|1 (1): hold Cross (B on the
 // Switch) to speed the prologue scroll up (src/st/st0/prologue_scroll.c).
 extern int g_DialogSkip, g_PrologueFF, g_MenuFill, g_RelicHint;
-void PortMenu_RelicHint(int relic); // a new relic: the hint (port_menu.c)
 void Cutscene_PadFilter(Pad* pad);
 void Cutscene_SkipReset(void);
 void Wide_LoadIni(const char* path);
