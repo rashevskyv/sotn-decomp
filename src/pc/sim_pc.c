@@ -404,6 +404,7 @@ bool LoadFilePc(const struct FileUseContent* file) {
         LoadStageTileset(sim->addr, MIN(file->length, 0x40000), 0x100);
         Lang_PaintFont8(); // the font sheet at 896,256 (language = uk only)
         Hud_PatchVram();
+        Hud_PatchClut((u16*)((u8*)sim->addr + 0x40000));
         LoadImage(&g_Vram.D_800ACD98, D_800A04CC);
         LoadImage(&g_Vram.D_800ACDA8, (u8*)sim->addr + 0x40000);
         StoreImage(&g_Vram.D_800ACDA8, g_Clut[1]);

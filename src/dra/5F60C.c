@@ -1256,12 +1256,19 @@ bool StatusPause(s32 arg0) {
 // the whole HUD 3 px lower than the mockup: rows 0..19 of the screen are
 // clipped, and the HP number starts at row 17 in the mockup
 #define HUD_DY 3
-// the third-hand item: 16x16 in the centre of the left orb
-#define HUD_THIRD_HAND_X 10
-#define HUD_THIRD_HAND_Y (27 + HUD_DY)
+// the third-hand item: 16x16 inside the left orb (owner layout, 2026-11-24)
+#define HUD_THIRD_HAND_X 5
+#define HUD_THIRD_HAND_Y (25 + HUD_DY)
+// its count: hearts digits (big, q=3, step 7, clut 0x196), NO "x" (owner),
+// top-left of the digits at icon + (8, 6)
+#define HUD_THIRD_HAND_NX (HUD_THIRD_HAND_X + 8)
+#define HUD_THIRD_HAND_NY (HUD_THIRD_HAND_Y + 6)
 // free 8x6 spot in tpage 0x1F for the heart icon (moved out of the frame)
 #define HUD_HEART_U 0xF0
 #define HUD_HEART_V 0xF0
+// free 52x8 spot in tpage 0x1F for the red HP bar strip
+#define HUD_HPBAR_U 0xA0
+#define HUD_HPBAR_V 0xE8
 
 #define HUD_PIX(b, u, v) (((b)[(v) * 32 + (u) / 4] >> ((u) % 4 * 4)) & 15)
 static void Hud_SetPix(u16* b, s32 u, s32 v, s32 c) {
@@ -1278,6 +1285,8 @@ void Hud_PatchVram(void) {
     static const u8 track2[5] = {6, 7, 8, 9, 11};
     RECT r = {960, 256, 32, 48}; // tpage 0x1F u 0..127, v 0..47
     RECT rh = {960 + HUD_HEART_U / 4, 256 + HUD_HEART_V, 2, 6};
+    static u16 hpBar[13 * 8];
+    RECT rb = {960 + HUD_HPBAR_U / 4, 256 + HUD_HPBAR_V, 13, 8};
     s32 i, u, v, c;
 
     DrawSync(0);
@@ -1323,7 +1332,39 @@ void Hud_PatchVram(void) {
         }
     }
     LoadImage(&r, (u_long*)vram);
+    // HP bar: the bar strip turned flat (50x8 at u/v HUD_HPBAR_U/V), its
+    // blue colours moved to the free 0x174 entries that Hud_PatchClut makes red
+    for (i = 0; i < LEN(hpBar); i++) {
+        hpBar[i] = 0;
+    }
+    for (u = 0; u < 50; u++) {
+        for (v = 0; v < 8; v++) {
+            // screen row v of the turned strip = strip column 7 - v
+            c = D_800C52F8[10][4 + u * 4 + (7 - v) / 2] >> ((7 - v) % 2 * 4) &
+                15;
+            c = c == 3 ? 8 : c == 4 ? 10 : c == 5 ? 11 : c == 7 ? 12
+                : c == 15 ? 13 : c;
+            hpBar[v * 13 + u / 4] |= c << (u % 4 * 4);
+        }
+    }
+    LoadImage(&rb, (u_long*)hpBar);
     DrawSync(0);
+}
+
+// Palette 0x174 (the bar strip) uses entries 2..7 and 15. Entries 8 and
+// 10..13 get the red HP colours of the mockup (owner, 2026-11-24).
+void Hud_PatchClut(u16* clut) {
+    static const u16 red[5] = {0x0C09, 0x0011, 0x153E, 0x085A, 0x5B3F};
+    u16* pal = &clut[(0x174 - 0x100) * 16];
+    s32 i;
+
+    if (pal[5] != 0x79A0) { // not the Alucard bar palette (F_GAME2)
+        return;
+    }
+    pal[8] = red[0];
+    for (i = 1; i < 5; i++) {
+        pal[9 + i] = red[i];
+    }
 }
 
 static void Hud_Quad(
@@ -1401,15 +1442,13 @@ static void Hud_Layout(void) {
         p[i]->y0 = p[i]->y1 = (i < 3 ? 23 : g_HudSpriteY[i]) + HUD_DY;
         p[i]->y2 = p[i]->y3 = p[i]->y0 + g_HudSpriteH[i];
     }
-    // HP bar: the MP strip tinted red
+    // HP bar: the red copy of the strip, drawn flat (mockup colours)
     prim = p[HUD_HP_BAR];
-    prim->clut = 0x196;
-    prim->r0 = prim->r1 = prim->r2 = prim->r3 = 200;
-    prim->g0 = prim->g1 = prim->g2 = prim->g3 = 40;
-    prim->b0 = prim->b1 = prim->b2 = prim->b3 = 40;
-    Hud_Bar(prim, 31, 26 + HUD_DY,
-            g_PlayerHud.displayHP * 50 / MAX(1, g_Status.hpMax),
-            DRAW_ABSPOS | DRAW_COLORS);
+    prim->clut = 0x174;
+    k = CLAMP(g_PlayerHud.displayHP * 50 / MAX(1, g_Status.hpMax), 0, 50);
+    Hud_Quad(prim, 31, 26 + HUD_DY, 31 + k, 34 + HUD_DY, HUD_HPBAR_U,
+             HUD_HPBAR_V, k, 8);
+    prim->drawMode = k ? DRAW_ABSPOS : DRAW_HIDE;
     Hud_Bar(p[5], 31, 33 + HUD_DY, g_Status.mp * 50 / MAX(1, g_Status.mpMax),
             DRAW_ABSPOS);
     // numbers: data/textures/common has the stock digits made bigger for
@@ -1431,7 +1470,7 @@ static void Hud_Layout(void) {
         prim->drawMode = DRAW_ABSPOS | DRAW_COLORS;
     }
     Hud_Number(
-        &p[HUD_MP_DIGITS], g_Status.mp, 40, 41 + HUD_DY, 1, false, 5, 4, 0x196);
+        &p[HUD_MP_DIGITS], g_Status.mp, 43, 41 + HUD_DY, 1, false, 5, 4, 0x196);
     // hearts: the stock flicker when the sub-weapon can be used
     clut = 0x196;
     if (func_800FE3C4(&subwpn, 0, false) && !(g_Timer & 2)) {
@@ -1439,15 +1478,17 @@ static void Hud_Layout(void) {
     }
     Hud_Number(&p[HUD_HEART_DIGITS], g_Status.hearts, 101, 38 + HUD_DY, 0, true,
                3, 7, clut);
-    // heart icon at 2x, left of a 4-digit hearts number (owner, 2026-11-24)
+    // heart icon 1x at 80,40, left of the hearts number (owner, 2026-11-24)
     prim = p[HUD_HEART];
     Hud_Quad(
-        prim, 73, 38 + HUD_DY, 89, 50 + HUD_DY, HUD_HEART_U, HUD_HEART_V, 8, 6);
+        prim, 80, 40 + HUD_DY, 88, 46 + HUD_DY, HUD_HEART_U, HUD_HEART_V, 8, 6);
     prim->clut = 0x172;
     prim->drawMode = DRAW_ABSPOS;
     // the third-hand item goes here: set tpage, clut, u/v of its icon,
     // Hud_Quad(prim, HUD_THIRD_HAND_X, HUD_THIRD_HAND_Y, +16, +16, ...) and
-    // DRAW_ABSPOS. Until then the orb stays empty.
+    // DRAW_ABSPOS; the count with Hud_Number(.., HUD_THIRD_HAND_NX,
+    // HUD_THIRD_HAND_NY, -1, true, 3, 7, 0x196) in prims before the HD
+    // numbers. Until then the orb stays empty.
     p[HUD_THIRD_HAND]->drawMode = DRAW_HIDE;
 }
 #endif
@@ -1620,7 +1661,13 @@ void DrawHudSubweapon() {
         (u_long*)(D_800C52F8[10] + 4), 0, 0, 0x3DC, 0x100, 8, mpFillSteps);
 #endif
     // Use one clut if MP is full, otherwise a different one
+#ifdef PLATFORM_PSYZ
+    // the mockup colours always (owner, 2026-11-24)
+    prim->clut = 0x174;
+    if (0) {
+#else
     if (mpFillSteps == 50) {
+#endif
         prim->clut = PAL_CC_MAGIC_HUD_EFFECT;
     } else {
         prim->clut = 0x174;
