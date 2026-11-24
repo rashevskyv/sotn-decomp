@@ -31,6 +31,21 @@ static void func_801D0B40(void) {
     Entity* ent;
     s16* unk88;
 
+#ifdef PLATFORM_PSYZ
+    // ET_801D0B40 is GH_Props seen through pad[8]: unk84 = rotate (0x9C),
+    // unk88 = parent (0xA0), unk88[0x4E] = parent's rotate. With 8-byte
+    // pointers the two layouts differ and unk88 read garbage (crash in NO2).
+    s32 i;
+    for (i = 15; i <= 16; i++) {
+        ent = g_CurrentEntity + i;
+        if (ent->ext.GH_Props.parent) {
+            ent->ext.GH_Props.rotate =
+                ent->ext.GH_Props.parent->ext.GH_Props.rotate - 0x600;
+        }
+    }
+    return;
+#endif
+
     ent = g_CurrentEntity + 15;
     unk88 = ent->ext.et_801D0B40.unk88;
     ent->ext.et_801D0B40.unk84 = unk88[0x4E] - 0x600;

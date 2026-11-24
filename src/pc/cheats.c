@@ -278,7 +278,9 @@ void Cheat_OnFrame(void) {
             RELIC_FLAG_FOUND | RELIC_FLAG_ACTIVE;
         g_Status.relics[RELIC_POWER_OF_MIST] |=
             RELIC_FLAG_FOUND | RELIC_FLAG_ACTIVE;
-        g_Status.mp = g_Status.mpMax;
+        if (g_Player.status & PLAYER_STATUS_MIST_FORM) { // spells still cost MP
+            g_Status.mp = g_Status.mpMax;
+        }
     }
     if (g_Cheat.items && !filled) {
         filled = 1;

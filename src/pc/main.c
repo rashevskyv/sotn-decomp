@@ -273,6 +273,8 @@ int Main(int argc, char* argv[]) {
             Psyz_HdTexAllow(32, 256, 24, 72, 8);
             // the stage-name banners and the ST0 title card (128x128, 4 bpp)
             Psyz_HdTexAllow(64, 256, 32, 128, 4);
+            // the HUD digits, both rows (tools/hud_digits.py)
+            Psyz_HdTexAllow(968, 280, 20, 24, 4);
             // the pick-up banners of EntityLevelUpAnimation: Life, Heart,
             // Level, relic (26x24 words sampled of the 4 bpp picture)
             {
