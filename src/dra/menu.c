@@ -78,8 +78,8 @@ extern s32 g_PrevEquippedWeapons[2];
 #define QUICK_SLOT NUM_ITEM_SLOTS
 #define EQUIP_ROWS (NUM_ITEM_SLOTS + !!g_QuickEnabled) // quick_item = 0: no row
 // The Pocket is not a row of the list: the overview draws it top right, next
-// to the two hands (name under its label). The cursor visits it after the
-// last accessory and Up on the first row; the stock rows stay as they were.
+// to the two hands (name under its label). Right moves the cursor to it, Left
+// back to the row it came from; Up and Down stay on the stock rows.
 // The Equip windows are 400 wide while the Pocket is on (the 16:9 canvas ends
 // at 405): its block starts after the stock hand count "(NN)" (x 224..256),
 // the longest uk name (14 cells) fits before the count, which is right-aligned.
@@ -91,7 +91,7 @@ extern s32 g_PrevEquippedWeapons[2];
 #define EQ_CURSOR_Y(r) ((r) * 13 + 0x1C)
 #define IS_QUICK_SLOT() (g_MenuNavigation.cursorEquip == QUICK_SLOT)
 s32 g_QuickMode, g_QuickListN;
-static s32 s_QuickNav;
+static s32 s_QuickNav, s_QuickFrom;
 #else
 #define EQUIP_ROWS NUM_ITEM_SLOTS
 #define EQ_TEXT_Y(r) (30 + (r) * 13)
@@ -5359,7 +5359,29 @@ block_4:
         D_80137948 = 0;
         func_800FB0FC();
         var_s1 = g_MenuNavigation.cursorEquip;
+#ifdef PLATFORM_PSYZ
+        // Right goes to the Pocket, Left back to the slot it came from; Up and
+        // Down stay on the stock slots
+        if (g_QuickEnabled) {
+            if (IS_QUICK_SLOT()) {
+                if (g_pads[0].repeat & PAD_LEFT) {
+                    g_MenuNavigation.cursorEquip = s_QuickFrom;
+                    PlaySfx(SFX_UI_MOVE);
+                }
+            } else if (g_pads[0].repeat & PAD_RIGHT) {
+                s_QuickFrom = g_MenuNavigation.cursorEquip;
+                g_MenuNavigation.cursorEquip = QUICK_SLOT;
+                PlaySfx(SFX_UI_MOVE);
+            } else {
+                MenuHandleCursorInput(
+                    &g_MenuNavigation.cursorEquip, NUM_ITEM_SLOTS, 0);
+            }
+        } else {
+            MenuHandleCursorInput(&g_MenuNavigation.cursorEquip, EQUIP_ROWS, 0);
+        }
+#else
         MenuHandleCursorInput(&g_MenuNavigation.cursorEquip, EQUIP_ROWS, 0);
+#endif
         MenuEquipHandlePageScroll(1);
         func_800FB0FC();
         if (var_s1 != g_MenuNavigation.cursorEquip) {
