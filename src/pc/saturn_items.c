@@ -6,6 +6,7 @@
 // block (StoreSaveData clears 0x2000 bytes).
 #include "game.h"
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 #define SATURN_SAVE_MAGIC 0x49544153 // "SATI"
@@ -15,6 +16,11 @@ typedef struct {
     u32 equipment[2]; // the real hand items: the PS1 area has stand-ins
     u8 handCount[NUM_SATURN_HAND_ITEMS];
     u8 handOrder[NUM_HAND_ORDER];
+    // the third hand (quick_item.c): its item, and the stock without the held
+    // copy. The PS1 area counts the held copy too, so an older build keeps it
+    // in the inventory. An older build that saved over this one leaves a
+    // count that does not match: the item goes back to the stock then.
+    u8 quickItem, quickStock;
 } SaturnSave;
 
 STATIC_ASSERT(sizeof(PlayerStatusPs1) == 0x334, "the PS1 PlayerStatus");
@@ -53,6 +59,9 @@ void Status_ToPs1(PlayerStatusPs1* dst, const PlayerStatus* src, void* ext) {
         }
     }
     memcpy(PS1_EQUIPMENT(dst), equipment, sizeof(equipment));
+    if (g_QuickItem && g_QuickItem < NUM_HAND_ITEMS) {
+        dst->equipHandCount[g_QuickItem]++;
+    }
 
     if (sat) {
         sat->magic = SATURN_SAVE_MAGIC;
@@ -60,6 +69,8 @@ void Status_ToPs1(PlayerStatusPs1* dst, const PlayerStatus* src, void* ext) {
         memcpy(sat->handCount, &src->equipHandCount[ITEM_ASTRAL_DAGGER],
                NUM_SATURN_HAND_ITEMS);
         memcpy(sat->handOrder, src->equipHandOrder, NUM_HAND_ORDER);
+        sat->quickItem = g_QuickItem < NUM_HAND_ITEMS ? g_QuickItem : 0;
+        sat->quickStock = src->equipHandCount[sat->quickItem];
     }
 }
 
@@ -83,6 +94,7 @@ void Status_FromPs1(
     const SaturnSave* sat = ext;
     int i;
 
+    g_QuickItem = 0;
     memcpy(dst->relics, src->relics, sizeof(dst->relics));
     memcpy(dst->spells, src->spells, sizeof(dst->spells));
     memset(dst->equipHandCount, 0, sizeof(dst->equipHandCount));
@@ -103,6 +115,11 @@ void Status_FromPs1(
                 dst->equipment[i] = id;
             }
         }
+        i = sat->quickItem;
+        if (QuickItem_Eligible(i) && src->equipHandCount[i] == sat->quickStock + 1) {
+            dst->equipHandCount[i]--;
+            g_QuickItem = i;
+        }
         return;
     }
     // a PS1 or 0.8.60 save: the Saturn items go last, none owned
@@ -111,3 +128,36 @@ void Status_FromPs1(
         dst->equipHandOrder[NUM_HAND_ITEMS + i] = ITEM_ASTRAL_DAGGER + i;
     }
 }
+
+// test (SOTN_TEST_QUICK, quick_item.c): the third hand through a save, and
+// through a save of 0.8.112 (zero tail), of the PS1 (no tail) and of an older
+// build that saved over it (its count differs)
+#ifdef QUICK_TEST
+void Saturn_QuickSaveTest(void) {
+    static u8 buf[0x2000];
+    PlayerStatusPs1 ps1;
+    PlayerStatus out;
+    SaturnSave* sat = (SaturnSave*)buf;
+    u32 q = g_QuickItem;
+    int stock = g_Status.equipHandCount[q];
+
+    Status_ToPs1(&ps1, &g_Status, buf);
+    g_QuickItem = 0;
+    Status_FromPs1(&out, &ps1, buf);
+    fprintf(stderr, "[quick] save: item %u->%u stock %d->%d ps1 count %d\n",
+            (unsigned)q, (unsigned)g_QuickItem, stock, out.equipHandCount[q],
+            ps1.equipHandCount[q]);
+    sat->quickItem = sat->quickStock = 0; // a save of 0.8.112
+    Status_FromPs1(&out, &ps1, buf);
+    fprintf(stderr, "[quick] old save: item %u, count %d\n",
+            (unsigned)g_QuickItem, out.equipHandCount[q]);
+    Status_FromPs1(&out, &ps1, NULL); // no tail (PS1)
+    fprintf(stderr, "[quick] ps1 save: item %u\n", (unsigned)g_QuickItem);
+    sat->quickItem = q;
+    sat->quickStock = stock + 5; // an older build changed the count
+    Status_FromPs1(&out, &ps1, buf);
+    fprintf(stderr, "[quick] stale save: item %u, count %d\n",
+            (unsigned)g_QuickItem, out.equipHandCount[q]);
+    g_QuickItem = q;
+}
+#endif

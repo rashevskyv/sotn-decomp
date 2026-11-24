@@ -1622,7 +1622,14 @@ PfnEntityUpdate g_DraEntityTbl[] = {
     func_80123F78,
     EntityTeleport,
     EntityPlayerSleepZ,
-    EntityNull};
+    EntityNull,
+#ifdef PLATFORM_PSYZ
+    EntityPocketFood, // E_POCKET_FOOD
+#endif
+};
+#ifdef PLATFORM_PSYZ
+STATIC_ASSERT(LEN(g_DraEntityTbl) == E_POCKET_FOOD + 1, "E_POCKET_FOOD");
+#endif
 
 extern AnimationFrame* D_psp_09234DC8;
 // Corresponding RIC function is RicUpdatePlayerEntities

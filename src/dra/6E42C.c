@@ -390,6 +390,18 @@ int func_8010EDB8(void) {
     if (g_Player.vram_flag & IN_AIR_OR_EDGE) {
         atLedge = true;
     }
+#ifdef PLATFORM_PSYZ
+    if (g_QuickUse) { // the third hand: UseQuickItem put its item in hand 1
+        hand = 1;
+        g_Player.D_80072EF8 = PAD_CIRCLE;
+        equipped_id = g_Status.equipment[hand];
+        equipped_item = &g_EquipDefs[equipped_id];
+        if (CheckChainLimit(equipped_id, hand) < 0) {
+            return false;
+        }
+        goto block_45;
+    }
+#endif
     attBtnsPressed = g_Player.padTapped & (PAD_SQUARE | PAD_CIRCLE);
 
     if (attBtnsPressed != 0 && func_8010EB5C() == 0) {
@@ -528,6 +540,10 @@ block_45:
             // Blueprint 57, child 31. EntityPlayerOutline
             CreateEntFactoryFromEntity(g_CurrentEntity, FACTORY(BP_57, 1), 0);
             goto block_70;
+#ifdef PLATFORM_PSYZ
+        } else if (g_QuickUse && equipped_item->unk13 == 50) {
+            ent6C = QuickItem_SpawnFood(equipped_id); // not a hand 1 program
+#endif
         } else if (!var_s7) {
             ent6C = CreateEntFactoryFromEntity(
                 g_CurrentEntity,

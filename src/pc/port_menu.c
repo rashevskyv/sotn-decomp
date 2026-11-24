@@ -3780,8 +3780,16 @@ void PortMenu_Draw(OT_TYPE* ot) {
     CountFps();
     for (i = 0; !is_open && i < queued_count; i++) {
         if (queued[i].cell) {
-            Cell(queued[i].x, queued[i].y, Lang_MenuCellAny(queued[i].cell),
-                 queued[i].r, queued[i].g, queued[i].bl);
+            const u8* rows = Lang_MenuCellAny(queued[i].cell);
+            if (!rows && !uk && queued[i].cell + 0x20 < 0x7F) {
+                // en: no serif cell, so the 5x7 letter (quick item toast)
+                char ch[2] = {queued[i].cell + 0x20, 0};
+                Text(queued[i].x, queued[i].y + 2, ch, queued[i].r,
+                     queued[i].g, queued[i].bl);
+            } else {
+                Cell(queued[i].x, queued[i].y, rows, queued[i].r,
+                     queued[i].g, queued[i].bl);
+            }
         } else {
             Mark(queued[i].x, queued[i].y + 2, queued[i].b);
         }
