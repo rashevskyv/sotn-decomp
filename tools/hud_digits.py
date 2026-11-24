@@ -7,7 +7,9 @@ and 5/4 of a game pixel, and at the 1x canvas such pixels come out uneven;
 over HD every stock pixel keeps one even size. The colours are those of
 the mockup: the small row 0x196, the big row 0x171 (white). The game
 animates 0x171 with the HP state, so the hearts draw with 0x196 and its
-file holds the 0x171 colours. The file names are the psyz HD keys
+file holds the 0x171 colours. Hud_PatchVram remaps the big row (REMAP) so
+0x196 also draws it white at 1x and the 0x193 flicker draws it green; the
+hash is of the remapped rows. The file names are the psyz HD keys
 (hdtex.h): VRAM rect, FNV-1a of the stock rows, FNV-1a of the palette.
 
 usage: hud_digits.py <F_GAME.BIN> <out dir> [--scale N]
@@ -22,10 +24,12 @@ from PIL import Image
 # and the big 8x16 row at v 0x20. In play only allowed rects get HD
 # (src/pc/main.c Psyz_HdTexAllow), so both rows share one rect.
 RECT = (968, 280, 20, 24)
-# the palette the HUD draws with: (small row, big row) colours.
+# the palette the HUD draws with: (small row, big row) colours, and whether
+# the big row takes the stock (False) or the remapped (True) indices.
 # 0x196 = normal, 0x193 = the hearts flicker when the sub-weapon can be used
-CLUTS = {0x196: (0x196, 0x171), 0x193: (0x193, 0x193)}
+CLUTS = {0x196: (0x196, 0x171, False), 0x193: (0x193, 0x193, True)}
 SMALL_ROWS = 8  # rect rows 0..7 = the small digits, 8..23 = the big ones
+REMAP = {9: 1, 14: 5, 15: 6}  # big row, as Hud_PatchVram (src/dra/5F60C.c)
 
 
 def fnv(data, h=0x811C9DC5):
@@ -63,8 +67,10 @@ def main():
     data = open(args[0], "rb").read()
     gfx, pals = data[:0x40000], data[0x40000:]
     x, y, w, h = RECT
-    rows = vram_rows(gfx, *RECT)
-    texels = [b >> s & 15 for b in rows for s in (0, 4)]
+    stock = [b >> s & 15 for b in vram_rows(gfx, *RECT) for s in (0, 4)]
+    n = SMALL_ROWS * w * 4
+    texels = stock[:n] + [REMAP.get(t, t) for t in stock[n:]]
+    rows = bytes(a | b << 4 for a, b in zip(texels[::2], texels[1::2]))
     os.makedirs(args[1], exist_ok=True)
 
     def pal(clut):
@@ -73,11 +79,11 @@ def main():
     def words(clut):
         return pals[(clut - 0x100) * 32:][:32]
 
-    for clut, (small, big) in CLUTS.items():
-        pals2 = (pal(small), pal(big))
+    for clut, (small, big, remapped) in CLUTS.items():
+        big_texels = texels if remapped else stock
         img = Image.new("RGBA", (w * 4, h))
-        img.putdata([pals2[i >= SMALL_ROWS * w * 4][t]
-                     for i, t in enumerate(texels)])
+        img.putdata([pal(small)[t] for t in texels[:n]]
+                    + [pal(big)[t] for t in big_texels[n:]])
         img = img.resize((w * 4 * scale, h * scale), Image.NEAREST)
         path = os.path.join(args[1], "hud_digits__%d_%d_%dx%d_4_%08x_c%08x.png"
                             % (RECT + (fnv(rows), fnv(words(clut)))))

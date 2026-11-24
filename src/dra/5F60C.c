@@ -1273,10 +1273,10 @@ static void Hud_SetPix(u16* b, s32 u, s32 v, s32 c) {
 // source pixels are always the original ones. Richter's HUD uses tpage
 // 0x1B, so F_GAME2 is safe to patch too.
 void Hud_PatchVram(void) {
-    static u16 vram[32 * 32], orig[32 * 32];
+    static u16 vram[32 * 48], orig[32 * 48];
     static u16 heart[2 * 6];
     static const u8 track2[5] = {6, 7, 8, 9, 11};
-    RECT r = {960, 256, 32, 32}; // tpage 0x1F u 0..127, v 0..31
+    RECT r = {960, 256, 32, 48}; // tpage 0x1F u 0..127, v 0..47
     RECT rh = {960 + HUD_HEART_U / 4, 256 + HUD_HEART_V, 2, 6};
     s32 i, u, v, c;
 
@@ -1310,6 +1310,16 @@ void Hud_PatchVram(void) {
             if (c == 0xA || c == 1) {
                 Hud_SetPix(vram, u, v, 9);
             }
+        }
+    }
+    // big digits (u 0x20.., v 0x20..0x2F): outline 9 -> 1, fill 14 -> 5 and
+    // 15 -> 6, so 0x196 draws them white with a black outline as 0x171 in
+    // the mockup, and the 0x193 flicker draws them green (also without the
+    // HD files; tools/hud_digits.py does the same before its hash)
+    for (v = 0x20; v < 0x30; v++) {
+        for (u = 0x20; u < 0x70; u++) {
+            c = HUD_PIX(orig, u, v);
+            Hud_SetPix(vram, u, v, c == 9 ? 1 : c == 14 ? 5 : c == 15 ? 6 : c);
         }
     }
     LoadImage(&r, (u_long*)vram);
