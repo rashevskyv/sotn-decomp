@@ -1249,11 +1249,15 @@ bool StatusPause(s32 arg0) {
 // first, the numbers last.
 #define HUD_HP_BAR 6
 #define HUD_HEART 7
-#define HUD_THIRD_HAND 8    // hidden for now
-#define HUD_HP_DIGITS 9     // 9..12
-#define HUD_HEART_DIGITS 13 // 13..16
-#define HUD_MP_DIGITS 17    // 17..20
-#define HUD_ALL (HUD_NUM_SPRITES + 7)
+#define HUD_THIRD_HAND 8    // the Pocket icon
+#define HUD_THIRD_DIGITS 9  // 9..12, its count
+#define HUD_HP_DIGITS 13    // 13..16
+#define HUD_HEART_DIGITS 17 // 17..20
+#define HUD_MP_DIGITS 21    // 21..24
+#define HUD_ALL (HUD_NUM_SPRITES + 11)
+// the Pocket icon: slot 0x1C of the icon page (0x1D..0x1F are the Pocket food
+// and the toast, 0x10..0x17 the Equip menu)
+#define HUD_THIRD_SLOT 0x1C
 // the whole HUD 3 px lower than the mockup: rows 0..19 of the screen are
 // clipped, and the HP number starts at row 17 in the mockup
 #define HUD_DY 3
@@ -1485,12 +1489,28 @@ static void Hud_Layout(void) {
         prim, 80, 40 + HUD_DY, 88, 46 + HUD_DY, HUD_HEART_U, HUD_HEART_V, 8, 6);
     prim->clut = 0x172;
     prim->drawMode = DRAW_ABSPOS;
-    // the third-hand item goes here: set tpage, clut, u/v of its icon,
-    // Hud_Quad(prim, HUD_THIRD_HAND_X, HUD_THIRD_HAND_Y, +16, +16, ...) and
-    // DRAW_ABSPOS; the count with Hud_Number(.., HUD_THIRD_HAND_NX,
-    // HUD_THIRD_HAND_NY, -1, true, 3, 7, 0x196) in prims before the HD
-    // numbers. Until then the orb stays empty.
-    p[HUD_THIRD_HAND]->drawMode = DRAW_HIDE;
+    // the Pocket: its icon in the left orb and its count (hearts digits, no
+    // "x"), in prims before the HD numbers. Empty Pocket: the orb stays blank.
+    prim = p[HUD_THIRD_HAND];
+    i = g_QuickEnabled ? g_QuickItem : 0;
+    if (i) {
+        LoadEquipIcon(g_EquipDefs[i].icon, g_EquipDefs[i].iconPalette,
+                      HUD_THIRD_SLOT);
+        Hud_Quad(prim, HUD_THIRD_HAND_X, HUD_THIRD_HAND_Y,
+                 HUD_THIRD_HAND_X + 16, HUD_THIRD_HAND_Y + 16,
+                 (HUD_THIRD_SLOT & 7) * 16, ((HUD_THIRD_SLOT & 0xF8) * 2) | 0x80,
+                 16, 16);
+        prim->tpage = 0x1A;
+        prim->clut = 0x1D0 + HUD_THIRD_SLOT;
+        prim->drawMode = DRAW_ABSPOS;
+    } else {
+        prim->drawMode = DRAW_HIDE;
+    }
+    Hud_Number(&p[HUD_THIRD_DIGITS], g_Status.equipHandCount[i] + 1,
+               HUD_THIRD_HAND_NX, HUD_THIRD_HAND_NY, -1, true, 3, 7, 0x196);
+    for (k = 0; !i && k < 4; k++) {
+        p[HUD_THIRD_DIGITS + k]->drawMode = DRAW_HIDE;
+    }
 }
 #endif
 
