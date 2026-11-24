@@ -137,6 +137,8 @@ void EntityMedusaHeadBlue(Entity* self) {
     side = Random() & 1;
 #endif
     self->posX.i.hi = medusaHeadInitParams[side].posX;
+    // spawn at the real screen edge (WIDE_X is 0 on 4:3 and PS1)
+    self->posX.i.hi += side ? WIDE_X : -WIDE_X;
     self->velocityX = medusaHeadInitParams[side].velocityX;
     self->facingLeft = medusaHeadInitParams[side].facingLeft;
     self->velocityY = FIX(2.5) - ((Random() & 0xF) * FIX(2.5) >> 3);
