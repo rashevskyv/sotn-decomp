@@ -946,10 +946,6 @@ void EntityEquipItemDrop(Entity* self) {
             g_api.AddToInventory(itemId, EQUIP_ARMOR);
         }
         BottomCornerText(name, true);
-#ifdef PLATFORM_PSYZ
-        // the port: the "Obtained" text stays about 10 s (stock 0x130, ~5 s; owner)
-        g_unkGraphicsStruct.BottomCornerTextTimer = 0x130 * 2;
-#endif
         DestroyEntity(self);
         break;
     }
