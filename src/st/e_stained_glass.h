@@ -153,7 +153,8 @@ Primitive* StainedGlassRecurseDepth(
         UV(tempPrim->u2) = uvValues[index2];
         UV(tempPrim->u3) = uvValues[index3];
 
-        if ((tempPrim->x1 >= 0) && (tempPrim->x0 <= 256)) {
+        // wide view: keep the pieces that reach into the margins
+        if ((tempPrim->x1 >= -WIDE_X) && (tempPrim->x0 <= 256 + WIDE_X)) {
             if (iterations == 1) {
                 dstPrimNext = dstPrim->next;
                 *dstPrim = *tempPrim;
@@ -193,7 +194,14 @@ void EntityStainedGlass(Entity* self) {
     switch (self->step) {
     case 0: // init
         InitializeEntity(g_EInitInteractable);
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 60);
+        // 12 panes, then at most 32 pieces and 18 light prims (50, while the
+        // 4:3 view drops the ones off screen, so 48 are enough there)
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(60, 62));
+#ifdef PLATFORM_PSYZ
+        if (primIndex == -1) {
+            primIndex = g_api.AllocPrimitives(PRIM_GT4, 60);
+        }
+#endif
         if (primIndex != -1) {
             self->flags |= FLAG_HAS_PRIMS;
             self->primIndex = primIndex;

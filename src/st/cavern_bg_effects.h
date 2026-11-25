@@ -504,11 +504,22 @@ void EntityBgColumnsParallax(Entity* self) {
     s32 posY;
     s32 posX;
     Primitive* prim;
+#ifdef PLATFORM_PSYZ
+    s32 i, repMin, repMax;
+#endif
 
     if (!self->step) {
         InitializeEntity(g_EInitInteractable);
         self->animSet = 0;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 10);
+        // wide view: the 4 columns repeat every 0x100 px, 4 per 0x100 px of
+        // the window (-20 - WIDE_X .. 0x100 + WIDE_X); 10 in 4:3
+        primIndex = g_api.AllocPrimitives(
+            PRIM_GT4, WIDE_POOL(10, 4 * ((276 + 2 * WIDE_X + 255) / 256) + 2));
+#ifdef PLATFORM_PSYZ
+        if (primIndex == -1) {
+            primIndex = g_api.AllocPrimitives(PRIM_GT4, 10); // 4:3 only
+        }
+#endif
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -538,6 +549,18 @@ void EntityBgColumnsParallax(Entity* self) {
     scrollY = g_Tilemap.scrollY.i.hi;
     if (scrollY < 0xB0) {
         scrollY /= 2;
+#ifdef PLATFORM_PSYZ
+        // wide view: the table is 4 columns, then the same 4 again 0x100 px
+        // further. Go through the copies that can reach the wide window
+        // (columns at 0x22..0xCE, scrollX 0..0xFF), left to right.
+        repMin = -((226 + WIDE_X) >> 8);
+        repMax = (476 + WIDE_X) >> 8;
+        for (i = 0; i < 4 * (repMax - repMin + 1) && !WIDE_NO_PRIM(prim); i++) {
+            ptr = (s16*)bg_columns_parallax_props + (i & 3) * 3;
+            posX = ptr[0] + (repMin + (i >> 2)) * 0x100;
+            posY = ptr[1];
+            flipXY = ptr[2];
+#else
 #ifdef FIX_UB
         // the original while loop does not prevent the function to read
         // outside the array boundaries
@@ -548,13 +571,14 @@ void EntityBgColumnsParallax(Entity* self) {
             posX = *ptr++;
             posY = *ptr++;
             flipXY = *ptr++;
+#endif
             posX -= scrollX;
             posY -= scrollY;
             posYBottom = posY + 0x7E;
-            if (posX < -20) {
+            if (posX < -20 - WIDE_X) {
                 continue;
             }
-            if (posX >= STAGE_WIDTH) {
+            if (posX >= STAGE_WIDTH + WIDE_X) {
                 break;
             }
             if (posYBottom >= 0 && posY < 0xE0) {

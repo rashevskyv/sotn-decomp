@@ -46,6 +46,70 @@ static void DebugInputWait(const char* msg) {
         DebugShowWaitInfo(msg);
 }
 
+#ifdef PLATFORM_PSYZ
+// Wide view. The far background is drawn with prims fixed to the 4:3 screen:
+// the mountains tile every 0x80 px, the clouds every 0x7F px and the fog every
+// 0x90 px. Extra prims cover the side margins. The prim count is fixed at the
+// spawn, so the margin of the spawn (WIDE_COLS, in 16 px) is kept in step_s.
+#define BG_ROWS 13
+// w = the margin in px; mountain tiles k = -1.. and 2.., cloud groups beyond
+// the 3 of the 4:3 view (they span -16..366)
+static s32 BgMtnL(s32 w) { return (w + 127) >> 7; }
+static s32 BgMtnR(s32 w) { return ((255 + w) >> 7) - 1; }
+static s32 BgCloudsL(s32 w) { return w > 13 ? (w - 13 + 126) / 127 : 0; }
+static s32 BgCloudsR(s32 w) {
+    return 256 + w > 363 ? (256 + w - 363 + 126) / 127 : 0;
+}
+// the prims of the background: the 4:3 ones, the extra cloud groups, then
+// the extra mountain tiles (they are set up as prim 2)
+static s32 BgTotal(s32 weather, s32 count, s32 q) {
+    s32 w = q * 16;
+    s32 n = count + BgMtnL(w) + BgMtnR(w);
+
+    if (weather != WEATHER_FOG) {
+        n += (BgCloudsL(w) + BgCloudsR(w)) * BG_ROWS;
+    }
+    return n;
+}
+
+// The fog grid has 9 rows. It has 4 columns of 0x90 px in the 4:3 view. A wide
+// view needs `lead` columns more on the left and more on the right.
+#define FOG_ROWS 9
+static s32 BgFogLead(s32 q) { return (q * 16 + 0x8F) / 0x90; }
+static s32 BgFogCols(s32 q) {
+    s32 cols = 1 + BgFogLead(q) + (256 + q * 16 + 0x8F) / 0x90;
+
+    return cols < 4 ? 4 : cols;
+}
+// a rain drop starts further out on both sides of the wide view
+static s32 BgRainX(void) {
+    s32 x = (rand() & 0xFF) - (rand() & 0x3F) - 0x10;
+
+    if (WIDE_X > 0) {
+        x += rand() % (2 * WIDE_X + 1) - WIDE_X;
+    }
+    return x;
+}
+#define BG_RAIN_X() BgRainX()
+#define BG_COUNT(q) BgTotal(weatherMode, aP->count, q)
+#define BG_MTN_EXTRA(i, q)                                                     \
+    ((i) >= BG_COUNT(q) - BgMtnL((q) * 16) - BgMtnR((q) * 16))
+#define BG_CASE(i, q) (BG_MTN_EXTRA(i, q) ? 2 : (i))
+#define FOG_COLS(self) BgFogCols((self)->step_s)
+#define FOG_ROW(i, self) ((i) / FOG_COLS(self))
+#define FOG_COL(i, self) ((i) % FOG_COLS(self))
+#define FOG_LEAD(self) BgFogLead((self)->step_s)
+#else
+#define BG_COUNT(q) (aP->count)
+#define BG_CASE(i, q) (i)
+#define BG_RAIN_X() ((rand() & 0xFF) - (rand() & 0x3F) - 0x10)
+#define FOG_ROW(i, self) ((i) >> 2)
+#define FOG_COL(i, self) ((i) & 3)
+#endif
+// the sky and the gradient run to the edges of the wide view
+#define BG_XL(q) WIDE_POOL(0, -(q) * 16)
+#define BG_XR(q) WIDE_POOL(0xFF, 0xFF + (q) * 16)
+
 void EntityFog(Entity* self) {
     Primitive* prim;
     AnimParam* aP;
@@ -54,6 +118,9 @@ void EntityFog(Entity* self) {
     s16 xMin, xMax;
     s32 i, j;
     s16 temp;
+#ifdef PLATFORM_PSYZ
+    s32 q, m, k;
+#endif
 
     aP = &animParams[weatherMode];
     if (self->step == 0) {
@@ -66,15 +133,25 @@ void EntityFog(Entity* self) {
         for (i = 0; i < LEN(D_us_801D6340); i++) {
             D_us_801D6340[i] = (i << 0xC) / 7;
         }
+#ifdef PLATFORM_PSYZ
+        q = WIDE_COLS;
+        self->primIndex = g_api.AllocPrimitives(PRIM_GT4, BG_COUNT(q));
+        if (self->primIndex == -1 && q) {
+            q = 0; // no room for the margins: the 4:3 view only
+            self->primIndex = g_api.AllocPrimitives(PRIM_GT4, aP->count);
+        }
+        self->step_s = q;
+#else
         self->primIndex = g_api.AllocPrimitives(PRIM_GT4, aP->count);
+#endif
         if (self->primIndex == -1) {
             DestroyEntity(self);
             return;
         }
         self->flags |= FLAG_HAS_PRIMS;
         prim = &g_PrimBuf[self->primIndex];
-        for (i = 0, j = 0; i < aP->count; i++) {
-            switch (i) {
+        for (i = 0, j = 0; i < BG_COUNT(q); i++) {
+            switch (BG_CASE(i, q)) {
             case 0:
                 if (weatherMode == WEATHER_CLEAR) {
                     prim->y0 = 0xE3;
@@ -93,8 +170,8 @@ void EntityFog(Entity* self) {
                     prim->v0 = 0xD9;
                     prim->v2 = 0xFE;
                 }
-                prim->x0 = prim->x2 = 0;
-                prim->x1 = prim->x3 = 0xFF;
+                prim->x0 = prim->x2 = BG_XL(q);
+                prim->x1 = prim->x3 = BG_XR(q);
                 prim->priority = 0x40;
                 prim->drawMode = DRAW_DEFAULT;
                 prim->tpage = 0xE;
@@ -107,8 +184,8 @@ void EntityFog(Entity* self) {
                 prim->y2 = 0x3E;
                 prim->type = PRIM_G4;
                 prim->priority = 0x40;
-                prim->x0 = prim->x2 = 0;
-                prim->x1 = prim->x3 = 0xFF;
+                prim->x0 = prim->x2 = BG_XL(q);
+                prim->x1 = prim->x3 = BG_XR(q);
                 prim->drawMode = DRAW_COLORS;
                 if (weatherMode == WEATHER_CLEAR) {
                     prim->drawMode = DRAW_HIDE;
@@ -128,6 +205,13 @@ void EntityFog(Entity* self) {
                 if (i == 2) {
                     prim->x0 = prim->x2 = 0;
                     prim->x1 = prim->x3 = 0x80;
+#ifdef PLATFORM_PSYZ
+                } else if (i != 3) { // an extra tile, left or right
+                    m = i - (BG_COUNT(q) - BgMtnL(q * 16) - BgMtnR(q * 16));
+                    k = m < BgMtnL(q * 16) ? -1 - m : 2 + m - BgMtnL(q * 16);
+                    prim->x0 = prim->x2 = k * 0x80;
+                    prim->x1 = prim->x3 = k * 0x80 + 0x80;
+#endif
                 } else {
                     prim->x0 = prim->x2 = 0x80;
                     prim->x1 = prim->x3 = 0xFF;
@@ -179,6 +263,9 @@ void EntityFog(Entity* self) {
     }
     g_api.UpdateAnim(NULL, NULL);
 
+#ifdef PLATFORM_PSYZ
+    q = self->step_s;
+#endif
     prim = &g_PrimBuf[self->primIndex];
     for (i = 0; i < 5; i++) {
         if (i == 2 || i == 3) {
@@ -214,6 +301,34 @@ void EntityFog(Entity* self) {
             prim = prim->next;
         }
     }
+#ifdef PLATFORM_PSYZ
+    // prim is now the first of the extra prims (after the 4:3 ones)
+    if (weatherMode != WEATHER_FOG) {
+        // extra cloud groups: nL to the left, then nR to the right
+        s32 nL = BgCloudsL(q * 16), nR = BgCloudsR(q * 16);
+
+        for (m = 0; m < nL + nR; m++) {
+            if (m < nL) {
+                xOffset = -0x10 - (m + 1) * 0x7F;
+            } else {
+                xOffset = 0xEE + (m - nL + 1) * 0x7F;
+            }
+            for (k = 0; k < BG_ROWS; k++, prim = prim->next) {
+                prim->u0 = prim->u2 = 0x80;
+                prim->u1 = prim->u3 = 0xFF;
+                prim->x0 = D_us_801D635C[k] + xOffset;
+                prim->x2 = D_us_801D635C[k + 1] + xOffset;
+                prim->x1 = prim->x0 + 0x80;
+                prim->x3 = prim->x2 + 0x80;
+            }
+        }
+    }
+    // extra mountain tiles
+    for (m = BgMtnL(q * 16) + BgMtnR(q * 16); m > 0; m--) {
+        prim->clut = self->animCurFrame & 0xFF;
+        prim = prim->next;
+    }
+#endif
     g_GpuBuffers[0].draw.r0 = aP->color.r;
     g_GpuBuffers[0].draw.g0 = aP->color.g;
     g_GpuBuffers[0].draw.b0 = aP->color.b;
@@ -260,7 +375,15 @@ void EntityRain(Entity* self) {
             InitializeEntity(g_EInitSpawner);
             if (weatherMode == WEATHER_RAIN) {
                 g_api.PlaySfx(SFX_RAIN_LOOP);
-                self->primIndex = g_api.func_800EDB58(PRIM_LINE_G2_ALT, 0x80);
+                self->primIndex = g_api.func_800EDB58(
+                    PRIM_LINE_G2_ALT,
+                    WIDE_POOL(0x80, 0x80 + MIN(WIDE_X, 0x80)));
+#ifdef PLATFORM_PSYZ
+                if (self->primIndex == -1) { // the 4:3 count of drops
+                    self->primIndex =
+                        g_api.func_800EDB58(PRIM_LINE_G2_ALT, 0x80);
+                }
+#endif
                 if (self->primIndex == -1) {
                     DestroyEntity(self);
                     return;
@@ -276,8 +399,7 @@ void EntityRain(Entity* self) {
                     PrimLine(prim)->b0 = 0x4F;
                     PrimLine(prim)->r1 = PrimLine(prim)->g1 =
                         PrimLine(prim)->b1 = 0x4F;
-                    PrimLine(prim)->x0 =
-                        (rand() & 0xFF) - (rand() & 0x3F) - 0x10;
+                    PrimLine(prim)->x0 = BG_RAIN_X();
                     PrimLine(prim)->y0 = rand() & 0xFF;
                     PrimLine(prim)->xLength = -xLen;
                     PrimLine(prim)->yLength = -yLen;
@@ -299,7 +421,17 @@ void EntityRain(Entity* self) {
                 }
             }
             if (weatherMode == WEATHER_FOG) {
+#ifdef PLATFORM_PSYZ
+                self->step_s = WIDE_COLS;
+                self->primIndex =
+                    g_api.AllocPrimitives(PRIM_GT4, FOG_ROWS * FOG_COLS(self));
+                if (self->primIndex == -1) { // the 4:3 grid
+                    self->step_s = 0;
+                    self->primIndex = g_api.AllocPrimitives(PRIM_GT4, 0x24);
+                }
+#else
                 self->primIndex = g_api.AllocPrimitives(PRIM_GT4, 0x24);
+#endif
                 if (self->primIndex == -1) {
                     DestroyEntity(self);
                     return;
@@ -310,10 +442,18 @@ void EntityRain(Entity* self) {
                 D_us_801D6334[1] = D_us_801D6328[3] = ROT(360 * 0.4);
                 D_us_801D6334[2] = D_us_801D6328[4] = ROT(360 * 0.2);
                 i = 0;
+#ifdef PLATFORM_PSYZ
+                posX =
+                    -(g_Tilemap.scrollX.i.hi * 5) / 4 - FOG_LEAD(self) * 0x90;
+                while (posX < -0x90 - FOG_LEAD(self) * 0x90) {
+                    posX += 0x90;
+                }
+#else
                 posX = -(g_Tilemap.scrollX.i.hi * 5) / 4;
                 while (posX < -0x90) {
                     posX += 0x90;
                 }
+#endif
 
                 posY = -(g_Tilemap.scrollY.i.hi * 5) / 4;
                 while (posY < -0x14A) {
@@ -323,20 +463,24 @@ void EntityRain(Entity* self) {
                 prim = &g_PrimBuf[self->primIndex];
 
                 while (prim != NULL) {
-                    x0 = (rsin(D_us_801D6328[((i >> 2) + 0) % 5]) >> 9) - 8 +
-                         posX;
-                    x1 = (rsin(D_us_801D6328[((i >> 2) + 1) % 5]) >> 9) - 8 +
-                         posX;
-                    y0 = (rcos(D_us_801D6334[((i >> 2) + 0) % 5]) >> 10) - 8 +
-                         posY;
-                    y1 = (rcos(D_us_801D6334[((i >> 2) + 1) % 5]) >> 10) - 8 +
-                         posY;
-                    prim->x0 = ((i & 3) * 0x90) + x0;
-                    prim->x2 = ((i & 3) * 0x90) + x1;
+                    x0 = (rsin(D_us_801D6328[(FOG_ROW(i, self) + 0) % 5]) >>
+                          9) -
+                         8 + posX;
+                    x1 = (rsin(D_us_801D6328[(FOG_ROW(i, self) + 1) % 5]) >>
+                          9) -
+                         8 + posX;
+                    y0 = (rcos(D_us_801D6334[(FOG_ROW(i, self) + 0) % 5]) >>
+                          10) -
+                         8 + posY;
+                    y1 = (rcos(D_us_801D6334[(FOG_ROW(i, self) + 1) % 5]) >>
+                          10) -
+                         8 + posY;
+                    prim->x0 = (FOG_COL(i, self) * 0x90) + x0;
+                    prim->x2 = (FOG_COL(i, self) * 0x90) + x1;
                     prim->x1 = prim->x0 + 0x90;
                     prim->x3 = prim->x2 + 0x90;
-                    prim->y1 = prim->y0 = ((i >> 2) * 0x42) + y0;
-                    prim->y3 = prim->y2 = ((i >> 2) * 0x42 + 0x42) + y1;
+                    prim->y1 = prim->y0 = (FOG_ROW(i, self) * 0x42) + y0;
+                    prim->y3 = prim->y2 = (FOG_ROW(i, self) * 0x42 + 0x42) + y1;
                     prim->u0 = prim->u2 = 0x7E;
                     prim->v0 = prim->v1 = 0x78;
                     prim->u1 = prim->u3 = 2;
@@ -376,8 +520,7 @@ void EntityRain(Entity* self) {
                     PrimLine(prim)->drawMode = DRAW_COLORS;
                     if (PrimLine(prim)->y0 < 0) {
                         PrimLine(prim)->drawMode = DRAW_HIDE;
-                        PrimLine(prim)->x0 =
-                            (rand() & 0xFF) - (rand() & 0x3F) - 0x10;
+                        PrimLine(prim)->x0 = BG_RAIN_X();
                         PrimLine(prim)->y0 += 0x120;
                         PrimLine(prim)->xLength = -xLen;
                         PrimLine(prim)->yLength = -yLen;
@@ -401,10 +544,17 @@ void EntityRain(Entity* self) {
                 D_us_801D6328[i] += 16;
                 D_us_801D6334[i] += 16;
             }
+#ifdef PLATFORM_PSYZ
+            posX = -(g_Tilemap.scrollX.i.hi * 5) / 4 - FOG_LEAD(self) * 0x90;
+            while (posX < -0x90 - FOG_LEAD(self) * 0x90) {
+                posX += 0x90;
+            }
+#else
             posX = -(g_Tilemap.scrollX.i.hi * 5) / 4;
             while (posX < -0x90) {
                 posX += 0x90;
             }
+#endif
             posY = -(g_Tilemap.scrollY.i.hi * 5) / 4;
             while (posY < -0x14A) {
                 posY += 0x14A;
@@ -412,18 +562,18 @@ void EntityRain(Entity* self) {
             i = 0;
             prim = &g_PrimBuf[self->primIndex];
             while (prim != NULL) {
-                angle = ((i >> 2) + 0) % 5;
+                angle = (FOG_ROW(i, self) + 0) % 5;
                 x0 = (rsin(D_us_801D6328[angle]) >> 9) - 8 + posX;
                 y0 = (rcos(D_us_801D6334[angle]) >> 10) - 8 + posY;
-                angle = ((i >> 2) + 1) % 5;
+                angle = (FOG_ROW(i, self) + 1) % 5;
                 x1 = (rsin(D_us_801D6328[angle]) >> 9) - 8 + posX;
                 y1 = (rcos(D_us_801D6334[angle]) >> 10) - 8 + posY;
-                prim->x0 = ((i & 3) * 0x90) + x0;
-                prim->x2 = ((i & 3) * 0x90) + x1;
+                prim->x0 = (FOG_COL(i, self) * 0x90) + x0;
+                prim->x2 = (FOG_COL(i, self) * 0x90) + x1;
                 prim->x1 = prim->x0 + 0x90;
                 prim->x3 = prim->x2 + 0x90;
-                prim->y1 = prim->y0 = ((i >> 2) * 0x42) + y0;
-                prim->y3 = prim->y2 = ((i >> 2) * 0x42 + 0x42) + y1;
+                prim->y1 = prim->y0 = (FOG_ROW(i, self) * 0x42) + y0;
+                prim->y3 = prim->y2 = (FOG_ROW(i, self) * 0x42 + 0x42) + y1;
                 i++;
                 prim = prim->next;
             }

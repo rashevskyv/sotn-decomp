@@ -6,6 +6,12 @@ static u8 D_us_80180FB0[] = {
 };
 extern EInit g_EInitInteractable;
 
+// Wide view: the grid is 3 columns of 128 px, starting in -128..-1. It gets
+// GEARS_LEAD() columns more on the left and (WIDE_X + 127) >> 7 more on the
+// right, to reach -WIDE_X and 0x100 + WIDE_X. 3 columns on PS1 and in 4:3.
+#define GEARS_LEAD() ((WIDE_X + 126) >> 7)
+#define GEARS_COLS() (3 + GEARS_LEAD() + ((WIDE_X + 127) >> 7))
+
 void EntityBackgroundGears(Entity* self) {
     Primitive* prim;
     s32 primIndex;
@@ -14,6 +20,12 @@ void EntityBackgroundGears(Entity* self) {
     s32 posY;
     s32 u;
     s32 v;
+#ifdef PLATFORM_PSYZ
+    s32 cols, lead;
+#else
+#define cols 3
+#define lead 0
+#endif
 
     switch (self->step) {
     case 0:
@@ -22,7 +34,15 @@ void EntityBackgroundGears(Entity* self) {
         self->posX.i.hi = 0;
         self->posY.i.hi = 0;
         self->unk68 = 0x80;
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 9);
+        primIndex =
+            g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(9, 3 * GEARS_COLS()));
+#ifdef PLATFORM_PSYZ
+        self->step_s = GEARS_COLS(); // the columns, as spawned
+        if (primIndex == -1) {
+            self->step_s = 3; // 4:3 only
+            primIndex = g_api.AllocPrimitives(PRIM_GT4, 9);
+        }
+#endif
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -59,8 +79,12 @@ void EntityBackgroundGears(Entity* self) {
         }
 
         prim = self->ext.prim;
+#ifdef PLATFORM_PSYZ
+        cols = self->step_s;
+        lead = (cols - 3) / 2; // GEARS_COLS() is 3 + 2 * lead (+ 1)
+#endif
         for (i = 0; i < 3; i++) {
-            for (j = 0; j < 3; j++) {
+            for (j = -lead; j < cols - lead; j++) {
                 prim->x0 = prim->x2 = posX + (j * 128);
                 prim->x1 = prim->x3 = posX + (j * 128) + 128;
                 prim->y0 = prim->y1 = posY + (i * 128);
@@ -80,3 +104,6 @@ void EntityBackgroundGears(Entity* self) {
         break;
     }
 }
+
+#undef cols
+#undef lead
