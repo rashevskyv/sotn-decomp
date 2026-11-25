@@ -5,9 +5,10 @@ title_logo no English HD redraw yet: English shows the 1x stock picture
 press_start no English HD redraw yet: English shows the 1x stock picture
 loading_text no English HD redraw yet: English shows the 1x stock picture
 loading_logo no English HD redraw yet: English shows the 1x stock picture
-gameover_uk no English HD redraw yet: English shows the 1x stock picture
-gameover_uk_169 no English HD redraw yet: English shows the 1x stock picture
-gameover_letters no English HD redraw yet: English shows the 1x stock picture
+gameover_uk different names by design: uk gameover_uk, en gameover_en (same rect 640,0; the stock pictures differ)
+gameover_uk_169 different names by design: uk gameover_uk_169, en gameover_en_169 (same rect 640,0)
+gameover_en different names by design: uk gameover_uk, en gameover_en (same rect 640,0; the stock pictures differ)
+gameover_en_169 different names by design: uk gameover_uk_169, en gameover_en_169 (same rect 640,0)
 prologue_title no English HD redraw yet: English shows the 1x stock picture
 gothic_uk different sheets by design: uk gothic_uk, en gothic_digits (same rect 832,256)
 gothic_digits different sheets by design: uk gothic_uk, en gothic_digits (same rect 832,256)
