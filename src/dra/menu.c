@@ -83,9 +83,9 @@ extern s32 g_PrevEquippedWeapons[2];
 // The Equip windows are 384 wide while the Pocket is on (the frame is 384, so
 // the menu keeps its scale at 1920x1080): its block starts after the stock
 // hand count "(NN)" (x 224..256). The count is right-aligned at the window
-// edge (units digit at x 376, "99" ends at 384); a longer name scrolls.
+// edge (units digit at x 375, "99" ends at 383); a longer name scrolls.
 #define POCKET_X 256
-#define POCKET_COUNT_X 376
+#define POCKET_COUNT_X 375
 #define EQUIP_WIN_W 384
 #define EQ_TEXT_Y(r) (30 + (r) * 13)
 #define EQ_ICON_Y(r) (0x1A + (r) * 13)

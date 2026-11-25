@@ -976,10 +976,10 @@ static int MainLineOf(int item) {
     int e = EditorRow();
     return e >= 0 && item > e ? item + 1 : item;
 }
-// the main page scrolls: MAIN_LINES on screen (with the hint and one or two
-// help lines, Box centres them together, they fit the stage rows 20..226),
-// the first is main_top
-#define MAIN_LINES 12
+// the main page scrolls: MAIN_LINES on screen (with the hint and two help
+// lines, which Box reserves on this page, they fit the stage rows 20..226 up
+// to 11 lines), the first is main_top
+#define MAIN_LINES 11
 static int main_top;
 static int MainVis(void) { return MIN(MAIN_LINES, MainLines()); }
 
@@ -2216,8 +2216,9 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
             hl[1][n - k - 1] = end;
             hl[0][k] = end;
         }
-        help_h = Len(hl[1]) ? LINE_H : 0;
     }
+    // reserved per page, not per row: the box must not move with the row
+    help_h = page == PAGE_MAIN || page == PAGE_CHEATS ? LINE_H : 0;
     x = box_left ? box_x : (FbW() - w) / 2;
     y = box_left ? box_y : (FbH() - h - help_h) / 2;
     box_x = x;
