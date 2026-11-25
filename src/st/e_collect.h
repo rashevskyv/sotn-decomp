@@ -947,8 +947,8 @@ void EntityEquipItemDrop(Entity* self) {
         }
         BottomCornerText(name, true);
 #ifdef PLATFORM_PSYZ
-        // the port: the "Obtained" text stays 3x longer (stock 0x130)
-        g_unkGraphicsStruct.BottomCornerTextTimer = 0x130 * 3;
+        // the port: the "Obtained" text stays about 10 s (stock 0x130, ~5 s; owner)
+        g_unkGraphicsStruct.BottomCornerTextTimer = 0x130 * 2;
 #endif
         DestroyEntity(self);
         break;
