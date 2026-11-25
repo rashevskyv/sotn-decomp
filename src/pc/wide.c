@@ -722,7 +722,11 @@ void Wide_OnFrame(void) {
            (g_GameState == Game_Play ||
             (g_GameState == Game_GameOver &&
              (g_GameStep < Gameover_6 || g_GameStep >= Gameover_Alt)));
-    if (stage_clip > 0) {
+    // a pause (port menu, level up: Engine_5) runs no stage camera, so the
+    // clip of the last frame stays: it must not count down to the PS1 clip
+    if (stage_clip > 0 &&
+        !(g_GameState == Game_Play &&
+          (PortMenu_IsOpen() || g_GameEngineStep == Engine_5))) {
         stage_clip--;
     }
     if (d.w <= 0 || d.h <= 0 ||
