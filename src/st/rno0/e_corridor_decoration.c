@@ -16,11 +16,16 @@ void EntityBackgroundPillar(Entity* self);
 #define PILLAR_COUNT WIDE_POOL(4, 12)
 #define PILLAR_PERIOD (PILLAR_COUNT * 0x60)
 #define PILLAR_EDGE WIDE_POOL(0, 0x160)
+// the back wall strips (0x1E px) start 12 strips left of the 4:3 start
+// (-0x10), so the seams keep their 4:3 phase
+#define PILLAR_BG_START WIDE_POOL(-0x10, -0x10 - 12 * 0x1E)
 
 void EntityCorridorDecorator(Entity* self) {
     Entity* pillar;
     s16 i;
+#ifdef PLATFORM_PSYZ
     s16 k;
+#endif
     Primitive* prim;
     s32 primIndex;
 
@@ -37,7 +42,7 @@ void EntityCorridorDecorator(Entity* self) {
         self->primIndex = primIndex;
         prim = &g_PrimBuf[primIndex];
         self->flags |= FLAG_HAS_PRIMS;
-        for (i = -0x10 - PILLAR_EDGE; prim != NULL; i += 0x1E) {
+        for (i = PILLAR_BG_START; prim != NULL; i += 0x1E) {
             prim->tpage = 0xF;
             prim->clut = 0x2A;
             prim->u0 = prim->u2 = 0xE0;
@@ -54,7 +59,6 @@ void EntityCorridorDecorator(Entity* self) {
         }
     }
 
-    pillar = self + 1;
 #ifdef PLATFORM_PSYZ
     // this spawner can run again in the same room: drop the old extra pillars
     for (pillar = &g_Entities[192]; pillar < &g_Entities[224]; pillar++) {
@@ -63,20 +67,17 @@ void EntityCorridorDecorator(Entity* self) {
         }
     }
     pillar = self + 1;
-#endif
     for (k = 0; k < PILLAR_COUNT; k++) {
         i = -0x10 + k * 0x60;
         if (i > 0x140 + PILLAR_EDGE) {
             i -= PILLAR_PERIOD;
         }
-#ifdef PLATFORM_PSYZ
         if (k >= 4) {
             pillar = AllocEntity(&g_Entities[192], &g_Entities[224]);
             if (pillar == NULL) {
                 break;
             }
         }
-#endif
         DestroyEntity(pillar);
         pillar->entityId = E_BG_PILLAR;
         pillar->pfnUpdate = EntityBackgroundPillar;
@@ -84,6 +85,15 @@ void EntityCorridorDecorator(Entity* self) {
         pillar->posX.i.hi = i;
         pillar++;
     }
+#else
+    for (pillar = self + 1, i = -0x10; i < 0x130; pillar++, i += 0x60) {
+        DestroyEntity(pillar);
+        pillar->entityId = E_BG_PILLAR;
+        pillar->pfnUpdate = EntityBackgroundPillar;
+        pillar->posY.i.hi = 0x6A;
+        pillar->posX.i.hi = i;
+    }
+#endif
 }
 
 void EntityBackgroundPillar(Entity* self) {

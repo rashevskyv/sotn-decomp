@@ -14,11 +14,16 @@ void func_us_801CC8F8(Entity*);
 #define COL_COUNT WIDE_POOL(4, 12)
 #define COL_PERIOD (COL_COUNT * 0x60)
 #define COL_EDGE WIDE_POOL(0, 0x160)
+// the back wall strips (0x1E px) start 12 strips left of the 4:3 start
+// (-0x10), so the seams keep their 4:3 phase
+#define COL_BG_START WIDE_POOL(-0x10, -0x10 - 12 * 0x1E)
 
 void func_us_801CC750(Entity* self) {
     Entity* entityPtr;
     s16 i;
+#ifdef PLATFORM_PSYZ
     s16 k;
+#endif
     Primitive* prim;
     s32 primIndex;
 
@@ -32,7 +37,7 @@ void func_us_801CC750(Entity* self) {
         self->primIndex = primIndex;
         prim = &g_PrimBuf[primIndex];
         self->flags |= FLAG_HAS_PRIMS;
-        for (i = -0x10 - COL_EDGE; prim != NULL; i += 0x1E) {
+        for (i = COL_BG_START; prim != NULL; i += 0x1E) {
             prim->tpage = 0xF;
             prim->clut = 0x2A;
             prim->u0 = prim->u2 = 0xC0;
@@ -60,20 +65,17 @@ void func_us_801CC750(Entity* self) {
         }
     }
     entityPtr = self + 1;
-#endif
     for (k = 0; k < COL_COUNT; k++) {
         i = -0x10 + k * 0x60;
         if (i > 0x140 + COL_EDGE) {
             i -= COL_PERIOD;
         }
-#ifdef PLATFORM_PSYZ
         if (k >= 4) {
             entityPtr = AllocEntity(&g_Entities[192], &g_Entities[224]);
             if (entityPtr == NULL) {
                 break;
             }
         }
-#endif
         DestroyEntity(entityPtr);
         entityPtr->entityId = E_ID_16;
         entityPtr->pfnUpdate = func_us_801CC8F8;
@@ -81,6 +83,16 @@ void func_us_801CC750(Entity* self) {
         entityPtr->posX.i.hi = i;
         entityPtr++;
     }
+#else
+    for (i = -0x10; i < 0x130; i += 0x60) {
+        DestroyEntity(entityPtr);
+        entityPtr->entityId = E_ID_16;
+        entityPtr->pfnUpdate = func_us_801CC8F8;
+        entityPtr->posY.i.hi = 0x8E;
+        entityPtr->posX.i.hi = i;
+        entityPtr++;
+    }
+#endif
 }
 
 void func_us_801CC8F8(Entity* self) {

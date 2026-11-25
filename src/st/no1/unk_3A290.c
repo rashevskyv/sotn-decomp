@@ -426,7 +426,10 @@ void func_us_801BA290(Entity* self) {
         LOW(prim->r2) = LOW(prim->r0);
         LOW(prim->r3) = LOW(prim->r0);
         if (prim->r0 > 0xF0) {
+#ifndef PLATFORM_PSYZ
+            // the port keeps the G4: a tile is 255 px and not wide enough
             prim->type = PRIM_TILE;
+#endif
             self->ext.et_801BA290.unkA4 = 1;
             g_Tilemap.flags ^= 1;
             prim = self->ext.et_801BA290.unkAC;

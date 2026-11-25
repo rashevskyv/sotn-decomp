@@ -79,7 +79,7 @@ static void BgMountain(Primitive* prim, s32 k, s32 xMin, s32 xMax) {
 #define FOG_ROWS 9
 static s32 BgFogLead(s32 q) { return (q * 16 + 0x8F) / 0x90; }
 static s32 BgFogCols(s32 q) {
-    s32 cols = 1 + BgFogLead(q) + (256 + q * 16 + 0x8F) / 0x90;
+    s32 cols = 1 + BgFogLead(q) + (256 + q * 16 + 0x8F + 0x10) / 0x90;
 
     return cols < 4 ? 4 : cols;
 }
@@ -93,13 +93,23 @@ static s32 BgRainX(void) {
     return x;
 }
 #define BG_RAIN_X() BgRainX()
+// the prim count of the background (the 4:3 count plus the margins) and the
+// extra mountain prims at its end (they are set up as prim 2)
+#define BG_COUNT(q) BgTotal(D_us_80180EEC, animParams->count, q)
+#define BG_MTN_EXTRA(i, q)                                                     \
+    ((i) >= BG_COUNT(q) - BgMtnL((q) * 16) - BgMtnR((q) * 16))
+#define BG_CASE(i, q) (BG_MTN_EXTRA(i, q) ? 2 : (i))
 #define FOG_COLS(self) BgFogCols((self)->step_s)
+#define FOG_ROW(i, self) ((i) / FOG_COLS(self))
+#define FOG_COL(i, self) ((i) % FOG_COLS(self))
 #define FOG_LEAD(self) BgFogLead((self)->step_s)
 #else
-#define BgTotal(weather, count, q) (count)
+#define BG_COUNT(q) (animParams->count)
+#define BG_CASE(i, q) (i)
+#define BG_MTN_EXTRA(i, q) 0
 #define BG_RAIN_X() ((rand() & 0xFF) + (rand() & 0x3F) + 0x10)
-#define FOG_COLS(self) 4
-#define FOG_LEAD(self) 0
+#define FOG_ROW(i, self) ((i) >> 2)
+#define FOG_COL(i, self) ((i) & 3)
 #endif
 
 void func_us_801B6490(Entity* self) {
@@ -110,7 +120,9 @@ void func_us_801B6490(Entity* self) {
     s16 xMin, xMax;
     s32 i, j;
     s16 temp;
-    s32 total, q;
+#ifdef PLATFORM_PSYZ
+    s32 q;
+#endif
 
     x0 = D_us_80180ED4[self->params * 2 + 0] - g_Tilemap.scrollX.i.hi;
     x1 = D_us_80180ED4[self->params * 2 + 1] - g_Tilemap.scrollX.i.hi;
@@ -140,7 +152,7 @@ void func_us_801B6490(Entity* self) {
         if (x1 < -WIDE_X) {
             x1 = -WIDE_X;
         }
-        if (x0 >= 0x100 + WIDE_X && x1 < 0xE0) {
+        if (x0 >= 0x100 + WIDE_X && x1 < 0xE0 + WIDE_X) {
             xMax = x1 + 0x20;
         }
     } else {
@@ -163,16 +175,17 @@ void func_us_801B6490(Entity* self) {
         for (i = 0; i < LEN(D_us_801D6340); i++) {
             D_us_801D6340[i] = (i << 0xC) / 7;
         }
-        q = WIDE_COLS;
-        self->primIndex = g_api.AllocPrimitives(
-            PRIM_GT4, BgTotal(D_us_80180EEC, animParams->count, q));
 #ifdef PLATFORM_PSYZ
+        q = WIDE_COLS;
+        self->primIndex = g_api.AllocPrimitives(PRIM_GT4, BG_COUNT(q));
         if (self->primIndex == -1 && q) {
             q = 0; // no room for the margins: the 4:3 view only
             self->primIndex =
                 g_api.AllocPrimitives(PRIM_GT4, animParams->count);
         }
         self->step_s = q;
+#else
+        self->primIndex = g_api.AllocPrimitives(PRIM_GT4, animParams->count);
 #endif
         if (self->primIndex == -1) {
             DestroyEntity(self);
@@ -180,10 +193,8 @@ void func_us_801B6490(Entity* self) {
         }
         self->flags |= FLAG_HAS_PRIMS;
         prim = &g_PrimBuf[self->primIndex];
-        total = BgTotal(D_us_80180EEC, animParams->count, q);
-        for (i = 0, j = 0; i < total; i++) {
-            switch (WIDE_POOL(
-                i, i >= total - BgMtnL(q * 16) - BgMtnR(q * 16) ? 2 : i)) {
+        for (i = 0, j = 0; i < BG_COUNT(q); i++) {
+            switch (BG_CASE(i, q)) {
             case 0:
                 if (D_us_80180EEC == 1) {
                     prim->y0 = 0x14;
@@ -261,12 +272,12 @@ void func_us_801B6490(Entity* self) {
     }
     g_api.UpdateAnim(NULL, NULL);
 
-    q = WIDE_POOL(0, self->step_s);
-    total = BgTotal(D_us_80180EEC, animParams->count, q);
+#ifdef PLATFORM_PSYZ
+    q = self->step_s;
+#endif
     prim = &g_PrimBuf[self->primIndex];
-    for (i = 0; i < total; i++) {
-        if (i == 2 || i == 3 ||
-            WIDE_POOL(0, i >= total - BgMtnL(q * 16) - BgMtnR(q * 16))) {
+    for (i = 0; i < BG_COUNT(q); i++) {
+        if (i == 2 || i == 3 || BG_MTN_EXTRA(i, q)) {
             prim->clut = self->animCurFrame & 0xFF;
         }
         prim->drawMode = DRAW_HIDE;
@@ -589,7 +600,7 @@ void func_us_801B7188(Entity* self) {
             if (x1 < -WIDE_X) {
                 x1 = -WIDE_X;
             }
-            if (x0 >= 0x100 + WIDE_X && x1 < 0xE0) {
+            if (x0 >= 0x100 + WIDE_X && x1 < 0xE0 + WIDE_X) {
                 xMax = x1 + 0x20;
             }
         } else {
@@ -614,7 +625,8 @@ void func_us_801B7188(Entity* self) {
             if (D_us_80180EEC == 0) {
                 g_api.PlaySfx(SFX_RAIN_LOOP);
                 self->primIndex = g_api.func_800EDB58(
-                    PRIM_LINE_G2_ALT, WIDE_POOL(0x80, 0x80 + WIDE_X));
+                    PRIM_LINE_G2_ALT,
+                    WIDE_POOL(0x80, 0x80 + MIN(WIDE_X, 0x80)));
 #ifdef PLATFORM_PSYZ
                 if (self->primIndex == -1) { // the 4:3 count of drops
                     self->primIndex =
@@ -679,11 +691,18 @@ void func_us_801B7188(Entity* self) {
                 D_us_801D6334[1] = D_us_801D6328[3] = 0x666;
                 D_us_801D6334[2] = D_us_801D6328[4] = 0x333;
                 i = 0;
+#ifdef PLATFORM_PSYZ
                 posX =
                     -(g_Tilemap.scrollX.i.hi * 5) / 4 - FOG_LEAD(self) * 0x90;
                 while (posX < -0x90 - FOG_LEAD(self) * 0x90) {
                     posX += 0x90;
                 }
+#else
+                posX = -(g_Tilemap.scrollX.i.hi * 5) / 4;
+                while (posX < -0x90) {
+                    posX += 0x90;
+                }
+#endif
 
                 posY = -(g_Tilemap.scrollY.i.hi * 5) / 4;
                 while (posY < -0x14A) {
@@ -693,25 +712,24 @@ void func_us_801B7188(Entity* self) {
                 prim = &g_PrimBuf[self->primIndex];
 
                 while (prim != NULL) {
-                    x0 = (rsin(D_us_801D6328[((i / FOG_COLS(self)) + 0) % 5]) >>
-                          9) -
-                         8 + posX;
-                    x1 = (rsin(D_us_801D6328[((i / FOG_COLS(self)) + 1) % 5]) >>
-                          9) -
-                         8 + posX;
-                    y0 = (rcos(D_us_801D6334[((i / FOG_COLS(self)) + 0) % 5]) >>
+                    x0 =
+                        (rsin(D_us_801D6328[(FOG_ROW(i, self) + 0) % 5]) >> 9) -
+                        8 + posX;
+                    x1 =
+                        (rsin(D_us_801D6328[(FOG_ROW(i, self) + 1) % 5]) >> 9) -
+                        8 + posX;
+                    y0 = (rcos(D_us_801D6334[(FOG_ROW(i, self) + 0) % 5]) >>
                           10) -
                          8 + posY;
-                    y1 = (rcos(D_us_801D6334[((i / FOG_COLS(self)) + 1) % 5]) >>
+                    y1 = (rcos(D_us_801D6334[(FOG_ROW(i, self) + 1) % 5]) >>
                           10) -
                          8 + posY;
-                    prim->x0 = ((i % FOG_COLS(self)) * 0x90) + x0;
-                    prim->x2 = ((i % FOG_COLS(self)) * 0x90) + x1;
+                    prim->x0 = (FOG_COL(i, self) * 0x90) + x0;
+                    prim->x2 = (FOG_COL(i, self) * 0x90) + x1;
                     prim->x1 = prim->x0 + 0x90;
                     prim->x3 = prim->x2 + 0x90;
-                    prim->y1 = prim->y0 = ((i / FOG_COLS(self)) * 0x42) + y0;
-                    prim->y3 = prim->y2 =
-                        ((i / FOG_COLS(self)) * 0x42 + 0x42) + y1;
+                    prim->y1 = prim->y0 = (FOG_ROW(i, self) * 0x42) + y0;
+                    prim->y3 = prim->y2 = (FOG_ROW(i, self) * 0x42 + 0x42) + y1;
                     prim->u0 = prim->u2 = 2;
                     prim->v0 = prim->v1 = 0x39;
                     prim->u1 = prim->u3 = 0x7E;
@@ -792,18 +810,18 @@ void func_us_801B7188(Entity* self) {
             i = 0;
             prim = &g_PrimBuf[self->primIndex];
             while (prim != NULL) {
-                angle = ((i / FOG_COLS(self)) + 0) % 5;
+                angle = (FOG_ROW(i, self) + 0) % 5;
                 x0 = (rsin(D_us_801D6328[angle]) >> 9) - 8 + posX;
                 y0 = (rcos(D_us_801D6334[angle]) >> 10) - 8 + posY;
-                angle = ((i / FOG_COLS(self)) + 1) % 5;
+                angle = (FOG_ROW(i, self) + 1) % 5;
                 x1 = (rsin(D_us_801D6328[angle]) >> 9) - 8 + posX;
                 y1 = (rcos(D_us_801D6334[angle]) >> 10) - 8 + posY;
-                prim->x0 = ((i % FOG_COLS(self)) * 0x90) + x0;
-                prim->x2 = ((i % FOG_COLS(self)) * 0x90) + x1;
+                prim->x0 = (FOG_COL(i, self) * 0x90) + x0;
+                prim->x2 = (FOG_COL(i, self) * 0x90) + x1;
                 prim->x1 = prim->x0 + 0x90;
                 prim->x3 = prim->x2 + 0x90;
-                prim->y1 = prim->y0 = ((i / FOG_COLS(self)) * 0x42) + y0;
-                prim->y3 = prim->y2 = ((i / FOG_COLS(self)) * 0x42 + 0x42) + y1;
+                prim->y1 = prim->y0 = (FOG_ROW(i, self) * 0x42) + y0;
+                prim->y3 = prim->y2 = (FOG_ROW(i, self) * 0x42 + 0x42) + y1;
                 i++;
                 prim = prim->next;
             }
