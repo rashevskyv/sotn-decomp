@@ -22,6 +22,11 @@ int SwitchNx_Touches(float* x, float* y, int max) {
     return n;
 }
 
+// The RomFS of the NRO (the HD picture packs): romfs:/ . 0 on success.
+int SwitchNx_RomfsInit(void) {
+    return (int)romfsInit();
+}
+
 // BSD sockets for the editor server: once, at the first switch on (sotn.ini
 // editor = 1 or the port menu). Returns 0 on success.
 int SwitchNx_NetInit(void) {
