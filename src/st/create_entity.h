@@ -85,10 +85,57 @@ static void JpCards_OnLayout(Entity* entity) {
 }
 #endif
 
+#ifdef PLATFORM_PSYZ
+// World x/y of the layout entry that made each entity (B02: see
+// LayoutSlotAlways).
+static u16 g_LayoutOriginX[TOTAL_ENTITY_COUNT];
+static u16 g_LayoutOriginY[TOTAL_ENTITY_COUNT];
+
+// Case 0xA000 ("always create") overwrites its slot. The wide spawn window is
+// wider than the distance between two entries of one slot, so the overwrite
+// can hit a live entity that is still on screen (the left clock glint). Then
+// the new entity goes to a free spare slot (searched from 191 down, so it
+// meets the 160-up allocations of bones and drops late). The same entry coming
+// back resets its own entity, as on PS1, also when that entity is in a spare.
+static Entity* LayoutSlotAlways(Entity* slot, LayoutEntity* obj) {
+    Entity* e;
+    s32 i = slot - g_Entities;
+    s32 sx = slot->posX.i.hi;
+    s32 sy = slot->posY.i.hi;
+
+    if (WIDE_X <= 0) {
+        return slot;
+    }
+    for (e = &g_Entities[191]; e >= &g_Entities[160]; e--) {
+        if (e->entityId == (obj->entityId & 0x3FF) &&
+            g_LayoutOriginX[e - g_Entities] == obj->posX &&
+            g_LayoutOriginY[e - g_Entities] == obj->posY) {
+            return e;
+        }
+    }
+    if (slot->entityId && sx > -WIDE_X - 32 && sx < 256 + WIDE_X + 32 &&
+        sy > -WIDE_Y - 32 && sy < 240 + WIDE_Y + 32 &&
+        (g_LayoutOriginX[i] != obj->posX || g_LayoutOriginY[i] != obj->posY)) {
+        for (e = &g_Entities[191]; e >= &g_Entities[160]; e--) {
+            if (!e->entityId) {
+                return e;
+            }
+        }
+    }
+    return slot;
+}
+#else
+#define LayoutSlotAlways(slot, obj) (slot)
+#endif
+
 void CreateEntityFromLayout(Entity* entity, LayoutEntity* initDesc) {
     Tilemap* tilemap;
 
     tilemap = &g_Tilemap;
+#ifdef PLATFORM_PSYZ
+    g_LayoutOriginX[entity - g_Entities] = initDesc->posX;
+    g_LayoutOriginY[entity - g_Entities] = initDesc->posY;
+#endif
 
     DestroyEntity(entity);
     entity->entityId = initDesc->entityId & 0x3FF;
@@ -133,6 +180,7 @@ void CreateEntityWhenInVerticalRange(LayoutEntity* obj) {
     case 0xA000:
         entity =
             g_Entities + STAGE_ENTITY_START + (obj->entityRoomIndex & 0xFF);
+        entity = LayoutSlotAlways(entity, obj);
         CreateEntityFromLayout(entity, obj);
         break;
     case 0x8000:
@@ -171,6 +219,7 @@ void CreateEntityWhenInHorizontalRange(LayoutEntity* obj) {
     case 0xA000:
         entity =
             g_Entities + STAGE_ENTITY_START + (obj->entityRoomIndex & 0xFF);
+        entity = LayoutSlotAlways(entity, obj);
         CreateEntityFromLayout(entity, obj);
         break;
     case 0x8000:

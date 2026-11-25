@@ -158,7 +158,8 @@ void EntitySkeleton(Entity* self) {
         }
 
         if ((animStatus & 0x80) && (self->animCurFrame == 10)) {
-            if ((self->posX.i.hi >= -16 && self->posX.i.hi <= 272) &&
+            if ((self->posX.i.hi >= -16 - WIDE_X &&
+                 self->posX.i.hi <= 272 + WIDE_X) &&
                 (self->posY.i.hi >= 0 && self->posY.i.hi <= 240)) {
                 newEntity = AllocEntity(&g_Entities[160], &g_Entities[192]);
                 if (newEntity != NULL) { // Spawn bone
