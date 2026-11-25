@@ -4,6 +4,7 @@
 #include <string.h>
 #include "overlay.h"
 #include "../../st/rno4/rno4.h"
+#include "../../st/cavern_bg_effects.h"
 
 extern RoomHeader rooms[];
 extern RoomDef rooms_layers[];
@@ -18,6 +19,7 @@ extern LayoutEntity** g_pStObjLayoutVertical;
 // clang-format off
 EInit g_EInitCommon = {ANIMSET_DRA(0), 0x00, 0x00, PAL_NONE, ENEMY_COMMON};
 EInit g_EInitParticle = {ANIMSET_DRA(3), 0x00, 0x00, PAL_NONE, ENEMY_PARTICLE};
+EInit g_EInitInteractable = {ANIMSET_DRA(0), 0x00, 0x00, PAL_NONE, ENEMY_INTERACTABLE};
 // clang-format on
 EInit g_EInitDamageNum;
 static SpriteParts* s_SpriteBanks[] = {NULL};
@@ -63,6 +65,7 @@ void Psyz_ModuleStart(void* param) {
 #endif
     EntityUpdates[E_RED_DOOR - 1] = EntityRedDoor;
     EntityUpdates[E_ROOM_FOREGROUND - 1] = EntityRoomForeground;
+    EntityUpdates[E_UNK_1F - 1] = EntityBgColumnsParallax_from_no4;
     o->Update = Update;
     o->HitDetection = Noop;
     o->UpdateRoomPosition = UpdateRoomPosition;

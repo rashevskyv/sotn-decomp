@@ -173,7 +173,7 @@ void func_us_801C5364(Entity* self) {
     }
 }
 
-INCLUDE_ASM("st/rno4/nonmatchings/first_c_file", EntityBgColumnsParallax_from_no4);
+#include "../cavern_bg_effects.h"
 
 INCLUDE_ASM("st/rno4/nonmatchings/first_c_file", func_us_801C1EE4_from_no4);
 
