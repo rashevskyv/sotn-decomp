@@ -1506,6 +1506,7 @@ static void Hud_Arc(Primitive** p, s32 cost) {
 static void Hud_Layout(void) {
     Primitive* p[HUD_ALL];
     Primitive* prim;
+    SubweaponDef subwpn;
     s32 i, k;
     u16 clut;
 
@@ -1556,6 +1557,8 @@ static void Hud_Layout(void) {
     clut = g_Status.hearts == g_Status.heartsMax ? 0x193 : 0x196;
     Hud_Number(&p[HUD_HEART_DIGITS], g_Status.hearts, 101, 38 + HUD_DY, 0, true,
                3, 7, clut);
+    // the arc needs the heart cost of the sub-weapon (Heart Broach applied)
+    func_800FE3C4(&subwpn, 0, false);
     Hud_Arc(&p[HUD_ARC], subwpn.heartCost);
     // heart icon 1x at 80,40, left of the hearts number (owner, 2026-11-24)
     prim = p[HUD_HEART];
