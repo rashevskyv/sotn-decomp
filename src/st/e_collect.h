@@ -1861,6 +1861,7 @@ void EntityMessageBox(Entity* self) {
 #ifdef PLATFORM_PSYZ
         // the box is the size of the text: the port glyph is 16 rows high and
         // wider than the PSX one, so the stock width and height do not fit
+        self->ext.messageBox.label = (char*)LANG_SJIS(self->ext.messageBox.label);
         self->ext.messageBox.width = MessageBoxTextW(self->ext.messageBox.label);
         self->ext.messageBox.height = 16;
         for (str = self->ext.messageBox.label; *str; str++) {
