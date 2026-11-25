@@ -39,6 +39,7 @@
 #include <psyz/audio.h>
 #include <psyz/input.h>
 #include "wide.h"
+#include "pc.h"
 #include <psyz/video.h>
 #include "room_stitch.h"
 #ifndef __SWITCH__
@@ -688,6 +689,19 @@ static void Zoom(int nz, int fx, int fy) {
     zoom16 = nz;
 }
 
+// The teleport map draws the Saturn gardens off their real cells: ST15 lies
+// on rows 44 of NO3, RS15 (its 180 degree mirror) on row 19 of RNO3, so they
+// are drawn two rows away, in free cells (ST15 down, RS15 up). Only the
+// drawing and the cursor use these; the game's cells, rooms and doors stay,
+// and a warp gets the real cell back (Cheat_Warp, MapDy).
+static int MapDy(int stage) {
+    return stage == STAGE_ID_SATURN_15           ? 2
+           : stage == STAGE_ID_REVERSE_SATURN_15 ? -2
+                                                 : 0;
+}
+#define RTOP(r) ((r)->top + MapDy((r)->stage))
+#define RBOT(r) ((r)->bottom + MapDy((r)->stage))
+
 // map_fit: the next DrawMap fits the castle's rooms into the map area (it
 // knows the hint lines) and keeps the cursor in it
 static int map_fit;
@@ -697,9 +711,9 @@ static void FitCastle(int x0, int y0, int x1, int y1) {
         const struct CastleRoom* rm = &g_CastleRooms[i];
         if ((rm->stage & 0x20) == castle) {
             l = MIN(l, rm->left);
-            t = MIN(t, rm->top);
+            t = MIN(t, RTOP(rm));
             r = MAX(r, rm->right);
-            b = MAX(b, rm->bottom);
+            b = MAX(b, RBOT(rm));
         }
     }
     if (r < l) {
@@ -721,14 +735,14 @@ static void FindOwners(int cx, int cy) {
     for (i = 0; i < g_CastleRoomCount && n_owners < MAX_OWNERS; i++) {
         r = &g_CastleRooms[i];
         if ((r->stage & 0x20) == castle && cx >= r->left && cx <= r->right &&
-            cy >= r->top && cy <= r->bottom) {
+            cy >= RTOP(r) && cy <= RBOT(r)) {
             owners[n_owners++] = r;
         }
     }
 }
 
 static void Go(const struct CastleRoom* r) {
-    const char* why = Cheat_Warp(r->stage, r->room, cur_x, cur_y);
+    const char* why = Cheat_Warp(r->stage, r->room, cur_x, cur_y - MapDy(r->stage));
     if (why) {
         MessageWhy(why);
         page = PAGE_MAP;
@@ -763,7 +777,7 @@ static void OpenMap(void) {
     if (!map_ready || castle != (g_StageId & 0x20)) {
         castle = g_StageId & 0x20;
         cur_x = D_8009791C.x & 63;
-        cur_y = D_8009791C.y & 63;
+        cur_y = (D_8009791C.y & 63) + MapDy(g_StageId);
         map_fit = 1;
         map_ready = 1;
     }
@@ -824,7 +838,7 @@ static const struct CastleRoom* RoomAt(int cx, int cy, int c, int it) {
     for (i = 0; i < g_CastleRoomCount; i++) {
         r = &g_CastleRooms[i];
         if ((r->stage & 0x20) == c && cx >= r->left && cx <= r->right &&
-            cy >= r->top && cy <= r->bottom &&
+            cy >= RTOP(r) && cy <= RBOT(r) &&
             (it == ITEM_ANY ? *Castle_ZoneName(r->stage) != 0
                             : ItemHas(it, r))) {
             return r;
@@ -914,14 +928,14 @@ static void MiniWarp(int x, int y) {
     for (i = 0; !r && i < g_CastleRoomCount; i++) {
         const struct CastleRoom* c = &g_CastleRooms[i];
         if ((c->stage & 0x20) == mark_c && mark_cx >= c->left &&
-            mark_cx <= c->right && mark_cy >= c->top && mark_cy <= c->bottom) {
+            mark_cx <= c->right && mark_cy >= RTOP(c) && mark_cy <= RBOT(c)) {
             r = c;
         }
     }
     if (!r) {
         return;
     }
-    why = Cheat_Warp(r->stage, r->room, mark_cx, mark_cy);
+    why = Cheat_Warp(r->stage, r->room, mark_cx, mark_cy - MapDy(r->stage));
     fprintf(stderr, "[menu] mini map click %d,%d: cell %d,%d %s room %d: %s\n",
             x, y, mark_cx, mark_cy, Castle_StageName(r->stage), r->room,
             why ? why : "warp");
@@ -2952,9 +2966,9 @@ static void DrawMini(int it) {
             rm = &g_CastleRooms[i];
             if ((rm->stage & 0x20) == mini_castle) {
                 l = MIN(l, rm->left);
-                t = MIN(t, rm->top);
+                t = MIN(t, RTOP(rm));
                 r = MAX(r, rm->right);
-                bt = MAX(bt, rm->bottom);
+                bt = MAX(bt, RBOT(rm));
             }
         }
     }
@@ -2986,9 +3000,9 @@ static void DrawMini(int it) {
             rm = &g_CastleRooms[i];
             if ((rm->stage & 0x20) == mini_castle && ItemHas(it, rm)) {
                 hl = MIN(hl, rm->left);
-                ht = MIN(ht, rm->top);
+                ht = MIN(ht, RTOP(rm));
                 hr = MAX(hr, rm->right);
-                hb = MAX(hb, rm->bottom);
+                hb = MAX(hb, RBOT(rm));
             }
         }
         if (hr >= 0) {
@@ -3014,9 +3028,9 @@ static void DrawMini(int it) {
                 continue;
             }
             x = (mini_ox + rm->left * mini_s) >> 4;
-            y = (mini_oy + rm->top * mini_s) >> 4;
+            y = (mini_oy + RTOP(rm) * mini_s) >> 4;
             w = ((mini_ox + (rm->right + 1) * mini_s) >> 4) - x;
-            h = ((mini_oy + (rm->bottom + 1) * mini_s) >> 4) - y;
+            h = ((mini_oy + (RBOT(rm) + 1) * mini_s) >> 4) - y;
             if (mini_s >= 48) { // a gap between rooms from 3 px a cell
                 w--;
                 h--;
@@ -3353,9 +3367,9 @@ static void DrawMap(void) {
                 continue;
             }
             hx = CellX(rm->left);
-            hy = CellY(rm->top);
+            hy = CellY(RTOP(rm));
             hw = CellX(rm->right + 1) - hx - gap;
-            hh = CellY(rm->bottom + 1) - hy - gap;
+            hh = CellY(RBOT(rm) + 1) - hy - gap;
             // grows by about a third of a cell (min 2 px), fades 255 -> 80
             ex = 1 + t * MAX(2, (CellX(1) - CellX(0)) / 3) / g_MapHeroPeriod;
             c = 255 - 175 * t / g_MapHeroPeriod;
@@ -3386,9 +3400,9 @@ static void DrawMap(void) {
             continue;
         }
         x = CellX(rm->left);
-        y = CellY(rm->top);
+        y = CellY(RTOP(rm));
         w = CellX(rm->right + 1) - x - gap;
-        h = CellY(rm->bottom + 1) - y - gap;
+        h = CellY(RBOT(rm) + 1) - y - gap;
         if (x >= x1 || y >= y1 || x + w <= x0 || y + h <= my0) {
             continue;
         }
