@@ -1023,7 +1023,7 @@ extern u16 msgBoxTpage[0x600];
 #define RELIC_DESC_ROW 0x80  // the line textures: bytes per row
 #define RELIC_LETTER(c)                                                        \
     (((c) >= 'a' && (c) <= 'z') || ((c) >= 'A' && (c) <= 'Z'))
-static u16 s_DescW[2]; // the width of each line in px (shrunk), 0 = none
+static u16 s_DescW[2]; // the width of each line in px, 0 = none
 
 // the text as the codes BlitChar reads: letters and space are one byte, all
 // the rest two (Shift-JIS; the digits and marks of ASCII become full width)
@@ -1080,6 +1080,10 @@ static u16 RelicDescBlit(const char* a, const char* b, u8* pix, const char** sp,
             tmp[1] = a[1];
             BlitChar(tmp, &x, pix, 0x100);
             a += RELIC_LETTER(*a) ? 1 : 2;
+            // BlitChar skips the pair after a closing quote (81 68 81 68)
+            if ((u8)tmp[0] == 0x81 && (u8)tmp[1] == 0x68 && a + 1 < b) {
+                a += 2;
+            }
         }
     }
     return x;
