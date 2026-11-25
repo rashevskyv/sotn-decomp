@@ -16,6 +16,9 @@ struct SpawnPoint {
 static const struct SpawnPoint s_SpawnPoints[] = {
     {STAGE_NP3, 1, 192, 870, "np3-stage15-door"},
     {STAGE_RNO3, 1, 96, 104, "reverse-trapdoor-underground"},
+    // the inverted save room (room 25, cell 60,21): a step right leaves it
+    {STAGE_RNO3, 25, 128, 136, "reverse-save-room"},
+    {STAGE_NP3, 22, 128, 136, "np3-save-room"},
     {STAGE_NO0, 0, 1440, 688, "marble-soul"},
     {STAGE_NO4, 5, 176, 396, "caverns-soul"},
     {STAGE_RNO0, 0, 64, 132, "reverse-marble-soul"},

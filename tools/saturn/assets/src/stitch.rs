@@ -3073,6 +3073,46 @@ const RNO3_CONFIG: ShaftStitchConfig = ShaftStitchConfig {
     },
 };
 
+/// The Saturn shaft has no tunnel to the save room, but the PSX room has one
+/// (a door at the edge of the room). Copy the PSX tiles of that door region
+/// over the stitched room, so the save room leads into the shaft (a player
+/// who walks out of the save room would be inside rock). The offset is the
+/// row of the PSX room inside the stitched room. This runs after the visual
+/// test, which compares the room with the Saturn art.
+fn patch_save_door(
+    stitch: &mut Stitch,
+    loaded: &StitchAssets,
+    rows: std::ops::RangeInclusive<usize>,
+    cols: std::ops::RangeInclusive<usize>,
+    row_offset: usize,
+) {
+    for row in rows {
+        for column in cols.clone() {
+            let from = row * TILES + column;
+            let to = (row + row_offset) * TILES + column;
+            stitch.fg[to] = loaded.fg[from];
+            stitch.bg[to] = loaded.bg[from];
+        }
+    }
+}
+
+/// Open rows of the stitched room from the room edge to the shaft, and fill
+/// the background with the Saturn cave texture of the shaft (rows 38-39,
+/// columns 8-11 of RNO3 hold the tile pairs below).
+fn carve_save_door(
+    stitch: &mut Stitch,
+    rows: std::ops::RangeInclusive<usize>,
+    cols: std::ops::RangeInclusive<usize>,
+) {
+    const TEXTURE: [[u16; 4]; 2] = [[0x71E, 0x71F, 0x71B, 0x71D], [0x721, 0x722, 0x723, 0x724]];
+    for row in rows {
+        for column in cols.clone() {
+            stitch.fg[row * TILES + column] = 0;
+            stitch.bg[row * TILES + column] = TEXTURE[row % 2][column % 4];
+        }
+    }
+}
+
 pub fn stitch_np3(
     prg_path: &Path,
     map_path: &Path,
@@ -3097,7 +3137,7 @@ pub fn stitch_np3(
     let (saturn_collision, saturn_art) =
         load_saturn_room_source(prg_path, map_path, &scratch, config.saturn)?;
 
-    let stitch = build(
+    let mut stitch = build(
         &saturn_art,
         &loaded.fg,
         &loaded.bg,
@@ -3118,6 +3158,8 @@ pub fn stitch_np3(
         config.visual_source,
         config.reverse,
     )?;
+    // PSX room 1 door to the save room (3,42): rows 22-25 on the right edge
+    patch_save_door(&mut stitch, &loaded, 21..=28, 8..=15, 0);
     let door = load_saturn_door(prg_path, map_path, config.door_layout, config.door_slot)?;
     emit_stitched_asset_tree(
         np3_assets,
@@ -3189,7 +3231,7 @@ pub fn stitch_rno3(
     let aligned_start = TILES * REVERSE_PSX_START;
     aligned_fg[aligned_start..].copy_from_slice(&loaded.fg);
     aligned_bg[aligned_start..].copy_from_slice(&loaded.bg);
-    let stitch = build_room(
+    let mut stitch = build_room(
         &saturn_art,
         &aligned_fg,
         &aligned_bg,
@@ -3221,6 +3263,10 @@ pub fn stitch_rno3(
         config.visual_source,
         config.reverse,
     )?;
+    // the 180 degree turn of the NP3 door (PSX rows 6-9, left edge). The PSX
+    // tiles of the inverted castle have another palette than the Saturn
+    // tiles, so the tunnel is cut open and filled with the Saturn cave tiles
+    carve_save_door(&mut stitch, 38..=41, 0..=8);
     let door = load_saturn_door(prg_path, map_path, config.door_layout, config.door_slot)?;
     emit_stitched_asset_tree(
         rno3_assets,
