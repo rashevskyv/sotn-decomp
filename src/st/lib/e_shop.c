@@ -777,18 +777,24 @@ static const char* D_us_80181310[] = {
 // The compare window is taller (9 rows): the item list goes 16 up, the
 // description bar 15 down (the scroll arrow under the list stays clear of
 // the compare window).
-#define SHOP_LIST_DY 16
+// (the stage clip starts at row 20, so the list window top stays at row 21)
+#define SHOP_LIST_DY 3
 #define SHOP_DESC_DY 15
 // The compare window. Its prims draw into the list's offscreen page (u =
 // prim x, v = prim y = screen y), and the page shows at x u + SHOP_CMP_D on
 // screen: the window's right edge on x 320. The content is u 36..252 (216
 // texels, in the 256 of the page), v 0x70..0xD6 (below the list's page
 // rows); SHOP_L is the x of its label column.
-#define SHOP_CMP_C 144  // the content centre
-#define SHOP_CMP_HW 108 // the content half width
-#define SHOP_CMP_D (SHOP_G - 16)
+// en: 3 letter stat names, so a narrower window (the columns from x 0x68 move
+// SHOP_COL_S left, the hand marks SHOP_MARK_S); uk: the full names. The
+// window's right edge stays at x 235 + WIDE_X, the list window's right edge.
+#define SHOP_CMP_C 144                  // the content centre
+#define SHOP_CMP_HW (g_Lang ? 108 : 80) // the content half width
+#define SHOP_CMP_D (WIDE_X + 91 - (SHOP_CMP_HW + 8))
 #define SHOP_L (SHOP_CMP_C - SHOP_CMP_HW + 8)
-#define SHOP_CMP_Y0 0x70 // the content top
+#define SHOP_COL_S (g_Lang ? 0 : 0x38)
+#define SHOP_MARK_S (g_Lang ? 0 : 0x20)
+#define SHOP_CMP_Y0 0x78 // the content top, under the list window
 #define SHOP_CMP_Y1 0xD6 // the content bottom
 // the 72 stock prims (D_us_80181530), then the tail (ShopResults): a
 // spare cell (once "=") and 3 result digits for each of the 7 value rows,
@@ -955,6 +961,9 @@ static void ShopSplit(Primitive* prim, u16 angle) {
     }
 }
 #define SHOP_LIST_HW (0x74 + SHOP_G)
+// the selected row: added over the list (DRAW_UNK_40 | DRAW_TPAGE2 pick add)
+#define SHOP_SEL_MODE \
+    (DRAW_TPAGE | DRAW_TPAGE2 | DRAW_COLORS | DRAW_TRANSP)
 #define SHOP_SPLIT(prim, angle) ShopSplit(prim, angle)
 #define SHOP_CMP_W (SHOP_CMP_HW + 8)
 
@@ -972,8 +981,8 @@ static void ShopDescX(Primitive* prim, s32 bar) {
 // LCK, Number, GOLD (screen y = page v; the hand rows 12 apart for
 // their 11-row button marks; the 8x11 cells start SHOP_FONT_DY higher)
 enum { R_H1, R_H2, R_DEF, R_STR, R_NUM = 7, R_GOLD };
-static const u8 ShopRowY[] = {0x73, 0x7F, 0x8B, 0x98, 0xA3,
-                              0xAE, 0xB9, 0xC4, 0xCE};
+static const u8 ShopRowY[] = {0x7B, 0x87, 0x92, 0x9C, 0xA6,
+                              0xB0, 0xBA, 0xC4, 0xCE};
 
 // The compare window's prims 11..82 (D_us_80181530 order): content x from
 // SHOP_L in 8-texel columns, and the row. The names in columns 0..11 (the
@@ -1023,6 +1032,11 @@ static void ShopCmpPlace(Primitive* prim, s32 j) {
     if (row < R_NUM && x >= 0x68) {
         prim->x0 += 8; // 2 cells after a 12-letter stat name
     }
+    if (prim->x0 >= SHOP_L + 0x68) {
+        prim->x0 -= SHOP_COL_S;
+    } else if (row <= R_H2 && (x == 0x40 || x == 0x48)) {
+        prim->x0 -= SHOP_MARK_S; // the hand marks
+    }
     ShopCellY(prim, ShopRowY[row] -
                         (x == SHOP_ARROW_X && !LANG_MENU_FONT_ON()));
 }
@@ -1049,6 +1063,7 @@ static void ShopGold(Primitive* prim) {
 #define SHOP_DESC_DY 0
 #define SHOP_DESC_X(prim, bar)
 #define SHOP_LIST_HW 0x74
+#define SHOP_SEL_MODE DRAW_COLORS
 #define SHOP_SPLIT(prim, angle)
 #define SHOP_CMP_W 0x42
 #define SHOP_CELL(prim, c)
@@ -2384,6 +2399,14 @@ void func_us_801B2BE4(Entity* self) {
                     PGRN(prim) = 0x10;
                     PBLU(prim) = 0x10;
                     prim->priority = 0x1FB;
+#ifdef PLATFORM_PSYZ
+                    // the content page is opaque here: the highlight goes
+                    // over it, added (the text stays readable)
+                    PRED(prim) = 0x58;
+                    PGRN(prim) = 0x14;
+                    PBLU(prim) = 0x14;
+                    prim->priority = 0x1FD;
+#endif
                     prim->drawMode = DRAW_HIDE;
 #ifdef PLATFORM_PSYZ
                 } else if (i == 13) {
@@ -2408,7 +2431,8 @@ void func_us_801B2BE4(Entity* self) {
                     prim->v2 = prim->v3 = 0x78 - (i - 11) * 8;
                     prim->x0 = prim->x2 = 0x7C;
                     prim->x1 = prim->x3 = prim->x0 + 8;
-                    prim->y0 = prim->y1 = (i - 11) * 0x60 + 0x14 - SHOP_LIST_DY;
+                    prim->y0 = prim->y1 =
+                        (i - 11) * 0x60 + 0x14 - (i == 11 ? 0 : SHOP_LIST_DY);
                     prim->y2 = prim->y3 = prim->y0 + 8;
                     prim->priority = 0x1FC;
                     prim->drawMode = DRAW_HIDE;
@@ -2659,7 +2683,7 @@ void func_us_801B2BE4(Entity* self) {
         }
         prim->y0 = prim->y1 = (self->ext.et_801B6F30.unk80 * 0xC) + 0x1F - SHOP_LIST_DY;
         prim->y2 = prim->y3 = prim->y0 + 0xC;
-        prim->drawMode = DRAW_COLORS;
+        prim->drawMode = SHOP_SEL_MODE;
 
         prim = prim->next;
         if (self->ext.et_801B6F30.unk82) {
@@ -2754,7 +2778,7 @@ void func_us_801B2BE4(Entity* self) {
         }
         prim->y0 = prim->y1 = (self->ext.et_801B6F30.unk80 * 0xC) + 0x1F - SHOP_LIST_DY;
         prim->y2 = prim->y3 = prim->y0 + 0xC;
-        prim->drawMode = DRAW_COLORS;
+        prim->drawMode = SHOP_SEL_MODE;
 
         prim = prim->next;
         if (self->ext.et_801B6F30.unk82) {
@@ -3023,13 +3047,6 @@ Primitive* func_us_801B4194(Primitive* prim) {
 }
 
 #ifdef PLATFORM_PSYZ
-// texel * c / 0x80 of a white texel, for a solid tile
-static u32 ShopTileRGB(u32 c) {
-    u32 r = (c >> 16 & 0xFF) * 2, g = (c >> 8 & 0xFF) * 2, b = (c & 0xFF) * 2;
-    return (r > 255 ? 255 : r) << 16 | (g > 255 ? 255 : g) << 8 |
-           (b > 255 ? 255 : b);
-}
-
 static void ShopTint(Primitive* prim, u32 rgb) {
     prim->drawMode |= DRAW_COLORS;
     prim->r0 = rgb >> 16;
@@ -3038,11 +3055,10 @@ static void ShopTint(Primitive* prim, u32 rgb) {
 }
 
 // The change d of a stat after its value: the arrow prim then digit prims.
-// The menu's up (red) or down (blue) arrow, or the stock → for none; then
-// |d| left aligned in the arrow's colour, no number for none. Without the
-// menu cells (no language pack) the stock arrows stay.
+// The equip menu's right-up (red) or right-down (blue) arrow, cells 0xE3 and
+// 0xE5 of the sheet (and of the atlas), the right arrow 0xE4 for none; then
+// |d| left aligned in the arrow's colour, no number for none.
 static Primitive* ShopDelta(Primitive* prim, s32 d, s32 digits) {
-    s32 cell = d > 0 ? MENU_CELL_UP : MENU_CELL_DOWN;
     u32 rgb = d > 0 ? TINT_BONUS_UP : TINT_BONUS_DOWN;
     s16 x = prim->x0 + 8;
     Primitive* p = prim->next;
@@ -3051,19 +3067,10 @@ static Primitive* ShopDelta(Primitive* prim, s32 d, s32 digits) {
     prim->v0 = 0x70;
     prim->drawMode = DRAW_DEFAULT;
     if (LANG_MENU_FONT_ON()) { // the atlas: the arrow cell itself, tinted
-        ShopCell(prim, !d                       ? 0xE4
-                       : Lang_MenuCellAny(cell) ? cell
-                       : d > 0                  ? 0xE3
-                                                : 0xE5);
+        ShopCell(prim, !d ? 0xE4 : d > 0 ? 0xE3 : 0xE5);
         if (d) {
             ShopTint(prim, rgb);
         }
-    } else if (d && Lang_MenuCellAny(cell)) {
-        prim->drawMode = DRAW_HIDE;
-        // the 8x8 row sits on rows 3..10 of the 8x11 cell
-        // on screen: the offscreen page shows SHOP_CMP_D to the right
-        PortMenu_Cell(
-            prim->x0 + SHOP_CMP_D, p->y0 - 3, cell, ShopTileRGB(rgb));
     }
     prim = func_us_801B3EC8(p, d < 0 ? -d : d, digits);
     for (; p != prim; p = p->next) {
@@ -3095,6 +3102,22 @@ static void ShopLabels(Primitive* prim) {
     }
 }
 
+// The name of stat row i (STR, CON, INT, LCK) as 12 cells: uk the full word,
+// en the 3 letters.
+static const char* ShopStatName(s32 i) {
+    static char buf[12];
+    const char* w = g_Lang ? ShopWord(2 + i, 12, 0) : NULL;
+    s32 j;
+
+    if (w) {
+        return w;
+    }
+    for (j = 0; j < 12; j++) {
+        buf[j] = j < 3 ? D_us_80181668[i * 3 + j] : CH(' ');
+    }
+    return buf;
+}
+
 // The tail prims (stats: before and after the buy, 7 rows: hands, DEF,
 // STR..LCK). Rows 0..6: the value after, left aligned in the result column
 // (a spare cell before it). Then the value before of the 4 stat rows,
@@ -3116,7 +3139,7 @@ static void ShopResults(Primitive* prim, const u16* stats, s32 hide) {
         }
         p = prim;
         prim = func_us_801B3EC8(p, i < 7 ? s[1] : s[0], 3);
-        for (x = SHOP_L + 0xB8; p != prim; p = p->next) {
+        for (x = SHOP_L + 0xB8 - SHOP_COL_S; p != prim; p = p->next) {
             if (hide) {
                 p->drawMode = DRAW_HIDE;
             } else if (i < 7 && !(p->drawMode & DRAW_HIDE)) {
@@ -3127,7 +3150,7 @@ static void ShopResults(Primitive* prim, const u16* stats, s32 hide) {
     }
     for (i = 0; i < 4 && prim; i++) { // PortWord 2..5: Strength .. Luck
         p = prim;
-        prim = func_us_801B3FB4(p, ShopWord(2 + i, 12, 0), 12, 1);
+        prim = func_us_801B3FB4(p, ShopStatName(i), 12, 1);
         for (; hide && p != prim; p = p->next) {
             p->drawMode = DRAW_HIDE;
         }
@@ -3691,7 +3714,8 @@ void func_us_801B4830(Entity* self) {
             for (i = 0; i < 2; i++) {
                 name = D_us_80181528[i];
 #ifdef PLATFORM_PSYZ
-                name = ShopTexWord(i, name, 0); // PORT 0, 1: Атака, Захист
+                // PORT 0, 1: Атака, Захист; en ATK, DEF
+                name = g_Lang ? ShopTexWord(i, name, 0) : i ? "DEF" : "ATK";
 #endif
 #if TARGET == TARGET_PSP
                 func_us_801B0FBC(name, 0x17, 0x104 + i * 16);
