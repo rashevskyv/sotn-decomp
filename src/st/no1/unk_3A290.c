@@ -27,6 +27,36 @@ static SVECTOR D_us_801814D0 = {FLT(0), FLT(0), FLT(0)};
 
 static SVECTOR D_us_801814D8 = {FLT(0), FLT(0), FLT(1)}; // unused
 
+#ifdef PLATFORM_PSYZ
+// The spyglass view is made for the 4:3 screen: a black overlay with a bright
+// spot of 96 px in the center. In a wide view the port covers the whole screen
+// with the black overlay and enlarges the spot by TELE_Z about the center
+// (0x80, 0x80), so it fits the screen height. TS() maps a 4:3 coordinate.
+#define TELE_Z (WIDE_X ? 2 : 1)
+#define TS(c) (0x80 + ((c) - 0x80) * TELE_Z)
+
+// A black rectangle as a G4 (a tile is limited to 255 px and to the 4:3 area).
+static void TeleBlack(Primitive* prim, s32 x0, s32 y0, s32 x1, s32 y1) {
+    prim->type = PRIM_G4;
+    prim->x0 = prim->x2 = x0;
+    prim->x1 = prim->x3 = x1;
+    prim->y0 = prim->y1 = y0;
+    prim->y2 = prim->y3 = y1;
+    prim->r0 = prim->g0 = prim->b0 = 0;
+    LOW(prim->r1) = LOW(prim->r0);
+    LOW(prim->r2) = LOW(prim->r0);
+    LOW(prim->r3) = LOW(prim->r0);
+}
+
+static void TeleMoveY(Primitive* prim, s32 dy) {
+    prim->y0 = prim->y1 = prim->y0 + dy;
+    prim->y2 = prim->y3 = prim->y2 + dy;
+}
+#else
+#define TELE_Z 1
+#define TS(c) (c)
+#endif
+
 // This is the spyglass at the bottom of NO1
 void func_us_801BA290(Entity* self) {
     long p, flag;
@@ -111,8 +141,8 @@ void func_us_801BA290(Entity* self) {
             drawEnv.b0 = 0;
             drawEnv.dtd = 0;
             drawEnv.ofs[0] = 0;
-            clipRect.x = 0;
-            clipRect.w = 0x100;
+            clipRect.x = -WIDE_X;
+            clipRect.w = 0x100 + 2 * WIDE_X;
             clipRect.y = 0x14;
             clipRect.h = 0;
             drawEnv.clip = clipRect;
@@ -223,8 +253,8 @@ void func_us_801BA290(Entity* self) {
         self->ext.et_801BA290.unk88 = prim;
         for (i = 0; i < 2; i++) {
             prim->type = PRIM_TILE;
-            prim->x0 = 0;
-            prim->x1 = 0x104;
+            prim->x0 = -WIDE_X;
+            prim->x1 = 0x104 + WIDE_X;
             prim->x2 = prim->x0;
             prim->x3 = prim->x1;
             prim->y0 = 0;
@@ -256,13 +286,13 @@ void func_us_801BA290(Entity* self) {
             prim->v1 = prim->v0;
             prim->v2 = 0xFF;
             prim->v3 = prim->v2;
-            prim->x0 = 0x50;
-            prim->x1 = 0xB0;
+            prim->x0 = TS(0x50);
+            prim->x1 = TS(0xB0);
             prim->x2 = prim->x0;
             prim->x3 = prim->x1;
-            prim->y0 = 0x50;
+            prim->y0 = TS(0x50);
             prim->y1 = prim->y0;
-            prim->y2 = 0xB0;
+            prim->y2 = TS(0xB0);
             prim->y3 = prim->y2;
             prim->r0 = 0;
             prim->b0 = 0;
@@ -287,13 +317,13 @@ void func_us_801BA290(Entity* self) {
             prim->v1 = prim->v0;
             prim->v2 = 0xFF;
             prim->v3 = prim->v2;
-            prim->x0 = 0x40;
-            prim->x1 = 0xC0;
+            prim->x0 = TS(0x40);
+            prim->x1 = TS(0xC0);
             prim->x2 = prim->x0;
             prim->x3 = prim->x1;
-            prim->y0 = 0x40;
+            prim->y0 = TS(0x40);
             prim->y1 = prim->y0;
-            prim->y2 = 0xC0;
+            prim->y2 = TS(0xC0);
             prim->y3 = prim->y2;
             prim->r0 = 0;
             prim->b0 = 0;
@@ -318,8 +348,8 @@ void func_us_801BA290(Entity* self) {
         prim->v1 = prim->v0;
         prim->v2 = 0x18;
         prim->v3 = prim->v2;
-        LOH(prim->next->r2) = 0x28;
-        LOH(prim->next->b2) = 0x18;
+        LOH(prim->next->r2) = 0x28 * TELE_Z;
+        LOH(prim->next->b2) = 0x18 * TELE_Z;
         LOH(prim->next->u1) = 0xB80;
         prim->next->b3 = 0x80;
         prim->next->x1 = 0x80;
@@ -396,7 +426,10 @@ void func_us_801BA290(Entity* self) {
         LOW(prim->r2) = LOW(prim->r0);
         LOW(prim->r3) = LOW(prim->r0);
         if (prim->r0 > 0xF0) {
+#ifndef PLATFORM_PSYZ
+            // the port keeps the G4: a tile is 255 px and not wide enough
             prim->type = PRIM_TILE;
+#endif
             self->ext.et_801BA290.unkA4 = 1;
             g_Tilemap.flags ^= 1;
             prim = self->ext.et_801BA290.unkAC;
@@ -413,6 +446,13 @@ void func_us_801BA290(Entity* self) {
         switch (self->step_s) {
         case 0:
             prim = self->ext.et_801BA290.unk94;
+#ifdef PLATFORM_PSYZ
+            TeleBlack(prim, -WIDE_X, 0, TS(0x50), 0xFF);
+            prim->drawMode = DRAW_DEFAULT;
+            prim = prim->next;
+            TeleBlack(prim, TS(0xB0), 0, 0x100 + WIDE_X, 0xFF);
+            prim->drawMode = DRAW_DEFAULT;
+#else
             prim->x0 = 0;
             prim->y0 = 0U;
             prim->u0 = 0x50;
@@ -426,11 +466,12 @@ void func_us_801BA290(Entity* self) {
             prim->u0 = 0x50;
             prim->v0 = 0xFF;
             prim->drawMode = DRAW_DEFAULT;
+#endif
             prim = self->ext.et_801BA290.unk88;
             for (i = 0; i < 2; i++) {
-                prim->x0 = prim->x2 = 0x50;
-                prim->x1 = prim->x3 = 0xB0;
-                prim->u0 = 0x60;
+                prim->x0 = prim->x2 = TS(0x50);
+                prim->x1 = prim->x3 = TS(0xB0);
+                prim->u0 = 0x60 * TELE_Z;
 #if TARGET == TARGET_PSP
                 prim->r0 = 0x40;
 #else
@@ -492,9 +533,9 @@ void func_us_801BA290(Entity* self) {
                         if ((Random() & 1) == 0) {
                             rnd = 7;
                         }
-                        tempEntity->posX.i.hi = D_us_80181474[rnd][0];
-                        tempEntity->posY.i.hi = D_us_80181474[rnd][1];
-                        tempEntity->scaleX = D_us_80181474[rnd][2];
+                        tempEntity->posX.i.hi = TS(D_us_80181474[rnd][0]);
+                        tempEntity->posY.i.hi = TS(D_us_80181474[rnd][1]);
+                        tempEntity->scaleX = D_us_80181474[rnd][2] * TELE_Z;
                     }
                 }
             }
@@ -508,7 +549,7 @@ void func_us_801BA290(Entity* self) {
             }
             break;
         }
-        SetGeomScreen(0x400);
+        SetGeomScreen(0x400 * TELE_Z);
         rotD.vx = 0;
         rotD.vy = 0;
         rotD.vz = 0;
@@ -575,11 +616,11 @@ void func_us_801BA290(Entity* self) {
             prim = self->ext.et_801BA290.unk8C;
             for (i = 0; i < 2; i++) {
                 if (prim->y0 != 0x80) {
-                    prim->y0 += 2;
+                    prim->y0 += 2 * TELE_Z;
                     prim->y1 = prim->y0;
                 }
                 if (prim->y2 != 0x80) {
-                    prim->y2 -= 2;
+                    prim->y2 -= 2 * TELE_Z;
                     prim->y3 = prim->y2;
                 }
                 prim = prim->next;
@@ -587,11 +628,11 @@ void func_us_801BA290(Entity* self) {
             prim = self->ext.et_801BA290.unk90;
             for (i = 0; i < 2; i++) {
                 if (prim->y0 != 0x80) {
-                    prim->y0 += 2;
+                    prim->y0 += 2 * TELE_Z;
                     prim->y1 = prim->y0;
                 }
                 if (prim->y2 != 0x80) {
-                    prim->y2 -= 2;
+                    prim->y2 -= 2 * TELE_Z;
                     prim->y3 = prim->y2;
                 } else {
                     self->step_s = 1;
@@ -617,6 +658,13 @@ void func_us_801BA290(Entity* self) {
                 prim = prim->next;
             }
             prim = self->ext.et_801BA290.unk94;
+#ifdef PLATFORM_PSYZ
+            TeleBlack(prim, -WIDE_X, 0, 0x100 + WIDE_X, 0x80);
+            prim->drawMode = DRAW_DEFAULT;
+            prim = prim->next;
+            TeleBlack(prim, -WIDE_X, 0x80, 0x100 + WIDE_X, 0x100);
+            prim->drawMode = DRAW_DEFAULT;
+#else
             prim->x0 = 0;
             prim->y0 = 0;
             prim->u0 = 0xFF;
@@ -629,15 +677,23 @@ void func_us_801BA290(Entity* self) {
             prim->u0 = 0xFF;
             prim->v0 = 0x80;
             prim->drawMode = DRAW_DEFAULT;
+#endif
             self->step_s++;
             break;
 
         case 2:
             prim = self->ext.et_801BA290.unk94;
+#ifdef PLATFORM_PSYZ
+            TeleMoveY(prim, -8);
+            prim = prim->next;
+
+            TeleMoveY(prim, 8);
+#else
             prim->y0 -= 8;
             prim = prim->next;
 
             prim->y0 += 8;
+#endif
             if (prim->y0 > 0x100) {
                 self->step_s++;
             }
@@ -674,7 +730,7 @@ void func_us_801BB4C0(Entity* self) {
         self->drawFlags |= ENTITY_SCALEX | ENTITY_SCALEY;
         self->scaleY = self->scaleX;
         self->ext.fish.timer = delays[Random() & 7];
-        if (self->scaleX < 0x100) {
+        if (self->scaleX < 0x100 * TELE_Z) {
             self->zPriority -= 4;
         }
         break;
