@@ -1019,6 +1019,17 @@ extern u16 msgBoxTpage[0x600];
 // that is copied: a serif cell has its 11 rows at the glyph rows 2..12
 #define RELIC_DESC_LH (MSG_FONT_CELLS ? 12 : 16)
 #define RELIC_DESC_ROW0 (MSG_FONT_CELLS ? 2 : 0)
+// the box: the top edge is 0x9B and the ink of the name starts 7 rows under it
+// (cell row 2). The lower edge goes 7 rows under the ink of the last line: the
+// same margin on top and below. The ink ends (cell rows, 12x16 glyph, measured
+// with the descenders of p and u) at row 15 in the name line and 14 in a
+// description line; a serif cell has 11 rows (2..12). The stock box ends at
+// 0xB3: PAD is how far the lower edge goes down (plus RELIC_DESC_LH for each
+// description line), NAME_PAD when there is no description.
+#define RELIC_NAME_INK_END (MSG_FONT_CELLS ? 13 : 15)
+#define RELIC_DESC_INK_END (MSG_FONT_CELLS ? 13 : 14)
+#define RELIC_DESC_PAD (RELIC_DESC_INK_END + 7 - RELIC_DESC_LH)
+#define RELIC_NAME_PAD (RELIC_NAME_INK_END + 7 - 0xB3 + 0xA0)
 #define RELIC_DESC_LINE 0x78 // the widest line: 240 px, the 4:3 screen less box
 #define RELIC_DESC_ROW 0x80  // the line textures: bytes per row
 #define RELIC_LETTER(c)                                                        \
@@ -1206,6 +1217,10 @@ void EntityRelicOrb(Entity* self) {
     u8* chPix;
     u16 var_s8;
     u16 msgLen;
+#ifdef PLATFORM_PSYZ
+    u8 relicQuoted, relicUk;
+    char relicPre[32];
+#endif
 
     // unnamed variables
     u8* var_v0_5;
@@ -1465,23 +1480,52 @@ void EntityRelicOrb(Entity* self) {
 #else
     msg = LANG_SJIS(g_RelicOrbTexts[0]);
     chPix = g_Pix[0];
+#ifdef PLATFORM_PSYZ
+    // uk: "Отримано «" NAME "»". The stock names start with a space (for the
+    // relic list): it would make a double gap after the opening quote.
+    relicUk = relicQuoted = msg != g_RelicOrbTexts[0];
+relicRetry:
+#endif
     var_v0_5 = (u8*)chPix;
     for (i = 0; i < 0xC00; i++) {
         *var_v0_5++ = 0;
     }
 
     msgLen = 0;
+    isObtainedTextStored = false;
     while (true) {
         if (*msg == 0) {
             if (isObtainedTextStored) {
+#ifdef PLATFORM_PSYZ
+                if (relicQuoted == 1) {
+                    relicQuoted = 2;
+                    msg = "\x81\xE2"; // the closing quote of the font
+                    continue;
+                }
+#endif
                 break;
             }
             msg = g_api.relicDefs[relicId].name;
+#ifdef PLATFORM_PSYZ
+            while (relicUk && *msg == ' ') {
+                msg++;
+            }
+#endif
             isObtainedTextStored = true;
         } else {
             msg = BlitChar(msg, &msgLen, chPix, 0xC0);
         }
     }
+#ifdef PLATFORM_PSYZ
+    // a name too wide for the box and the screen (252 px) goes without quotes
+    if (relicQuoted && msgLen > 0x7E) {
+        strcpy(relicPre, LANG_SJIS(g_RelicOrbTexts[0]));
+        relicPre[strlen(relicPre) - 2] = 0; // the opening quote
+        msg = relicPre;
+        relicQuoted = 0;
+        goto relicRetry;
+    }
+#endif
 
     LoadTPage(chPix, 0, 0, 0, 0x100, 0x180, 0x10);
 #ifdef RELIC_DESC
@@ -1566,9 +1610,10 @@ void EntityRelicOrb(Entity* self) {
                 half = 0x7E; // stay inside the screen
             }
             e = (half > 0x60 ? half - 0x60 : 0) * (orbUnk7C + 1) / 8;
-            i = s_DescW[0] ? (RELIC_DESC_LH * (s_DescW[1] ? 2 : 1) + 2) *
-                                 (orbUnk7C + 1) / 8
-                           : 0;
+            i = (s_DescW[0] ? RELIC_DESC_LH * (s_DescW[1] ? 2 : 1) +
+                                  RELIC_DESC_PAD
+                            : RELIC_NAME_PAD) *
+                (orbUnk7C + 1) / 8;
             prim = g_PrimBuf[self->primIndex].next;
             for (iconSlot = 0; iconSlot < 2; iconSlot++) {
                 if (prim->y0 >= prim->y2) {
