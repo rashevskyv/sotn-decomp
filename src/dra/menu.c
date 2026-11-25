@@ -4735,6 +4735,9 @@ block_4:
         }
         break;
     case MENU_STEP_EXIT_BEGIN:
+#ifdef PLATFORM_PSYZ
+        RelicInfoBar(0); // Start on the relic page: drop the wide scale
+#endif
         SetFadeMode(FADE_TO_BLACK);
         g_MenuStep++;
         break;
