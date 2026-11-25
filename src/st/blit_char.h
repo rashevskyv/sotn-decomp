@@ -35,6 +35,11 @@ const char* BlitChar(const char* str, u16* xOffset, u8* pix, u16 stride) {
             ch = DOUBLE_SPACE;
             chSize = 2;
         } else {
+#ifdef PLATFORM_PSYZ
+            if (!*str) { // a lead byte at the end of the text: nothing to draw
+                return str;
+            }
+#endif
             ch = *str++ | (ch << 8);
             if (ch == DOUBLE_SPACE) {
                 chSize = 2;
@@ -47,7 +52,13 @@ const char* BlitChar(const char* str, u16* xOffset, u8* pix, u16 stride) {
     }
 
     // use the converted Shift-JIS character to retrieve the font data
+#ifdef PLATFORM_PSYZ
+    // kind 0 (the glyph of the Equip description line): every row as it is.
+    // Kind 1 mixes two rows into one, which blurs the text.
+    chPix = (u8*)g_api.func_80106A28(ch, 0);
+#else
     chPix = g_api.func_80106A28(ch, 1);
+#endif
     while (true) {
         if (ch == DOUBLE_SPACE) {
             break;

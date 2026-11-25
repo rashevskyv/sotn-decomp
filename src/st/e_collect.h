@@ -1004,9 +1004,10 @@ extern u16 msgBoxTpage[0x600];
 #if defined(PLATFORM_PSYZ) && STAGE != STAGE_ST0 && VERSION >= VER_BETA_MAD && \
     REGION != REGION_JP
 // relic_hint: the description of the relic under the banner "Obtained NAME",
-// in the same font (BlitChar) at 3/4 size, one or two lines, as part of the
+// in the same font (BlitChar) at full size, one or two lines, as part of the
 // banner: the same entity, prims and lifetime. The textures go under the
-// name's one in VRAM (y 0x110 and 0x120), the prims 7 and 8 are scaled quads.
+// name's one in VRAM (y 0x110 and 0x120), the prims 7 and 8 are sprites: one
+// texel is one pixel, so the text is not blurred.
 // The description is the game's own text (g_api.relicDefs[].desc; uk: the
 // swapped Shift-JIS text); ASCII digits and marks of the en text become the
 // full width ones, which the font has.
@@ -1014,8 +1015,9 @@ extern u16 msgBoxTpage[0x600];
 #define RELIC_DESC_PRIMS 9
 #define RELIC_ANIM_PRIMS 7  // the sparkle loop at the end of the entity
 #define RELIC_DESC_SRC 0xFA  // the text at full size: bytes of 2 px per row
-#define RELIC_DESC_LH 12 // the height of a description line, text and box
-#define RELIC_DESC_LINE 0x98 // a line at full size (228 px shrunk)
+#define RELIC_DESC_LH 16 // rows of a description line: texture, sprite, box
+#define RELIC_DESC_ROW0 0 // the first row of the glyph that is copied
+#define RELIC_DESC_LINE 0x78 // the widest line: 240 px, the 4:3 screen less box
 #define RELIC_DESC_ROW 0x80  // the line textures: bytes per row
 #define RELIC_LETTER(c)                                                        \
     (((c) >= 'a' && (c) <= 'z') || ((c) >= 'A' && (c) <= 'Z'))
@@ -1081,47 +1083,20 @@ static u16 RelicDescBlit(const char* a, const char* b, u8* pix, const char** sp,
     return x;
 }
 
-// The columns x0..x1 (bytes) of the 16 rows in src, shrunk to 3/4 into the 12
-// rows of dst: a pixel of dst is the mean of the 1 or 2 by 1 or 2 source pixels
-// it covers (a plain pick of every 4th would lose the thin strokes).
-// Returns the width in px.
-static u16 RelicDescShrink(const u8* src, u16 x0, u16 x1, u8* dst) {
-    u16 w = (x1 - x0) * 2, ow = w * 3 / 4, ox, oy, sx, sy, a, b, c, d, v, m;
-    if (ow > RELIC_DESC_ROW * 2 - 2) {
-        ow = RELIC_DESC_ROW * 2 - 2;
+// The columns x0..x1 (bytes) of the rows of src into dst, as they are (no
+// scaling, so no blur). Returns the width in px.
+static u16 RelicDescCopy(const u8* src, u16 x0, u16 x1, u8* dst) {
+    u16 n = MIN(x1 - x0, RELIC_DESC_ROW - 2), y;
+    for (y = 0; y < RELIC_DESC_LH; y++) {
+        memcpy(dst + y * RELIC_DESC_ROW,
+               src + (y + RELIC_DESC_ROW0) * 0x100 + x0, n);
     }
-    for (oy = 0; oy < 12; oy++) {
-        c = (oy * 4 + 2) / 3;
-        d = ((oy + 1) * 4 + 2) / 3 - 1;
-        for (ox = 0; ox < ow; ox++) {
-            a = (ox * 4 + 2) / 3;
-            b = ((ox + 1) * 4 + 2) / 3 - 1;
-            m = 0;
-            for (sy = c; sy <= d; sy++) {
-                for (sx = a; sx <= b; sx++) {
-                    v = src[sy * 0x100 + x0 + sx / 2];
-                    m += (sx & 1) ? v >> 4 : v & 15;
-                }
-            }
-            v = (d - c + 1) * (b - a + 1); // the source pixels of this one
-            sy = m;
-            m = (m + v / 2) / v;
-            if (!m && sy) {
-                m = 1;
-            }
-            if (ox & 1) {
-                dst[oy * RELIC_DESC_ROW + ox / 2] |= m << 4;
-            } else {
-                dst[oy * RELIC_DESC_ROW + ox / 2] = m;
-            }
-        }
-    }
-    return ow;
+    return n * 2;
 }
 
 // Builds the textures of the lines (VRAM y 0x110, 0x120). The name texture is
 // in the VRAM already, so g_Pix[0] is free: the text goes full size into the
-// first 0x1000 bytes, the lines (shrunk) after them.
+// first 0x1000 bytes, the lines after them.
 static void RelicDescBuild(const char* desc) {
     char codes[96];
     const char* sp[24];
@@ -1143,7 +1118,7 @@ static void RelicDescBuild(const char* desc) {
     }
     total = RelicDescBlit(codes, end, scr, sp, spx, spe, &n);
     if (total <= RELIC_DESC_LINE || n == 0) {
-        s_DescW[0] = RelicDescShrink(scr, 0, total, l1);
+        s_DescW[0] = RelicDescCopy(scr, 0, total, l1);
     } else { // two lines: cut at the space nearest to the middle
         mid = total / 2;
         for (i = 1; i < n; i++) {
@@ -1151,16 +1126,17 @@ static void RelicDescBuild(const char* desc) {
                 best = i;
             }
         }
-        s_DescW[0] = RelicDescShrink(scr, 0, spx[best], l1);
-        s_DescW[1] = RelicDescShrink(scr, spe[best], total, l2);
+        s_DescW[0] = RelicDescCopy(scr, 0, spx[best], l1);
+        s_DescW[1] = RelicDescCopy(scr, spe[best], total, l2);
     }
-    LoadTPage((u_long*)l1, 0, 0, 0, 0x110, RELIC_DESC_ROW * 2, 12);
+    LoadTPage((u_long*)l1, 0, 0, 0, 0x110, RELIC_DESC_ROW * 2, RELIC_DESC_LH);
     if (s_DescW[1]) {
-        LoadTPage((u_long*)l2, 0, 0, 0, 0x120, RELIC_DESC_ROW * 2, 12);
+        LoadTPage((u_long*)l2, 0, 0, 0, 0x120, RELIC_DESC_ROW * 2,
+                  RELIC_DESC_LH);
     }
 }
 
-// The quads of the lines (the 8th and the 9th prim): centred under the
+// The sprites of the lines (the 8th and the 9th prim): centred under the
 // banner, hidden until the banner shows (step 9).
 static void RelicDescPrims(Primitive* prim) {
     int i, k, w, x, y;
@@ -1175,16 +1151,15 @@ static void RelicDescPrims(Primitive* prim) {
         w = s_DescW[k];
         x = 0x80 - w / 2;
         y = 0xB3 + k * RELIC_DESC_LH;
+        prim->type = PRIM_SPRT;
         prim->tpage = 0x10;
         prim->clut = PAL_UNK_1A1;
-        prim->u0 = prim->u2 = 0;
-        prim->u1 = prim->u3 = w - 1;
-        prim->v0 = prim->v1 = 0x10 + k * 0x10;
-        prim->v2 = prim->v3 = prim->v0 + 11;
-        prim->x0 = prim->x2 = x;
-        prim->x1 = prim->x3 = x + w;
-        prim->y0 = prim->y1 = y;
-        prim->y2 = prim->y3 = y + RELIC_DESC_LH;
+        prim->u0 = 0;
+        prim->v0 = 0x10 + k * 0x10;
+        prim->u1 = w;
+        prim->v1 = RELIC_DESC_LH;
+        prim->x0 = x;
+        prim->y0 = y;
         PCOL(prim) = 0x80;
         prim->priority = 0x1FE;
     }
@@ -1878,10 +1853,14 @@ void EntityMessageBox(Entity* self) {
         self->ext.messageBox.height = *str++;
         self->ext.messageBox.label += 2;
 #ifdef PLATFORM_PSYZ
-        // the text can be wider than the box: widen the box to the text
-        i = MessageBoxTextW(self->ext.messageBox.label);
-        if (i > self->ext.messageBox.width) {
-            self->ext.messageBox.width = i;
+        // the box is the size of the text: the port glyph is 16 rows high and
+        // wider than the PSX one, so the stock width and height do not fit
+        self->ext.messageBox.width = MessageBoxTextW(self->ext.messageBox.label);
+        self->ext.messageBox.height = 16;
+        for (str = self->ext.messageBox.label; *str; str++) {
+            if (*str == 1) {
+                self->ext.messageBox.height += 16;
+            }
         }
 #endif
         break;
