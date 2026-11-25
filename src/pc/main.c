@@ -294,6 +294,27 @@ int Main(int argc, char* argv[]) {
                     }
                 }
             }
+            // the Ukrainian status popup words (EntityGuardText): one rect
+            // for each row of words, 4 bpp
+            // POPUP_HD_BEGIN (tools/lang/uk/popup_words.py writes this block)
+            {
+                static const short pr[][4] = {  // x, y, w, h of the popup rects, 4 bpp
+                    {656, 330, 12, 8},
+                    {648, 339, 23, 8},
+                    {648, 348, 24, 8},
+                    {648, 366, 24, 8},
+                    {648, 357, 22, 8},
+                    {648, 375, 16, 8},
+                    {673, 376, 31, 8},
+                };
+                int pi;
+                for (pi = 0; pi < (int)(sizeof(pr) / sizeof(pr[0])); pi++) {
+                    if (!Psyz_HdTexAllow(pr[pi][0], pr[pi][1], pr[pi][2], pr[pi][3], 4)) {
+                        fprintf(stderr, "[hd] allow table full: popup rect %d\n", pi);
+                    }
+                }
+            }
+            // POPUP_HD_END
         }
         if (g_HdDump) {
             Psyz_HdTexDump("data/textures/dump");

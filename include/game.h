@@ -1324,6 +1324,7 @@ void Wide_MoveCornerText(s32 prims, s32 left);
 // Under English every Lang_ lookup returns its argument.
 extern int g_Lang, g_LangNext;
 void Lang_Init(void);
+int Lang_Popups(void); // the uk popup records are in VRAM
 const char* Lang_Cell(const char* s);
 const char* Lang_Sjis(const char* s);
 const char* Lang_Row(int table, int index, const char* s);

@@ -116,7 +116,7 @@ Without a file the disc music plays. `music_files = 0` always plays the disc mus
 | Ten uk labels that keep stock pixels (file select titles, name plate, HUD) | Ukrainian Xbox 360 mod | `ps1vram_uk.bin` in `games/` -> pack | `art.bin` | No | Stock-derived, local |
 | Three file-select plates | PS1 US image, cleared by the pack | `tools/lang/uk/plates.py` (rules only) | `art.bin` | Rules: yes. Pixels: no | Stock-derived, local |
 | "1792" card (uk) | Our render, Alegreya Sans Italic | `plates.py` `title_card` | `art.bin` | Yes (rule and font) | OFL-1.1 font |
-| Status popup words (uk) | PS1 US image (Latin twin letters, stock rows cleared) and our hand-drawn Cyrillic 3x5 masks | `tools/lang/uk/popup_words.py` | `art.bin` | Rules and masks: yes. Pixels: no | Stock-derived, local |
+| Status popup words (uk) | PS1 US image (Latin twin letters, stock rows cleared) and our hand-drawn Cyrillic 3x5 masks; the HD pictures (textures/uk/popup_*) are drawn from the same masks, no stock pixel | `tools/lang/uk/popup_words.py` | `art.bin` | Rules and masks: yes. Pixels: no | Stock-derived, local |
 | uk title logo, PRESS START, loading text, title background, game-over picture | Owner's pictures made from stock art | `tools/lang/uk/local/art.bin` | `art.bin` | No | Stock-derived, local |
 | Saturn stages and character select art | Saturn image | CMake, `-DENABLE_SATURN_STAGES=ON` | `data/ST/...` | No | Stock, local |
 
