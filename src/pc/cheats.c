@@ -371,27 +371,36 @@ const char* Castle_ZoneName(int stage) {
     return "";
 }
 
+extern s32 g_WarpMapCursor[3]; // port_menu.c: 1 while a portal warp map shows
+
+// Why a warp cannot start now, as a line for the player (the port menu has
+// the uk words, port_menu.c WhyWord), or NULL. The castle map screen (SELECT)
+// does not refuse: StartWarp closes it first. The warp map of a portal does
+// (its own pick code owns the screen), and so does the pause menu.
 const char* Cheat_WarpRefusal(void) {
-    if (g_GameState != Game_Play || g_GameStep != Play_Default) {
-        return "not in play";
+    if (g_GameState != Game_Play) {
+        return "start or load a game first";
     }
-    if (g_GameEngineStep != Engine_Normal) {
-        return "game menu, map or scene";
+    if (g_GameStep != Play_Default || D_8003C730 != 0 || g_WarpTarget.active) {
+        return "the game is busy";
     }
-    if (D_8003C730 != 0 || g_WarpTarget.active) {
-        return "a load runs";
+    if (g_GameEngineStep == Engine_Map && g_WarpMapCursor[0]) {
+        return "close the map first";
     }
-    if (g_DemoMode != Demo_None) {
-        return "demo";
+    if (g_GameEngineStep == Engine_Menu || g_GameEngineStep == Engine_0x70) {
+        return "close the pause menu first";
     }
-    if (g_CutsceneHasControl) {
-        return "cutscene";
+    if (g_GameEngineStep != Engine_Normal && g_GameEngineStep != Engine_Map) {
+        return "the game is busy";
+    }
+    if (g_DemoMode != Demo_None || g_CutsceneHasControl) {
+        return "the game is busy";
     }
     if (g_Player.status & PLAYER_STATUS_DEAD) {
-        return "player is dead";
+        return "you are dead";
     }
     if (g_StageId == STAGE_ST0) {
-        return "prologue";
+        return "not in the prologue";
     }
     return NULL;
 }
@@ -423,6 +432,12 @@ static int Crashes(int stage, int room) {
 // mist 0: a boss door spot, the player arrives on foot (mist does not start
 // some bosses and falls through floors)
 static void StartWarp(int stage, int room, int cx, int cy, int mist) {
+    if (g_GameEngineStep == Engine_Map) { // the castle map screen: close it
+        g_api.SetFadeMode(FADE_HIDE_MAP);
+        D_800974A4 = 0;
+        g_PauseAllowed = true;
+        g_GameEngineStep = Engine_Normal;
+    }
     g_WarpTarget = (struct WarpTarget){1, stage, room, cx, cy};
     // arrival in mist inside a wall must be safe: these stay on until the
     // game ends; not written to sotn.ini, so the next start has them off
@@ -443,13 +458,13 @@ const char* Cheat_Warp(int stage, int room, int cx, int cy) {
     const char* why = Cheat_WarpRefusal();
 
     if (!why && !r) {
-        why = "unknown room";
+        why = "pick another room";
     }
     if (!why && Crashes(stage, room)) {
-        why = "this room crashes the port, pick another";
+        why = "pick another room";
     }
     if (!why && (cx < r->left || cx > r->right || cy < r->top || cy > r->bottom)) {
-        why = "cell is outside the room";
+        why = "pick another room";
     }
     if (why) {
         fprintf(stderr, "[cheat] warp %s room %d cell %d,%d: refused, %s\n",
@@ -482,7 +497,7 @@ const char* Cheat_WarpStart(int stage) {
             return Cheat_Warp(stage, r->room, r->left, r->bottom);
         }
     }
-    return "unknown room";
+    return "pick another room";
 }
 
 // The boss list of the port menu. stage, room, px, py: where the game's
@@ -689,17 +704,20 @@ const char* Cheat_ApplyCharacter(void) {
         g_CheatSaveChar = g_PlayableCharacter;
     }
     want = Cheat_Character(g_CheatSaveChar);
+    if (!why && g_GameEngineStep == Engine_Map) {
+        why = "close the map first"; // only a warp closes it itself
+    }
     if (!why && want == g_PlayableCharacter) {
-        why = "already playing";
+        why = "already playing this hero";
     }
     if (!why && (g_Player.status & PLAYER_STATUS_TRANSFORM)) {
-        why = "change form back";
+        why = "stand on the ground first";
     }
     if (!why && !(g_Player.vram_flag & TOUCHING_GROUND)) {
-        why = "stand on the ground";
+        why = "stand on the ground first";
     }
     if (!why && (!g_LastRoom.active || g_LastRoom.stage != g_StageId)) {
-        why = "room unknown";
+        why = "enter a room first";
     }
     if (why) {
         fprintf(stderr, "[cheat] apply character %d: refused, %s\n", want, why);

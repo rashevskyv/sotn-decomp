@@ -239,7 +239,21 @@ static int ox16, oy16;   // frame position of cell (0, 0), 1/16 px
 static int map_ready;
 static const struct CastleRoom* owners[MAX_OWNERS];
 static int n_owners;
+// uk words of the teleport reasons (tools/lang/uk/ua_port.json 270..279)
+enum {
+    P_W_NOGAME = 270, // the help line of the greyed TELEPORT
+    P_W_NOGAME_MSG,
+    P_W_BUSY,
+    P_W_CLOSE_MAP,
+    P_W_CLOSE_PAUSE,
+    P_W_DEAD,
+    P_W_PROLOGUE,
+    P_W_OTHER_ROOM,
+    P_W_GROUND,
+    P_W_SAME_HERO,
+};
 static char msg[48];
+static int msg_word = -1; // its uk word (P_*), -1: none
 static int msg_timer;
 static int click_act; // Activate runs for a mouse click
 static int exit_armed; // EXIT was pressed once: the next press quits
@@ -510,7 +524,7 @@ static void Restart(void) {
     char pid[16];
     int i, rc;
     if (!av || g_ArgC < 1) {
-        Message("cannot start");
+        Message("could not restart");
         return;
     }
     for (i = 0; i < g_ArgC; i++) {
@@ -536,7 +550,7 @@ static void Restart(void) {
     }
 #endif
     if (rc) {
-        Message("cannot start");
+        Message("could not restart");
         return;
     }
 #endif
@@ -592,7 +606,32 @@ static void Message(const char* s) {
         msg[i] = s[i] >= 'a' && s[i] <= 'z' ? s[i] - 32 : s[i];
     }
     msg[i] = 0;
+    msg_word = -1;
     msg_timer = 150;
+}
+
+// uk words of the reasons Cheat_WarpRefusal and the warp code give (cheats.c)
+static const struct {
+    const char* en;
+    int word;
+} why_words[] = {{"start or load a game first", P_W_NOGAME_MSG},
+                 {"the game is busy", P_W_BUSY},
+                 {"close the map first", P_W_CLOSE_MAP},
+                 {"close the pause menu first", P_W_CLOSE_PAUSE},
+                 {"you are dead", P_W_DEAD},
+                 {"not in the prologue", P_W_PROLOGUE},
+                 {"pick another room", P_W_OTHER_ROOM},
+                 {"stand on the ground first", P_W_GROUND},
+                 {"already playing this hero", P_W_SAME_HERO}};
+
+static void MessageWhy(const char* why) {
+    int i;
+    Message(why);
+    for (i = 0; i < LEN(why_words); i++) {
+        if (!strcmp(why, why_words[i].en)) {
+            msg_word = why_words[i].word;
+        }
+    }
 }
 
 static int FbW(void) { return g_CurrentBuffer->disp.disp.w; }
@@ -693,7 +732,7 @@ static void FindOwners(int cx, int cy) {
 static void Go(const struct CastleRoom* r) {
     const char* why = Cheat_Warp(r->stage, r->room, cur_x, cur_y);
     if (why) {
-        Message(why);
+        MessageWhy(why);
         page = PAGE_MAP;
     } else {
         page = PAGE_MAIN;
@@ -704,7 +743,7 @@ static void Go(const struct CastleRoom* r) {
 static void Teleport(void) {
     FindOwners(cur_x, cur_y);
     if (n_owners == 0) {
-        Message("no room here");
+        MessageWhy("pick another room");
     } else if (n_owners == 1) {
         Go(owners[0]);
     } else {
@@ -731,7 +770,7 @@ static void OpenMap(void) {
         map_ready = 1;
     }
     if (g_CastleRoomCount == 0) {
-        Message("no castle data in this build");
+        Message("no castle map in this build");
     }
 }
 
@@ -889,7 +928,7 @@ static void MiniWarp(int x, int y) {
             x, y, mark_cx, mark_cy, Castle_StageName(r->stage), r->room,
             why ? why : "warp");
     if (why) {
-        Message(why); // shown in the header line
+        MessageWhy(why); // shown in the header line
     } else {
         page = PAGE_MAIN;
         Close();
@@ -1491,7 +1530,9 @@ static void Activate(void) {
             Change(1);
         }
     } else if (page == PAGE_CHEATS) {
-        if (sel == CH_TELEPORT) {
+        if (sel == CH_TELEPORT && g_GameState != Game_Play) {
+            // greyed out: the help line says why
+        } else if (sel == CH_TELEPORT) {
             map_ready = 0; // the map, on the player's room
             OpenMap();
         } else if (sel == CH_CHARACTER && click_act) {
@@ -1499,7 +1540,7 @@ static void Activate(void) {
         } else if (sel == CH_CHARACTER) {
             const char* why = Cheat_ApplyCharacter();
             if (why) {
-                Message(why); // shown in the CHARACTER line
+                MessageWhy(why); // shown in the CHARACTER line
             } else {
                 page = PAGE_MAIN;
                 Close();
@@ -1534,7 +1575,7 @@ static void Activate(void) {
             OpenList(1);
         } else if ((why = it >= ITEM_BOSS ? Cheat_WarpBoss(it - ITEM_BOSS)
                                           : Cheat_WarpStart(it))) {
-            Message(why); // shown in the header line
+            MessageWhy(why); // shown in the header line
         } else {
             page = PAGE_MAIN;
             Close();
@@ -2167,6 +2208,7 @@ static void Marquee(int x, int y, int w, const char* s, u8 r, u8 g, u8 b,
 // box lines sb_first.. show them) gets a scroll bar inside the right edge:
 // a thumb as long as the part on screen, at its place.
 static int box_mark = -1, box_min_w;
+static int box_off = -1; // a greyed line (one frame): it does nothing
 static int help_word = -1; // the help line under the box (one frame)
 static const char* help_en;
 static int sb_first, sb_total, sb_top;
@@ -2228,6 +2270,12 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     for (i = 0; i < count; i++) {
         lit = i == hi || (box_left && i == box_mark);
         c = lit ? 255 : 160;
+        if (i == box_off) {
+            Marquee(x + BORDER, y + BORDER + i * LINE_H,
+                    w - BORDER * 2 - (bar ? 6 : 0), lines[i], 90, 90, 90,
+                    i == hi);
+            continue;
+        }
         if (i == info && !lit) {
             Marquee(x + BORDER, y + BORDER + i * LINE_H,
                     w - BORDER * 2 - (bar ? 6 : 0), lines[i], 128, 200, 255, 0);
@@ -2246,6 +2294,7 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
         Rect(x + w - 8, y + BORDER + sb_first * LINE_H - 2, 4, tl, 48, 48, 96);
     }
     sb_total = sb_first = 0;
+    box_off = -1;
     // the button hint under the box; beside the mini map the box lets the
     // rooms under it show through, so its frame is four lines
     Line(x + BORDER, y + h + 4, hint, 255, 255, 64);
@@ -2678,9 +2727,7 @@ static void DrawCheats(void) {
         } else if (msg_timer > 0) { // why the character did not change
             msg_timer--;
             Clear(lines[i]);
-            AddW(lines[i], P_NO, "NO:");
-            snprintf(tmp, sizeof(tmp), uk ? " %.24s" : " %.27s", msg);
-            Add(lines[i], tmp);
+            AddW(lines[i], msg_word, msg);
         } else {
             AddValue(lines[i], chars[g_Cheat.character].word,
                      chars[g_Cheat.character].en);
@@ -2692,6 +2739,13 @@ static void DrawCheats(void) {
     AddW(lines[CH_BACK], P_BACK, "BACK");
     help_word = CHEAT_HELP_WORD + sel;
     help_en = hints[sel];
+    if (g_GameState != Game_Play) { // no game: the teleport has nowhere to go
+        box_off = CH_TELEPORT;
+        if (sel == CH_TELEPORT) {
+            help_word = P_W_NOGAME;
+            help_en = "START OR LOAD A GAME TO USE THE TELEPORT.";
+        }
+    }
     Box(lines, N_CHEATS, sel, -1);
 }
 
@@ -3075,9 +3129,7 @@ static void DrawList(void) {
     Clear(lines[0]);
     if (msg_timer > 0) {
         msg_timer--;
-        AddW(lines[0], P_NO, "NO:");
-        snprintf(tmp, sizeof(tmp), uk ? " %.24s" : " %.27s", msg);
-        Add(lines[0], tmp);
+        AddW(lines[0], msg_word, msg);
     } else if (rm) { // the place of the room under the pointer
         AddTag(lines[0], rm->src, 0);
         AddZone(lines[0], rm->stage);
@@ -3252,7 +3304,7 @@ static void DrawMap(void) {
     Clear(line);
     if (msg_timer > 0) {
         msg_timer--;
-        Add(line, msg);
+        AddW(line, msg_word, msg);
         Line(x0 + 4, y0 + 3 + LINE_H, line, 255, 120, 80);
     } else if (n_owners) {
         i = BossAt(cur_x, cur_y, castle);
