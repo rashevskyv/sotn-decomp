@@ -195,6 +195,14 @@ static const char* D_800A2D68[] = {
 };
 #endif
 
+#ifdef PLATFORM_PSYZ
+// port: the Pocket is the 8th button row; without it the 8th button is the
+// stock leftover
+#define BUTTON_ROWS (g_QuickEnabled ? 8 : 7)
+#else
+#define BUTTON_ROWS 7
+#endif
+
 bool CheckIfAllButtonsAreAssigned(void) {
     s32 buf[BUTTON_COUNT];
     s32 i;
@@ -205,7 +213,7 @@ bool CheckIfAllButtonsAreAssigned(void) {
         buf[i] = 0;
     }
 
-    for (i = 0; i < 7; i++) {
+    for (i = 0; i < BUTTON_ROWS; i++) {
         buf[g_Settings.buttonConfig[i]] = 1;
     }
 
@@ -1482,8 +1490,13 @@ void MenuButtonConfigDraw(MenuContext* ctx) {
 #define XVAR x
 #endif
 
-    for (i = 0, x = startX; i < 7; i++) {
+    for (i = 0, x = startX; i < BUTTON_ROWS; i++) {
+#ifdef PLATFORM_PSYZ
+        MenuDrawStr(i == 7 ? PocketLabel() : g_MenuStr[i + 22], cursorX,
+                    0x30 + i * 16, ctx);
+#else
         MenuDrawStr(g_MenuStr[i + 22], cursorX, 0x30 + i * 16, ctx);
+#endif
         buttonId = g_Settings.buttonConfig[i];
 #ifdef PLATFORM_PSYZ
         if (MenuDrawButton(
@@ -4195,7 +4208,11 @@ MenuContextInit g_MenuInit[NUM_MENU] = {
 #else
     {168, 120, 144, 64, 0x30}, // MENU_DG_CLOAK_COLOR
 #endif
+#ifdef PLATFORM_PSYZ
+    {148, 44, 200, 128, 0x30}, // MENU_DG_CFG_BUTTONS (8 rows: the Pocket)
+#else
     {148, 44, 200, 112, 0x30}, // MENU_DG_CFG_BUTTONS
+#endif
 #ifdef PLATFORM_PSYZ
     {CLOAK_WIN_X, 44, 70, 32, 0x30}, // MENU_DG_CLOAK_LINING (w: MenuReverseCloakDraw)
 #else
@@ -5065,7 +5082,7 @@ block_4:
         }
         break;
     case MENU_STEP_SYSTEM_BUTTONS:
-        MenuHandleCursorInput(&g_MenuNavigation.cursorButtons, 7, 0);
+        MenuHandleCursorInput(&g_MenuNavigation.cursorButtons, BUTTON_ROWS, 0);
         MenuHandleCursorInput(
             &g_Settings.buttonConfig[g_MenuNavigation.cursorButtons], 8, 5);
         if (g_pads[0].tapped & PAD_MENU_BACK_ALT) {

@@ -448,10 +448,22 @@ void HandlePlay(void) {
                 *ptr++ = 0;
             }
 
+#ifdef PLATFORM_PSYZ
+            {
+                // port: right hand Y, left hand R, jump B, special L, wolf X,
+                // mist ZR, bat A, Pocket ZL (button ids: src/pc/buttons.c)
+                static const u8 dflt[BUTTON_COUNT] = {0, 6, 2, 5, 3, 4, 1, 7};
+                for (i = 0; i < BUTTON_COUNT; i++) {
+                    g_Settings.buttonConfig[i] = dflt[i];
+                    g_Settings.buttonMask[i] = g_ButtonMask[dflt[i]];
+                }
+            }
+#else
             for (i = 0; i < BUTTON_COUNT; i++) {
                 g_Settings.buttonConfig[i] = i;
                 g_Settings.buttonMask[i] = g_ButtonMask[i];
             }
+#endif
             for (i = 0; i < LEN(g_Settings.cloakColors); i++) {
                 g_Settings.cloakColors[i] = 0;
             }
