@@ -220,7 +220,12 @@ bool CheckIfAllButtonsAreAssigned(void) {
     for (i = 0; i < BUTTON_COUNT; i++) {
         if (buf[i] == 0) {
 #if TARGET != TARGET_PSP
-            g_Settings.buttonConfig[7] = i;
+#ifdef PLATFORM_PSYZ
+            // port: with the Pocket row the 8th slot is the player choice;
+            // a clash must not move it, the check below refuses instead
+            if (BUTTON_ROWS == 7)
+#endif
+                g_Settings.buttonConfig[7] = i;
 #endif
             break;
         }
