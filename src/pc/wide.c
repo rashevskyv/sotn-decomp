@@ -474,7 +474,8 @@ void Wide_LoadIni(const char* path) {
                 g_MapHeroPulse = v != 0;
             } else if (sscanf(line, " voice = %15s", word) == 1) {
                 for (v = 0; v < VOICE_COUNT; v++) {
-                    if (!strcmp(word, g_VoiceSetNames[v])) {
+                    if (!strcmp(word, g_VoiceSetNames[v]) &&
+                        Voice_SetAvailable(v)) { // else the PS1 voice
                         g_VoiceSet = v;
                     }
                 }

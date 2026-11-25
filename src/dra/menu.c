@@ -2288,11 +2288,19 @@ void MenuSpellsDraw(MenuContext* ctx) {
 // The US data keeps the Japanese LEVEL/EXP labels of the two familiars
 // carried over from the Saturn version: draw the labels of the other rows
 // (a language pack translates them). Their US names are Japanese: under en
-// the build takes the PSP English names from the PSP disc, under uk the
+// the build takes the PSP English names from the PSP disc (else two built-in
+// copies), under uk the
 // language pack swaps them.
 #define FAMILIAR_JP_LABELS 0
 #ifdef SOTN_PSP_FAMILIAR_NAMES
 #include "psp_familiar_names.h"
+#else
+// Without the PSP disc: the same two English names ("Fairy", "N Demon") the
+// PSP table has, 7 cells at most, so en never shows the Japanese ones.
+static const char psp_familiar_names[2][10] = {
+    "\x26\x41\x49\x52\x59\xFF",
+    "\x2E\x00\x24\x45\x4D\x4F\x4E\xFF",
+};
 #endif
 
 // A name has 7 cells before the LEVEL label. A longer one takes two lines
@@ -2303,11 +2311,9 @@ static void MenuDrawFamiliarName(s32 i, s32 x, s32 y, MenuContext* ctx) {
     char head[16];
     s32 n, k;
 
-#ifdef SOTN_PSP_FAMILIAR_NAMES
     if (!g_Lang && i >= FAM_STATS_YOUSEI) {
         s = psp_familiar_names[i - FAM_STATS_YOUSEI];
     }
-#endif
     for (n = 0; s[n] != (char)0xFF; n++) {
     }
     for (k = 0; n > 7 && k < n && k < LEN(head) - 2; k++) {
