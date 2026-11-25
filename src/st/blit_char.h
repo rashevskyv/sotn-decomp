@@ -8,6 +8,17 @@
 //
 #include <stage.h>
 
+#ifdef PLATFORM_PSYZ
+// The font of the banner and the message boxes (port builds):
+// 0 = the 12x16 glyph of the Equip description line (en: the BIOS font, uk:
+//     the 12x16 serif Cyrillic), 1:1
+// 1 = the 8x11 serif cells of the shop, the dialogue and the save box, as a
+//     12x16 glyph (Lang_SerifGlyph); a code with no cell takes the glyph of 0
+#ifndef MSG_FONT_CELLS
+#define MSG_FONT_CELLS 0
+#endif
+#endif
+
 const char* BlitChar(const char* str, u16* xOffset, u8* pix, u16 stride) {
     const u16 DOUBLE_SPACE = 0x8140;
     const u16 RIGHT_DOUBLE_QUOTATION_MARK = 0x8168;
@@ -55,7 +66,10 @@ const char* BlitChar(const char* str, u16* xOffset, u8* pix, u16 stride) {
 #ifdef PLATFORM_PSYZ
     // kind 0 (the glyph of the Equip description line): every row as it is.
     // Kind 1 mixes two rows into one, which blurs the text.
-    chPix = (u8*)g_api.func_80106A28(ch, 0);
+    chPix = MSG_FONT_CELLS ? Lang_SerifGlyph(ch) : NULL;
+    if (!chPix) {
+        chPix = (u8*)g_api.func_80106A28(ch, 0);
+    }
 #else
     chPix = g_api.func_80106A28(ch, 1);
 #endif

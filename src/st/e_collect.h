@@ -1015,8 +1015,10 @@ extern u16 msgBoxTpage[0x600];
 #define RELIC_DESC_PRIMS 9
 #define RELIC_ANIM_PRIMS 7  // the sparkle loop at the end of the entity
 #define RELIC_DESC_SRC 0xFA  // the text at full size: bytes of 2 px per row
-#define RELIC_DESC_LH 16 // rows of a description line: texture, sprite, box
-#define RELIC_DESC_ROW0 0 // the first row of the glyph that is copied
+// rows of a description line (texture, sprite, box) and the first glyph row
+// that is copied: a serif cell has its 11 rows at the glyph rows 2..12
+#define RELIC_DESC_LH (MSG_FONT_CELLS ? 12 : 16)
+#define RELIC_DESC_ROW0 (MSG_FONT_CELLS ? 2 : 0)
 #define RELIC_DESC_LINE 0x78 // the widest line: 240 px, the 4:3 screen less box
 #define RELIC_DESC_ROW 0x80  // the line textures: bytes per row
 #define RELIC_LETTER(c)                                                        \

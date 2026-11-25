@@ -803,6 +803,35 @@ int Lang_SjisCell(int sj) {
     return c ? c - 0x20 : -1;
 }
 
+// A serif menu cell of Lang_SjisCell as a 12x16 glyph of the BIOS font format
+// (6 bytes a row, 16 rows, 4 bits a pixel): one ink (the full shade 8 of the
+// BIOS glyphs), the 11 rows of the cell at rows 2..12. The save box and the
+// banner and message boxes of the stages draw their text with it (the shop
+// and the dialogue use the cells themselves). NULL for a code with no cell:
+// the caller takes the BIOS glyph.
+u8* Lang_SerifGlyph(int sj) {
+    static u8 glyph[16 * 6];
+    const u8* cell = NULL;
+    int c = Lang_SjisCell(sj);
+    int y, i, ink = 0;
+
+    // < and > are the port menu's cells, as in Lang_DialogueGlyph
+    if (sj == '<' || sj == '>' || c < 0 || (c && !(cell = mfont[c & 0xFF]))) {
+        return NULL;
+    }
+    memset(glyph, 0, sizeof(glyph));
+    for (y = 0; c && y < 11; y++) {
+        for (i = 0; i < 8; i++) {
+            if (cell[y * 4 + i / 2] >> (i & 1) * 4 & 15) {
+                glyph[(y + 2) * 6 + i / 2] |= 8 << (i & 1) * 4;
+                ink = 1;
+            }
+        }
+    }
+    // a blank non-space cell would not end the left-shift loop of the callers
+    return ink || !c ? glyph : NULL;
+}
+
 // uk: a word of the port's own screens (tools/lang/uk/ua_port.json) as menu
 // cells (FF end), or NULL
 const char* Lang_Port(int index) {
