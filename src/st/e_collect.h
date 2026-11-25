@@ -1659,7 +1659,14 @@ relicRetry:
         }
 #endif
         self->ext.relicOrb.unk7C++;
+#ifdef PLATFORM_PSYZ
+        // the port: the relic banner stays 3x longer (stock 0x60, ST0 0x100)
 #if STAGE == STAGE_ST0
+        if (self->ext.relicOrb.unk7C > 0x100 * 3) {
+#else
+        if (self->ext.relicOrb.unk7C > 0x60 * 3) {
+#endif
+#elif STAGE == STAGE_ST0
         if (self->ext.relicOrb.unk7C > 0x100) {
 #else
         if (self->ext.relicOrb.unk7C > 0x60) {

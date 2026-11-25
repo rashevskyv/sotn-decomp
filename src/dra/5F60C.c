@@ -1430,7 +1430,6 @@ static void Hud_Number(Primitive** p, s32 value, s32 x, s32 y, s32 align,
 static void Hud_Layout(void) {
     Primitive* p[HUD_ALL];
     Primitive* prim;
-    SubweaponDef subwpn;
     s32 i, k;
     u16 clut;
 
@@ -1476,11 +1475,9 @@ static void Hud_Layout(void) {
     }
     Hud_Number(
         &p[HUD_MP_DIGITS], g_Status.mp, 43, 41 + HUD_DY, 1, false, 5, 4, 0x196);
-    // hearts: the stock flicker when the sub-weapon can be used
-    clut = 0x196;
-    if (func_800FE3C4(&subwpn, 0, false) && !(g_Timer & 2)) {
-        clut = 0x193;
-    }
+    // hearts: normal colour, steady green (0x193) at the maximum (owner,
+    // 2026-11-25). Stock flickers green while the sub-weapon is usable.
+    clut = g_Status.hearts == g_Status.heartsMax ? 0x193 : 0x196;
     Hud_Number(&p[HUD_HEART_DIGITS], g_Status.hearts, 101, 38 + HUD_DY, 0, true,
                3, 7, clut);
     // heart icon 1x at 80,40, left of the hearts number (owner, 2026-11-24)
