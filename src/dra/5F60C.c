@@ -1239,35 +1239,41 @@ bool StatusPause(s32 arg0) {
 }
 
 #ifdef PLATFORM_PSYZ
-// Alucard HUD, the owner's layout of 2026-11-24 (mockup preset "Ваш макет"):
-// the frame holds two bars (red HP on top, blue MP below), small HP and MP
-// numbers above and below the frame, a big hearts number with a heart icon
-// under the sub-weapon. The left orb is blank: it is kept for the
-// third-hand item (HUD_THIRD_HAND). Hud_PatchVram makes the art.
+// Alucard HUD, the owner's layout of 2026-11-25 (HUD editor): the frame holds
+// two bars (red HP on top, blue MP below), small HP and MP numbers above and
+// below the frame. The left orb holds the sub-weapon icon; the hearts gauge
+// is a flask horseshoe round it, with a heart icon and the big hearts number
+// under it. The Pocket (third hand) icon and its count sit right of the frame.
+// Hud_PatchVram makes the art.
 // The chain draws in order, and psyz keeps an HD number only when no later
 // primitive overlaps it (sdl3_gl.c Hd_OverHide): the bar and icons come
-// first, the numbers last.
+// first, the numbers last. The orb and the flask are at priority 0x1EF, one
+// slot before the rest (0x1F0), so the sub-weapon icon (chain index 0) draws
+// over them.
+#define HUD_ORB 4
 #define HUD_HP_BAR 6
 #define HUD_HEART 7
 #define HUD_THIRD_HAND 8    // the Pocket icon
-// the hearts arc around the sub-weapon ring: HUD_ARC_N flat quads (PRIM_G4)
-// before the numbers, so no HD number is hidden by them
+// the hearts gauge: ONE textured prim, the flask picture (HUD_FLASK_*)
 #define HUD_ARC 9
-#define HUD_ARC_N 36
-#define HUD_THIRD_DIGITS (HUD_ARC + HUD_ARC_N) // 4 prims, its count
-#define HUD_HP_DIGITS (HUD_THIRD_DIGITS + 4)   // 4 prims
-#define HUD_HEART_DIGITS (HUD_HP_DIGITS + 4)   // 4 prims
-#define HUD_MP_DIGITS (HUD_HEART_DIGITS + 4)   // 4 prims
-#define HUD_ALL (HUD_NUM_SPRITES + 11 + HUD_ARC_N)
+#define HUD_THIRD_DIGITS (HUD_ARC + 1)       // 4 prims, its count
+#define HUD_HP_DIGITS (HUD_THIRD_DIGITS + 4) // 4 prims
+#define HUD_HEART_DIGITS (HUD_HP_DIGITS + 4) // 4 prims
+#define HUD_MP_DIGITS (HUD_HEART_DIGITS + 4) // 4 prims
+#define HUD_ALL (HUD_MP_DIGITS + 4)
 // the Pocket icon: slot 0x1C of the icon page (0x1D..0x1F are the Pocket food
 // and the toast, 0x10..0x17 the Equip menu)
 #define HUD_THIRD_SLOT 0x1C
 // the whole HUD 3 px lower than the mockup: rows 0..19 of the screen are
 // clipped, and the HP number starts at row 17 in the mockup
 #define HUD_DY 3
-// the third-hand item: 16x16 inside the left orb (owner layout, 2026-11-24)
-#define HUD_THIRD_HAND_X 5
-#define HUD_THIRD_HAND_Y (25 + HUD_DY)
+// the sub-weapon icon, its sparkle and dot: 16x16 in the left orb (owner
+// layout, 2026-11-25; top-left, editor y + HUD_DY)
+#define HUD_SUBWPN_X 9
+#define HUD_SUBWPN_Y (27 + HUD_DY)
+// the third-hand item: 16x16 right of the frame
+#define HUD_THIRD_HAND_X 90
+#define HUD_THIRD_HAND_Y (23 + HUD_DY)
 // its count: hearts digits (big, q=3, step 7, clut 0x196), NO "x" (owner),
 // top-left of the digits at icon + (8, 6)
 #define HUD_THIRD_HAND_NX (HUD_THIRD_HAND_X + 8)
@@ -1278,6 +1284,25 @@ bool StatusPause(s32 arg0) {
 // free 52x8 spot in tpage 0x1F for the red HP bar strip
 #define HUD_HPBAR_U 0xA0
 #define HUD_HPBAR_V 0xE8
+// The flask picture (HUD_FLASK_W x HUD_FLASK_H, 4 bits a pixel) and its 16
+// colours, in free VRAM of tpage 0x1F. Free: both F_GAME.BIN and F_GAME2.BIN
+// hold only zeros at u 160..255, v 232..255 (the HP strip, the heart and the
+// flask are the only users), and no loader of the game writes there.
+#define HUD_FLASK_U 212 // 7 words: x 1013..1019, past the HP strip (u < 212)
+#define HUD_FLASK_V 232 // 23 rows: y 488..510, above the CLUT row
+#define HUD_FLASK_W 26
+#define HUD_FLASK_H 23
+#define HUD_FLASK_CLUT_X 1008 // u 192..255 of the last row (v 255, y 511)
+#define HUD_FLASK_CLUT_Y 511
+#define HUD_FLASK_CLUT 0x3FD // a g_ClutIds slot (0x3FE, 0x3FF: lang.c)
+static u32 g_HudFlaskKey; // what the VRAM holds (n, colour); 0 = nothing
+// The status CLUT of the HP bar (Hud_HpClut): u 128..191 of the last row (v
+// 255, y 511): zero in both F_GAME files, as the other rows from 254 down;
+// g_ClutIds slot 0x3FC is unused.
+#define HUD_HP_CLUT_X 992
+#define HUD_HP_CLUT_Y 511
+#define HUD_HP_CLUT 0x3FC
+static u8 g_HudHpClut; // the status the VRAM CLUT holds; 0 = nothing
 
 #define HUD_PIX(b, u, v) (((b)[(v) * 32 + (u) / 4] >> ((u) % 4 * 4)) & 15)
 static void Hud_SetPix(u16* b, s32 u, s32 v, s32 c) {
@@ -1298,6 +1323,8 @@ void Hud_PatchVram(void) {
     RECT rb = {960 + HUD_HPBAR_U / 4, 256 + HUD_HPBAR_V, 13, 8};
     s32 i, u, v, c;
 
+    g_HudFlaskKey = 0; // the tileset load wiped the flask: draw it again
+    g_HudHpClut = 0;
     DrawSync(0);
     StoreImage(&r, (u_long*)vram);
     DrawSync(0);
@@ -1407,7 +1434,7 @@ static void Hud_Bar(Primitive* p, s32 x, s32 y, s32 len, u16 mode) {
 // 1x, align: -1 = x is the left edge, 0 = the centre, 1 = the right edge.
 static void Hud_Number(Primitive** p, s32 value, s32 x, s32 y, s32 align,
                        bool big, s32 q, s32 step, u16 clut) {
-    s32 nd, div, k, w4, h;
+    s32 nd, div, k, w4, h, x8;
 
     for (nd = 1, div = 10; nd < 4 && value >= div; nd++, div *= 10) {
     }
@@ -1416,91 +1443,152 @@ static void Hud_Number(Primitive** p, s32 value, s32 x, s32 y, s32 align,
     }
     h = big ? 16 : 8;
     w4 = ((nd - 1) * step + 8) * q;
-    x = x * 4 - (align > 0 ? w4 : align == 0 ? w4 / 2 : 0);
+    // in eighths of a pixel, so a centred odd w4 (3 quarters, 2 digits at
+    // q=3) is exact: left = x - w * q / 8, each edge rounded once
+    x8 = x * 8 - (align > 0 ? w4 * 2 : align == 0 ? w4 : 0);
     for (k = 0; k < 4; k++) {
         if (k >= nd) {
             p[k]->drawMode = DRAW_HIDE;
             continue;
         }
         div /= 10;
-        Hud_Quad(p[k], (x + k * step * q + 2) >> 2, y,
-                 (x + (k * step + 8) * q + 2) >> 2, y + (h * q + 2) / 4,
+        Hud_Quad(p[k], (x8 + k * step * q * 2 + 4) >> 3, y,
+                 (x8 + (k * step + 8) * q * 2 + 4) >> 3, y + (h * q + 2) / 4,
                  0x20 + (value / div) % 10 * 8, big ? 0x20 : 0x18, 8, h);
         p[k]->clut = clut;
         p[k]->drawMode = DRAW_ABSPOS;
     }
 }
 
-// Hearts gauge: a 270 degree horseshoe arc round the sub-weapon ring (icon
-// 90,26 16x16, centre 98,34), gap at the bottom, fills clockwise from the
-// bottom left (owner, 2026-11-25). Segment k spans 7.5 degrees.
-#define HUD_ARC_CX 98
-#define HUD_ARC_CY (23 + 8 + HUD_DY) // icon y + half its height
-#define HUD_ARC_RI 9.5f
-#define HUD_ARC_RO 11.0f
-#include <math.h>
-static s32 Hud_ArcRound(float v) {
-    return (s32)(v < 0 ? v - 0.5f : v + 0.5f);
+// Hearts gauge: a flask horseshoe round the left orb (owner HUD editor,
+// 2026-11-25), pixel-exact from g_HudFlaskPx (made by gen_flask.py, do not
+// edit): dx, dy from the centre, seg 0..35 (fill order), the empty and the
+// full colour index. It is drawn on the CPU into a 26x23 4bpp picture in free
+// VRAM with its own 16-colour CLUT, one textured prim. The picture is made
+// again only when the filled segments or the state colour change.
+#include "hud_flask_px.h"
+#define HUD_FLASK_SEGS 36
+#define HUD_FLASK_CX 16
+#define HUD_FLASK_CY (35 + HUD_DY)
+// c * t %, and c + (255 - c) * t %, rounded
+#define HUD_DARK(c, t) (((c) * (t) + 50) / 100)
+#define HUD_LIGHT(c, t) ((c) + ((255 - (c)) * (t) + 50) / 100)
+#define HUD_RGB(r, g, b) (0x8000 | (r) >> 3 | (g) >> 3 << 5 | (b) >> 3 << 10)
+
+// the 7 liquid shades of the colour c: q = a b d e f g h
+static void Hud_Liquid(u16* q, s32 r, s32 g, s32 b) {
+    q[0] = HUD_RGB(r, g, b);
+    q[1] = HUD_RGB(HUD_DARK(r, 55), HUD_DARK(g, 55), HUD_DARK(b, 55));
+    q[2] = HUD_RGB(HUD_LIGHT(r, 75), HUD_LIGHT(g, 75), HUD_LIGHT(b, 75));
+    q[3] = HUD_RGB(HUD_LIGHT(r, 40), HUD_LIGHT(g, 40), HUD_LIGHT(b, 40));
+    q[4] = HUD_RGB(HUD_DARK(r, 82), HUD_DARK(g, 82), HUD_DARK(b, 82));
+    q[5] = HUD_RGB(8, 8, 8);
+    q[6] = HUD_RGB(HUD_DARK(r, 30), HUD_DARK(g, 30), HUD_DARK(b, 30));
 }
 
-static void Hud_Arc(Primitive** p, s32 cost) {
-    static float sn[HUD_ARC_N + 1], cs[HUD_ARC_N + 1];
-    s32 k, n, h, m, r, g, b;
+// The HP bar CLUT: 0x174 while the player has no status. With one, a copy of
+// 0x174 whose liquid entries take the status colour (RGB, as MENU_TINT in
+// menu.c: stone 0x606060, poison 0x30FF30, curse 0x7020FF; same priority).
+// Roles in the strip (original entry -> entry the strip draws): a main
+// 5 -> 11, b dark 4 -> 10, d highlight 15 -> 13, e light 6 -> 6,
+// f 7 -> 12, g outline 2 -> 2 (kept), h darkest 3 -> 8.
+static u16 Hud_HpClut(void) {
+    static const u8 tint[3][3] = {{96, 96, 96}, {48, 255, 48}, {112, 32, 255}};
+    static u16 pal[16];
+    u16 q[7];
+    s32 st;
 
-    if (!sn[HUD_ARC_N] && !cs[HUD_ARC_N]) {
-        for (k = 0; k <= HUD_ARC_N; k++) { // clockwise from up, start -135
-            float t = (-135.0f + 270.0f * k / HUD_ARC_N) * 3.14159265f / 180;
-            sn[k] = sinf(t);
-            cs[k] = cosf(t);
-        }
+    st = g_Player.status & PLAYER_STATUS_STONE    ? 1
+         : g_Player.status & PLAYER_STATUS_POISON ? 2
+         : g_Player.status & PLAYER_STATUS_CURSE  ? 3
+                                                  : 0;
+    if (!st) {
+        return 0x174;
     }
+    if (st != g_HudHpClut) {
+        RECT rs = {(g_ClutIds[0x174] & 0x3F) << 4, g_ClutIds[0x174] >> 6, 16, 1};
+        RECT rd = {HUD_HP_CLUT_X, HUD_HP_CLUT_Y, 16, 1};
+
+        g_HudHpClut = st;
+        DrawSync(0);
+        StoreImage(&rs, (u_long*)pal);
+        DrawSync(0);
+        Hud_Liquid(q, tint[st - 1][0], tint[st - 1][1], tint[st - 1][2]);
+        pal[11] = q[0];
+        pal[10] = q[1];
+        pal[13] = q[2];
+        pal[6] = q[3];
+        pal[12] = q[4];
+        pal[8] = q[6];
+        LoadImage(&rd, (u_long*)pal);
+    }
+    g_ClutIds[HUD_HP_CLUT] = GetClut(HUD_HP_CLUT_X, HUD_HP_CLUT_Y);
+    return HUD_HP_CLUT;
+}
+
+static void Hud_Arc(Primitive* p, s32 cost) {
+    static u16 img[7 * HUD_FLASK_H], pal[16];
+    RECT ri = {960 + HUD_FLASK_U / 4, 256 + HUD_FLASK_V, 7, HUD_FLASK_H};
+    RECT rc = {HUD_FLASK_CLUT_X, HUD_FLASK_CLUT_Y, 16, 1};
+    s32 k, n, h, m, r, g, b, x, y;
+    u32 key;
+
     h = g_Status.hearts;
     m = g_Status.heartsMax;
     if (m <= 0) {
-        for (k = 0; k < HUD_ARC_N; k++) {
-            p[k]->drawMode = DRAW_HIDE;
-        }
+        p->drawMode = DRAW_HIDE;
         return;
     }
     h = CLAMP(h, 0, m);
-    n = (h * HUD_ARC_N + m / 2) / m;
+    n = (h * HUD_FLASK_SEGS + m / 2) / m;
     if (h && !n) {
         n = 1;
     }
-    r = g = b = 240; // white
+    r = 215, g = 198, b = 9; // the liquid colour c
     if (h == m) {
         r = 0, g = 224, b = 64; // full: green
     } else if (g_Status.subWeapon && cost > 0) {
         if (h < cost * 2) {
             r = 240, g = 32, b = 32; // one use or less: red
         } else if (h < cost * 3) {
-            r = 240, g = 208, b = 0; // two uses: yellow
+            r = 255, g = 136, b = 0; // two uses: orange
         }
     }
-    for (k = 0; k < HUD_ARC_N; k++) {
-        Primitive* q = p[k];
-        s32 cx = HUD_ARC_CX, cy = HUD_ARC_CY;
+    key = (n + 1) << 24 | r << 16 | g << 8 | b;
+    if (key != g_HudFlaskKey) {
+        g_HudFlaskKey = key;
+        for (k = 0; k < LEN(img); k++) {
+            img[k] = 0;
+        }
+        for (k = 0; k < HUD_FLASK_N; k++) {
+            const signed char* e = g_HudFlaskPx[k];
+            s32 c = e[2] < n ? e[4] : e[3];
 
-        q->type = PRIM_G4;
-        q->x0 = cx + Hud_ArcRound(HUD_ARC_RO * sn[k]);
-        q->y0 = cy - Hud_ArcRound(HUD_ARC_RO * cs[k]);
-        q->x1 = cx + Hud_ArcRound(HUD_ARC_RO * sn[k + 1]);
-        q->y1 = cy - Hud_ArcRound(HUD_ARC_RO * cs[k + 1]);
-        q->x2 = cx + Hud_ArcRound(HUD_ARC_RI * sn[k]);
-        q->y2 = cy - Hud_ArcRound(HUD_ARC_RI * cs[k]);
-        q->x3 = cx + Hud_ArcRound(HUD_ARC_RI * sn[k + 1]);
-        q->y3 = cy - Hud_ArcRound(HUD_ARC_RI * cs[k + 1]);
-        if (k < n) {
-            q->r0 = q->r1 = q->r2 = q->r3 = r;
-            q->g0 = q->g1 = q->g2 = q->g3 = g;
-            q->b0 = q->b1 = q->b2 = q->b3 = b;
-        } else { // dim dark-gray track
-            q->r0 = q->r1 = q->r2 = q->r3 = 56;
-            q->g0 = q->g1 = q->g2 = q->g3 = 56;
-            q->b0 = q->b1 = q->b2 = q->b3 = 56;
+            x = e[0] + 13; // the box is dx -13..12, dy -13..9
+            y = e[1] + 13;
+            img[y * 7 + x / 4] |= c << (x % 4 * 4);
         }
-        q->drawMode = DRAW_ABSPOS;
+        pal[0] = 0;
+        pal[1] = HUD_RGB(88, 88, 88);
+        pal[2] = HUD_RGB(152, 152, 152);
+        pal[3] = HUD_RGB(8, 208, 8);
+        pal[4] = HUD_RGB(8, 104, 8);
+        Hud_Liquid(&pal[5], r, g, b); // entries 5..11 = roles a b d e f g h
+        for (k = 12; k < 16; k++) {
+            pal[k] = 0;
+        }
+        LoadImage(&ri, (u_long*)img);
+        LoadImage(&rc, (u_long*)pal);
     }
+    g_ClutIds[HUD_FLASK_CLUT] = GetClut(HUD_FLASK_CLUT_X, HUD_FLASK_CLUT_Y);
+    x = HUD_FLASK_CX - 13;
+    y = HUD_FLASK_CY - 13;
+    Hud_Quad(p, x, y, x + HUD_FLASK_W, y + HUD_FLASK_H, HUD_FLASK_U,
+             HUD_FLASK_V, HUD_FLASK_W, HUD_FLASK_H);
+    p->tpage = 0x1F;
+    p->clut = HUD_FLASK_CLUT;
+    p->priority = 0x1EF; // with the orb: under the sub-weapon icon
+    p->drawMode = DRAW_ABSPOS;
 }
 
 static void Hud_Layout(void) {
@@ -1517,15 +1605,21 @@ static void Hud_Layout(void) {
     if (i < HUD_ALL) {
         return;
     }
-    // sub-weapon icon, its sparkle and dot (y 23 in the mockup), the frame
-    // and the orb
+    // sub-weapon icon, its sparkle and dot (in the left orb), the frame and
+    // the orb
     for (i = 0; i < 5; i++) {
-        p[i]->y0 = p[i]->y1 = (i < 3 ? 23 : g_HudSpriteY[i]) + HUD_DY;
+        p[i]->y0 = p[i]->y1 =
+            i < 3 ? HUD_SUBWPN_Y : g_HudSpriteY[i] + HUD_DY;
         p[i]->y2 = p[i]->y3 = p[i]->y0 + g_HudSpriteH[i];
+        if (i < 3) {
+            p[i]->x0 = p[i]->x2 = HUD_SUBWPN_X;
+            p[i]->x1 = p[i]->x3 = HUD_SUBWPN_X + g_HudSpriteW[i];
+        }
     }
+    p[HUD_ORB]->priority = 0x1EF; // with the flask: under the sub-weapon icon
     // HP bar: the red copy of the strip, drawn flat (mockup colours)
     prim = p[HUD_HP_BAR];
-    prim->clut = 0x174;
+    prim->clut = Hud_HpClut(); // the status colour while the player has one
     k = CLAMP(g_PlayerHud.displayHP * 50 / MAX(1, g_Status.hpMax), 0, 50);
     Hud_Quad(prim, 31, 26 + HUD_DY, 31 + k, 34 + HUD_DY, HUD_HPBAR_U,
              HUD_HPBAR_V, k, 8);
@@ -1554,20 +1648,22 @@ static void Hud_Layout(void) {
         &p[HUD_MP_DIGITS], g_Status.mp, 43, 41 + HUD_DY, 1, false, 5, 4, 0x196);
     // hearts: normal colour, steady green (0x193) at the maximum (owner,
     // 2026-11-25). Stock flickers green while the sub-weapon is usable.
+    // Big digits at 3/4, step 7, centred on x 16 (the flask), top y 39.
     clut = g_Status.hearts == g_Status.heartsMax ? 0x193 : 0x196;
-    Hud_Number(&p[HUD_HEART_DIGITS], g_Status.hearts, 101, 38 + HUD_DY, 0, true,
+    Hud_Number(&p[HUD_HEART_DIGITS], g_Status.hearts, 16, 39 + HUD_DY, 0, true,
                3, 7, clut);
-    // the arc needs the heart cost of the sub-weapon (Heart Broach applied)
+    // the flask needs the heart cost of the sub-weapon (Heart Broach applied)
     func_800FE3C4(&subwpn, 0, false);
-    Hud_Arc(&p[HUD_ARC], subwpn.heartCost);
-    // heart icon 1x at 80,40, left of the hearts number (owner, 2026-11-24)
+    Hud_Arc(p[HUD_ARC], subwpn.heartCost);
+    // heart icon "x" at 3/4 (8x6 -> 6x5) at 1,43 under the flask (owner,
+    // 2026-11-25)
     prim = p[HUD_HEART];
-    Hud_Quad(
-        prim, 80, 40 + HUD_DY, 88, 46 + HUD_DY, HUD_HEART_U, HUD_HEART_V, 8, 6);
+    Hud_Quad(prim, 1, 43 + HUD_DY, 1 + (8 * 3 + 2) / 4,
+             43 + HUD_DY + (6 * 3 + 2) / 4, HUD_HEART_U, HUD_HEART_V, 8, 6);
     prim->clut = 0x172;
     prim->drawMode = DRAW_ABSPOS;
-    // the Pocket: its icon in the left orb and its count (hearts digits, no
-    // "x"), in prims before the HD numbers. Empty Pocket: the orb stays blank.
+    // the Pocket: its icon right of the frame and its count (hearts digits,
+    // no "x"), in prims before the HD numbers. Empty Pocket: nothing drawn.
     prim = p[HUD_THIRD_HAND];
     i = g_QuickEnabled ? g_QuickItem : 0;
     if (i) {
