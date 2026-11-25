@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+#ifndef STAGE_IS_RNO4
 // unused
 static u8 D_us_8018110C[] = {
     0x24, 0x1A, 0x21, 0x1A, 0x2B, 0x1B, 0x22, 0x1B, 0x2C, 0x1C, 0x23,
@@ -487,18 +488,38 @@ void func_us_801C1844(Entity* self) {
     }
 }
 
+#endif
+
+#ifdef STAGE_IS_RNO4
+#define BG_COLUMN_Y(y) (0x7A - (y) + (g_Tilemap.height - 0x100) / 2)
+#ifdef PLATFORM_PSYZ
+static s16 bg_columns_parallax_props[][3] = {
+    {0x032, 0x024, 0x001}, {0x090, 0x021, 0x002}, {0x0B8, 0x022, 0x001},
+    {0x0DE, 0x023, 0x003},
+};
+#else
+extern s16 D_us_80181428[9][3];
+#define bg_columns_parallax_props D_us_80181428
+#endif
+#else
+#define BG_COLUMN_Y(y) (y)
 static s16 bg_columns_parallax_props[][3] = {
     {0x022, 0x023, 0x003}, {0x048, 0x022, 0x001}, {0x070, 0x021, 0x002},
     {0x0CE, 0x024, 0x001}, {0x122, 0x023, 0x003}, {0x148, 0x022, 0x001},
     {0x170, 0x021, 0x002}, {0x1CE, 0x024, 0x001},
 };
+#endif
 
 // The margin that the entity may use: the width it was spawned with (its
 // prim chain covers no more), at most the current one. 0 on PS1.
 #define SCENERY_MARGIN(self) WIDE_POOL(0, MIN(WIDE_X, (s32)(self)->step_s))
 
 // background columns scrolling in parallax
+#ifdef STAGE_IS_RNO4
+void EntityBgColumnsParallax_from_no4(Entity* self) {
+#else
 void EntityBgColumnsParallax(Entity* self) {
+#endif
     s32 primIndex;
     s32 scrollY;
     s32 scrollX;
@@ -539,8 +560,13 @@ void EntityBgColumnsParallax(Entity* self) {
             prim->clut = 0x84;
             prim->u0 = prim->u2 = 0xE9;
             prim->u1 = prim->u3 = 0xFD;
+#ifdef STAGE_IS_RNO4
+            prim->v0 = prim->v1 = 0x7F;
+            prim->v2 = prim->v3 = 1;
+#else
             prim->v0 = prim->v1 = 1;
             prim->v2 = prim->v3 = 0x7F;
+#endif
             prim->priority = 0x1C;
             prim->drawMode = DRAW_HIDE;
             prim = prim->next;
@@ -553,18 +579,24 @@ void EntityBgColumnsParallax(Entity* self) {
     scrollX /= 2;
     scrollX &= 0xFF;
     scrollY = g_Tilemap.scrollY.i.hi;
+#ifdef STAGE_IS_RNO4
+    {
+#else
     if (scrollY < 0xB0) {
+#endif
         scrollY /= 2;
 #ifdef PLATFORM_PSYZ
         // wide view: the table is 4 columns, then the same 4 again 0x100 px
-        // further. Go through the copies that can reach the wide window
-        // (columns at 0x22..0xCE, scrollX 0..0xFF), left to right.
-        repMin = -((226 + SCENERY_MARGIN(self)) >> 8);
-        repMax = (476 + SCENERY_MARGIN(self)) >> 8;
+        // further. Use the first and last column in one period to bound the
+        // copies that can reach the wide window for scrollX 0..0xFF.
+        repMin = -((bg_columns_parallax_props[3][0] + 20 +
+                    SCENERY_MARGIN(self)) >> 8);
+        repMax = (2 * (STAGE_WIDTH - 1) - bg_columns_parallax_props[0][0] +
+                  SCENERY_MARGIN(self)) >> 8;
         for (i = 0; i < 4 * (repMax - repMin + 1) && !WIDE_NO_PRIM(prim); i++) {
             ptr = (s16*)bg_columns_parallax_props + (i & 3) * 3;
             posX = ptr[0] + (repMin + (i >> 2)) * 0x100;
-            posY = ptr[1];
+            posY = BG_COLUMN_Y(ptr[1]);
             flipXY = ptr[2];
 #else
 #ifdef FIX_UB
@@ -575,7 +607,7 @@ void EntityBgColumnsParallax(Entity* self) {
         while (1) {
 #endif
             posX = *ptr++;
-            posY = *ptr++;
+            posY = BG_COLUMN_Y(*ptr++);
             flipXY = *ptr++;
 #endif
             posX -= scrollX;
@@ -613,6 +645,13 @@ void EntityBgColumnsParallax(Entity* self) {
     }
 }
 
+#undef SCENERY_MARGIN
+#undef BG_COLUMN_Y
+#if defined(STAGE_IS_RNO4) && !defined(PLATFORM_PSYZ)
+#undef bg_columns_parallax_props
+#endif
+
+#ifndef STAGE_IS_RNO4
 static s16 D_us_80181514[] = {
     0x010, 0x032, 0x070, 0x09E, 0x0DF, 0x110,
     0x132, 0x170, 0x19E, 0x1DF, 0x210, 0x000,
@@ -2140,3 +2179,4 @@ void EntityWaterBox(Entity* self) {
         }
     }
 }
+#endif
