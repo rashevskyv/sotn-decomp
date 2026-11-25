@@ -86,6 +86,9 @@ extern s32 g_PrevEquippedWeapons[2];
 // edge (units digit at x 375, "99" ends at 383); a longer name scrolls.
 #define POCKET_X 256
 #define POCKET_COUNT_X 375
+// px between a name and the count (a glyph has 1 px of its own); 7, so the
+// field is 8 * k px (src/pc/quick_item.c Marquee_Over)
+#define POCKET_GAP 7
 #define EQUIP_WIN_W 384
 #define EQ_TEXT_Y(r) (30 + (r) * 13)
 #define EQ_ICON_Y(r) (0x1A + (r) * 13)
@@ -818,7 +821,11 @@ static s32 s_PocketT;
 static void PocketName(const char* name, MenuContext* ctx) {
     static const char* last;
     s32 cnt = g_Status.equipHandCount[g_QuickItem] + 1;
-    s32 w = POCKET_COUNT_X - 8 * (cnt > 9) - 8 * (cnt > 99) - 8 - POCKET_X - 16;
+    // the count is drawn for a consumable only (not for the empty hand)
+    s32 digits = !g_EquipDefs[g_QuickItem].isConsumable
+                     ? 0
+                     : 1 + (cnt > 9) + (cnt > 99);
+    s32 w = POCKET_COUNT_X + 8 - 8 * digits - POCKET_GAP - POCKET_X - 16;
     if (name != last) {
         last = name;
         s_PocketT = 0;
