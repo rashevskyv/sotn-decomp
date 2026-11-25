@@ -420,6 +420,10 @@ u16* func_80106A28(u16 ch, u16 kind) {
     // under language = uk, the owner's serif design of the Cyrillic letters
     u8* sharp;
     bitmap = sharp = (u8*)Lang_Glyph(ch);
+    if (!bitmap && kind == 0) {
+        // P7: the crisp one-ink Latin set and quotes for the 1:1 form
+        bitmap = sharp = (u8*)Lang_LatinGlyph(ch);
+    }
     if (!bitmap) {
         bitmap = (u8*)Krom2RawAdd(ch);
     }

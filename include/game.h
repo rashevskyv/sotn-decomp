@@ -1328,6 +1328,7 @@ const char* Lang_Cell(const char* s);
 const char* Lang_Sjis(const char* s);
 const char* Lang_Row(int table, int index, const char* s);
 const unsigned char* Lang_Glyph(unsigned short ch);
+const unsigned char* Lang_LatinGlyph(unsigned short ch);
 void Lang_PaintFont8(void);
 void Lang_DialogueGlyph(RECT* rect, s32 x, s32 y);
 #define LANG_DIALOGUE_GLYPH(rect, x, y) Lang_DialogueGlyph(rect, x, y)

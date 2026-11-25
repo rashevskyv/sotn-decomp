@@ -536,6 +536,30 @@ const u8* Lang_Glyph(u16 ch) {
     return NULL;
 }
 
+#include "latin12.h"
+// The crisp one-ink Latin glyph (and the quote marks) of the A font for a Shift-JIS code, or NULL.
+// 30 bytes, 15 rows of a big-endian u16, MSB = left: the layout of Lang_Glyph. All languages.
+const u8* Lang_LatinGlyph(u16 ch) {
+    static u8 rec[30];
+    int lo = 0, hi = LEN(latin12) - 1, i;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        if (latin12[mid].code == ch) {
+            for (i = 0; i < 15; i++) {
+                rec[i * 2] = latin12[mid].rows[i] >> 8;
+                rec[i * 2 + 1] = latin12[mid].rows[i] & 0xFF;
+            }
+            return rec;
+        }
+        if (latin12[mid].code < ch) {
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    return NULL;
+}
+
 // The Ukrainian 8x8 letters over the cells 0x66..0x97 of the font sheet at
 // VRAM 896,256 (cell c at x 896 + (c & 15) * 2, y 256 + (c >> 4) * 8).
 void Lang_PaintFont8(void) {
