@@ -1909,7 +1909,9 @@ def cmd_pack(_args):
         if any(n in STOCK_PIXELS for n in art_missing):
             print("     the labels with stock pixels come from the Xbox 360 mod's ps1vram_uk.bin:"
                   " put it in games/ (build.py) or set SOTN_LANG_MEDIA to its folder")
-    plates = plate_records(srcs) + local_records()
+    sys.path.insert(0, UK)
+    import popup_words
+    plates = plate_records(srcs) + popup_words.records() + local_records()
     with open(os.path.join(OUT, "art.bin"), "wb") as f:
         f.write(b"SOTNART1" + struct.pack("<I", len(recs) + len(plates)))
         for r in recs:
