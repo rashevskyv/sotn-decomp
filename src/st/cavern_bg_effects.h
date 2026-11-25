@@ -493,6 +493,10 @@ static s16 bg_columns_parallax_props[][3] = {
     {0x170, 0x021, 0x002}, {0x1CE, 0x024, 0x001},
 };
 
+// The margin that the entity may use: the width it was spawned with (its
+// prim chain covers no more), at most the current one. 0 on PS1.
+#define SCENERY_MARGIN(self) WIDE_POOL(0, MIN(WIDE_X, (s32)(self)->step_s))
+
 // background columns scrolling in parallax
 void EntityBgColumnsParallax(Entity* self) {
     s32 primIndex;
@@ -516,7 +520,9 @@ void EntityBgColumnsParallax(Entity* self) {
         primIndex = g_api.AllocPrimitives(
             PRIM_GT4, WIDE_POOL(10, 4 * ((276 + 2 * WIDE_X + 255) / 256) + 2));
 #ifdef PLATFORM_PSYZ
+        self->step_s = WIDE_X; // the margin the chain covers
         if (primIndex == -1) {
+            self->step_s = 0;
             primIndex = g_api.AllocPrimitives(PRIM_GT4, 10); // 4:3 only
         }
 #endif
@@ -553,8 +559,8 @@ void EntityBgColumnsParallax(Entity* self) {
         // wide view: the table is 4 columns, then the same 4 again 0x100 px
         // further. Go through the copies that can reach the wide window
         // (columns at 0x22..0xCE, scrollX 0..0xFF), left to right.
-        repMin = -((226 + WIDE_X) >> 8);
-        repMax = (476 + WIDE_X) >> 8;
+        repMin = -((226 + SCENERY_MARGIN(self)) >> 8);
+        repMax = (476 + SCENERY_MARGIN(self)) >> 8;
         for (i = 0; i < 4 * (repMax - repMin + 1) && !WIDE_NO_PRIM(prim); i++) {
             ptr = (s16*)bg_columns_parallax_props + (i & 3) * 3;
             posX = ptr[0] + (repMin + (i >> 2)) * 0x100;
@@ -575,10 +581,10 @@ void EntityBgColumnsParallax(Entity* self) {
             posX -= scrollX;
             posY -= scrollY;
             posYBottom = posY + 0x7E;
-            if (posX < -20 - WIDE_X) {
+            if (posX < -20 - SCENERY_MARGIN(self)) {
                 continue;
             }
-            if (posX >= STAGE_WIDTH + WIDE_X) {
+            if (posX >= STAGE_WIDTH + SCENERY_MARGIN(self)) {
                 break;
             }
             if (posYBottom >= 0 && posY < 0xE0) {

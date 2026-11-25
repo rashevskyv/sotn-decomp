@@ -52,6 +52,9 @@ void EntityBackgroundClouds(Entity* self) {
         while (camX > -wx) {
             camX -= 95;
         }
+        while (camX <= -wx - 95) {
+            camX += 95;
+        }
 #endif
         camY = 32 - g_Tilemap.scrollY.i.hi;
         while (prim != NULL) {

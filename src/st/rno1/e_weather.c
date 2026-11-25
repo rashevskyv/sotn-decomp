@@ -77,18 +77,18 @@ static s32 BgTotal(s32 weather, s32 count, s32 q) {
 #define FOG_ROWS 9
 static s32 BgFogLead(s32 q) { return (q * 16 + 0x8F) / 0x90; }
 static s32 BgFogCols(s32 q) {
-    s32 cols = 1 + BgFogLead(q) + (256 + q * 16 + 0x8F) / 0x90;
+    s32 cols = 1 + BgFogLead(q) + (256 + q * 16 + 16 + 0x8F) / 0x90;
 
     return cols < 4 ? 4 : cols;
 }
 // a rain drop starts further out on both sides of the wide view
 static s32 BgRainX(void) {
-    s32 x = (rand() & 0xFF) - (rand() & 0x3F) - 0x10;
-
     if (WIDE_X > 0) {
-        x += rand() % (2 * WIDE_X + 1) - WIDE_X;
+        // one x over the whole wide view; 0x50 px more on the left for the
+        // drift of the drops to the right
+        return rand() % (0x100 + 2 * WIDE_X + 0x50) - WIDE_X - 0x50;
     }
-    return x;
+    return (rand() & 0xFF) - (rand() & 0x3F) - 0x10;
 }
 #define BG_RAIN_X() BgRainX()
 #define BG_COUNT(q) BgTotal(weatherMode, aP->count, q)
@@ -108,7 +108,7 @@ static s32 BgRainX(void) {
 #endif
 // the sky and the gradient run to the edges of the wide view
 #define BG_XL(q) WIDE_POOL(0, -(q) * 16)
-#define BG_XR(q) WIDE_POOL(0xFF, 0xFF + (q) * 16)
+#define BG_XR(q) WIDE_POOL(0xFF, (q) ? 0x100 + (q) * 16 : 0xFF)
 
 void EntityFog(Entity* self) {
     Primitive* prim;
@@ -214,7 +214,7 @@ void EntityFog(Entity* self) {
 #endif
                 } else {
                     prim->x0 = prim->x2 = 0x80;
-                    prim->x1 = prim->x3 = 0xFF;
+                    prim->x1 = prim->x3 = WIDE_POOL(0xFF, q ? 0x100 : 0xFF);
                 }
                 break;
             case 4:

@@ -77,7 +77,12 @@ void EntityDeepBackgroundArch(Entity* self) {
             prim->u2 = 0xC8;
             prim->v1 = 0x68;
 
+#ifdef PLATFORM_PSYZ
+            // ARCH_COL is negative on the left: no shift of a negative
+            prim->x0 = prim->x2 = xOffset + ARCH_COL(i) * 0x40;
+#else
             prim->x0 = prim->x2 = xOffset + (ARCH_COL(i) << 6);
+#endif
             prim->x1 = prim->x3 = prim->x0 + 0x48;
             prim->y1 = prim->y0 = yOffset + (ARCH_ROW(i) * 0x64);
             prim->y3 = prim->y2 = prim->y0 + 0x6C;

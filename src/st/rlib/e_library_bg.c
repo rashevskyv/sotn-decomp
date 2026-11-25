@@ -7,6 +7,10 @@ extern EInit g_EInitInteractable;
 // past 0x100 + WIDE_X. A strip is `pitch` px wide and the first one starts in
 // (-WIDE_X - pitch, -WIDE_X], so the row needs STRIPS(pitch) strips (4 for the
 // 4:3 view, the original count). WIDE_X is 0 on PS1.
+// The margin that the entity may use: the width it was spawned with (its
+// prim chain covers no more), at most the current one. 0 on PS1.
+#define SCENERY_MARGIN(self) WIDE_POOL(0, MIN(WIDE_X, (s32)(self)->step_s))
+
 #define STRIPS(pitch) ((255 + 2 * WIDE_X + (pitch)) / (pitch) + 1)
 
 static SVECTOR D_us_80180DC0 = {0, 0, 512};
@@ -28,7 +32,9 @@ void EntityBackgroundBookcase(Entity* self) {
         InitializeEntity(g_EInitInteractable);
         primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(4, STRIPS(124)));
 #ifdef PLATFORM_PSYZ
+        self->step_s = WIDE_X; // the margin the chain covers
         if (primIndex == -1) {
+            self->step_s = 0;
             primIndex = g_api.AllocPrimitives(PRIM_GT4, 4); // 4:3 only
         }
 #endif
@@ -82,7 +88,7 @@ void EntityBackgroundBookcase(Entity* self) {
             }
         }
 #ifdef PLATFORM_PSYZ
-        while (x > -WIDE_X) {
+        while (x > -SCENERY_MARGIN(self)) {
             x -= 124;
         }
 #endif
@@ -97,7 +103,7 @@ void EntityBackgroundBookcase(Entity* self) {
             prim->drawMode = DRAW_UNK02;
 
             prim = prim->next;
-            if (x > 256 + WIDE_X) {
+            if (x > 256 + SCENERY_MARGIN(self)) {
                 break;
             }
         }
@@ -128,7 +134,9 @@ void EntityBackgroundFurniture(Entity* self) {
         InitializeEntity(g_EInitInteractable);
         primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(4, STRIPS(120)));
 #ifdef PLATFORM_PSYZ
+        self->step_s = WIDE_X; // the margin the chain covers
         if (primIndex == -1) {
+            self->step_s = 0;
             primIndex = g_api.AllocPrimitives(PRIM_GT4, 4); // 4:3 only
         }
 #endif
@@ -176,7 +184,7 @@ void EntityBackgroundFurniture(Entity* self) {
             }
         }
 #ifdef PLATFORM_PSYZ
-        while (x > -WIDE_X) {
+        while (x > -SCENERY_MARGIN(self)) {
             x -= 120;
         }
 #endif
@@ -191,7 +199,7 @@ void EntityBackgroundFurniture(Entity* self) {
             prim->drawMode = DRAW_UNK02;
 
             prim = prim->next;
-            if (x > 256 + WIDE_X) {
+            if (x > 256 + SCENERY_MARGIN(self)) {
                 break;
             }
         }
@@ -211,8 +219,10 @@ static SVECTOR D_us_80180DE8 = {0};
 // the band pieces for the margins (a tile is at most 255 px wide, the band
 // of the last prim covers 0..255), then the last prim. 4:3: 9 tiles, no
 // pieces, as the original 10 prims.
-#define SHADOW_TILES WIDE_POOL(9, 9 + (2 * WIDE_X + 55) / 56)
-#define SHADOW_PIECES WIDE_POOL(0, 2 * ((WIDE_X + 254) / 255))
+#define SHADOW_TILES(w) WIDE_POOL(9, 9 + (2 * (w) + 55) / 56)
+// left piece -w..0 and right piece 0xFF..0x100 + w (the centre band is 0..254)
+#define SHADOW_PIECES(w)                                                       \
+    WIDE_POOL(0, ((w) + 254) / 255 + ((w) > 0 ? ((w) + 255) / 255 : 0))
 
 #ifdef PLATFORM_PSYZ
 // Black pieces of the band from px to end, 255 px at most each, side by side.
@@ -251,12 +261,12 @@ void EntityBackgroundShadow(Entity* self) {
     case 0:
         InitializeEntity(g_EInitInteractable);
         primIndex = g_api.func_800EDB58(
-            PRIM_TILE_ALT, WIDE_POOL(10, SHADOW_TILES + SHADOW_PIECES + 1));
+            PRIM_TILE_ALT, WIDE_POOL(10, SHADOW_TILES(WIDE_X) + SHADOW_PIECES(WIDE_X) + 1));
 #ifdef PLATFORM_PSYZ
-        self->step_s = SHADOW_TILES; // the tile prims, as spawned
+        self->step_s = WIDE_X; // the margin the chain covers
         if (primIndex == -1) {
             primIndex = g_api.func_800EDB58(PRIM_TILE_ALT, 10); // 4:3 only
-            self->step_s = 9;
+            self->step_s = 0;
         }
 #endif
         if (primIndex != -1) {
@@ -310,11 +320,28 @@ void EntityBackgroundShadow(Entity* self) {
             }
         }
 #ifdef PLATFORM_PSYZ
-        while (x > -WIDE_X) {
+        while (x > -SCENERY_MARGIN(self)) {
             x -= 56;
         }
 #endif
 
+#ifdef PLATFORM_PSYZ
+        last = self->ext.libraryShadow.lastPrim;
+        prim = self->ext.libraryShadow.prim;
+        for (i = 0;
+             prim != NULL && prim != last && i < SHADOW_TILES(self->step_s);
+             i++) {
+            prim->x0 = x;
+            x += 56;
+            prim->y0 = self->posY.i.hi;
+            prim->drawMode = DRAW_TPAGE | DRAW_UNK02 | DRAW_TRANSP;
+
+            prim = prim->next;
+            if (x > 256 + SCENERY_MARGIN(self)) {
+                break;
+            }
+        }
+#else
         prim = self->ext.libraryShadow.prim;
         while (prim != NULL) {
             prim->x0 = x;
@@ -323,10 +350,11 @@ void EntityBackgroundShadow(Entity* self) {
             prim->drawMode = DRAW_TPAGE | DRAW_UNK02 | DRAW_TRANSP;
 
             prim = prim->next;
-            if (x > 256 + WIDE_X) {
+            if (x > 256) {
                 break;
             }
         }
+#endif
 
         while (prim != NULL) {
             prim->drawMode = DRAW_HIDE;
@@ -337,13 +365,15 @@ void EntityBackgroundShadow(Entity* self) {
         // the band of the last prim (0..255) goes on over the margins in
         // pieces that do not overlap: -WIDE_X..0 and 0x100..0x100 + WIDE_X
         prim = self->ext.libraryShadow.prim;
-        for (i = 0; i < self->step_s && prim != NULL; i++) {
+        for (i = 0; i < SHADOW_TILES(self->step_s) && prim != NULL; i++) {
             prim = prim->next;
         }
-        prim = ShadowBand(prim, self->ext.libraryShadow.lastPrim, -WIDE_X, 0,
-                          self->posY.i.hi + 64);
-        ShadowBand(prim, self->ext.libraryShadow.lastPrim, 0x100,
-                   0x100 + WIDE_X, self->posY.i.hi + 64);
+        prim = ShadowBand(prim, self->ext.libraryShadow.lastPrim,
+                          -SCENERY_MARGIN(self), 0, self->posY.i.hi + 64);
+        if (SCENERY_MARGIN(self) > 0) {
+            ShadowBand(prim, self->ext.libraryShadow.lastPrim, 0xFF,
+                       0x100 + SCENERY_MARGIN(self), self->posY.i.hi + 64);
+        }
 #endif
         prim = self->ext.libraryShadow.lastPrim;
         prim->u0 = 255;
