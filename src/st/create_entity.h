@@ -128,6 +128,24 @@ static Entity* LayoutSlotAlways(Entity* slot, LayoutEntity* obj) {
 #define LayoutSlotAlways(slot, obj) (slot)
 #endif
 
+#if defined(PLATFORM_PSYZ) && defined(STAGE_IS_RNO3)
+// Port: the inverted Saturn hatch. The mirror of the NP3 hatch lid (the way to
+// the Hell Garden) is baked closed in the tilemap of room 0 (tiles 0x132 and
+// 0x129 at column 23, row 5 of 32x48) and no entity opens it, so a player who
+// comes down the shaft from the cave above stands on it for good. The
+// inverted castle comes after the Death meeting, so the lid is always open:
+// the two hatch tiles of NP3 (0x6C8, 0x6C9) in mirrored order.
+static void Rno3_OpenHatch(void) {
+    u16* fg = g_Tilemap.fg;
+
+    if (g_Tilemap.hSize == 2 && g_Tilemap.vSize == 3 &&
+        fg[5 * 32 + 23] == 0x132 && fg[5 * 32 + 24] == 0x129) {
+        fg[5 * 32 + 23] = 0x6C9;
+        fg[5 * 32 + 24] = 0x6C8;
+    }
+}
+#endif
+
 void CreateEntityFromLayout(Entity* entity, LayoutEntity* initDesc) {
     Tilemap* tilemap;
 
@@ -147,6 +165,9 @@ void CreateEntityFromLayout(Entity* entity, LayoutEntity* initDesc) {
     entity->unk68 = (initDesc->entityId >> 0xA) & 7;
 #if defined(PLATFORM_PSYZ) && (defined(STAGE_IS_ARE) || defined(STAGE_IS_NO2))
     JpCards_OnLayout(entity);
+#endif
+#if defined(PLATFORM_PSYZ) && defined(STAGE_IS_RNO3)
+    Rno3_OpenHatch();
 #endif
 }
 

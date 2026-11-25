@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-static s32 g_TrapDoorFlag = 0; // 0 = Closed, 1 = Open
+// the lid is open once it was hit (NP3_TRAPDOOR_OPEN, kept in the castle flags
+// so a reload and a save keep it) or after Death took the equipment
+#define TRAPDOOR_OPEN()                                                        \
+    (g_CastleFlags[NP3_TRAPDOOR_OPEN] || g_CastleFlags[IVE_BEEN_ROBBED])
 
 static u8 trapdoor_anim[] = {1, 27, 6, 28, 6, 29, 129, 30, 255};
 
@@ -17,7 +20,7 @@ void EntityTrapDoor(Entity* self) {
         self->hitboxWidth = 16;
         self->hitboxHeight = 4;
 
-        if (g_TrapDoorFlag == 0) {
+        if (!TRAPDOOR_OPEN()) {
             player = &PLAYER;
             if (player->posY.val < self->posY.val) {
                 g_Tilemap.fg[0xA8E / 2] = 0x129;
@@ -36,7 +39,7 @@ void EntityTrapDoor(Entity* self) {
 
     case 1:
         if (self->hitFlags) {
-            g_TrapDoorFlag = 1;
+            g_CastleFlags[NP3_TRAPDOOR_OPEN] = 1;
             self->step++;
         }
         break;
