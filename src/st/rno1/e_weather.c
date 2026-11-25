@@ -154,7 +154,7 @@ void EntityFog(Entity* self) {
             switch (BG_CASE(i, q)) {
             case 0:
                 if (weatherMode == WEATHER_CLEAR) {
-                    prim->y0 = 0xE3;
+                    prim->y0 = WIDE_POOL(0xE3, WIDE_X ? DISP_STAGE_H : 0xE3);
                     prim->y2 = 0xA8;
                     prim->clut = 0x45;
                     prim->u0 = prim->u2 = 0xF1;
@@ -193,7 +193,7 @@ void EntityFog(Entity* self) {
                 break;
             case 2:
             case 3:
-                prim->y2 = 0x14;
+                prim->y2 = WIDE_POOL(0x14, WIDE_X ? 0 : 0x14);
                 prim->y0 = 0x42;
                 prim->v0 = prim->v1 = 0;
                 prim->v2 = prim->v3 = 0x2F;

@@ -197,7 +197,7 @@ void func_us_801B6490(Entity* self) {
             switch (BG_CASE(i, q)) {
             case 0:
                 if (D_us_80180EEC == 1) {
-                    prim->y0 = 0x14;
+                    prim->y0 = WIDE_POOL(0x14, WIDE_X ? 0 : 0x14);
                     prim->y2 = 0x4F;
                     prim->clut = 0x45;
                     prim->u0 = prim->u2 = 0xF1;
@@ -228,7 +228,7 @@ void func_us_801B6490(Entity* self) {
             case 2:
             case 3:
                 prim->y0 = 0xB5;
-                prim->y2 = 0xE3;
+                prim->y2 = WIDE_POOL(0xE3, WIDE_X ? DISP_STAGE_H : 0xE3);
                 prim->v0 = prim->v1 = 0;
                 prim->v2 = prim->v3 = 0x2F;
                 prim->tpage = 0xF;
