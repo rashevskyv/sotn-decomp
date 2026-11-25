@@ -2003,8 +2003,13 @@ fn load_saturn_door(
     Ok(door)
 }
 
+/// NP3 room 1 candles (x, y): the bottom niche, the right chamber ledge and
+/// the lower left corner of the Saturn shaft
+const NP3_CANDLES: [(i16, i16); 3] = [(70, 989), (204, 679), (70, 477)];
+
 fn write_stitched_entity_layout(
     assets: &Path,
+    stage: &str,
     layout: usize,
     y_offset: i16,
     door: &EntityRecord,
@@ -2041,6 +2046,30 @@ fn write_stitched_entity_layout(
             Error::Format("shifted PSX entity position is outside i16".to_string())
         })?;
     }
+    if stage == "np3" {
+        // the Saturn area has no water: drop the PSX water band (E_ID_18),
+        // and place the three candles of the Saturn room (its own are
+        // another type and sit at Saturn coordinates)
+        entities.retain(|entity| entity.id != "E_ID_18");
+        let end = entities.len() - 1;
+        for (n, (x, y)) in NP3_CANDLES.iter().enumerate() {
+            let slot = 0xA0 + n as u8;
+            entities.insert(
+                end,
+                PsxEntity {
+                    x: *x,
+                    y: *y,
+                    id: "E_BREAKABLE".to_string(),
+                    flags: 0xA0,
+                    slot,
+                    spawn_id: 0,
+                    params: 0,
+                    y_order: None,
+                },
+            );
+        }
+    }
+    let end = entities.len() - 1;
     let requested_slot = door.room_index as u8;
     let spawn_id = (door.room_index >> 8) as u8;
     if !entities.iter().any(|entity| {
@@ -2408,7 +2437,7 @@ fn emit_stitched_asset_tree(
             &loaded.defs,
             &stitch.minted,
         )?;
-        write_stitched_entity_layout(staging, entity_layout, entity_y_offset, door)?;
+        write_stitched_entity_layout(staging, config.stage, entity_layout, entity_y_offset, door)?;
         write_stitched_rooms_and_layers(staging, config)
     })?;
     Ok(output)

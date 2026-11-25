@@ -19,6 +19,10 @@ static const struct SpawnPoint s_SpawnPoints[] = {
     // the inverted save room (room 25, cell 60,21): a step right leaves it
     {STAGE_RNO3, 25, 128, 136, "reverse-save-room"},
     {STAGE_NP3, 22, 128, 136, "np3-save-room"},
+    // the Saturn-only shaft: the candle niches (bottom, right ledge, corner)
+    {STAGE_NP3, 1, 80, 440, "np3-candle-niche"},
+    {STAGE_NP3, 1, 198, 640, "np3-candle-ledge"},
+    {STAGE_NP3, 1, 130, 950, "np3-candle-corner"},
     {STAGE_NO0, 0, 1440, 688, "marble-soul"},
     {STAGE_NO4, 5, 176, 396, "caverns-soul"},
     {STAGE_RNO0, 0, 64, 132, "reverse-marble-soul"},
