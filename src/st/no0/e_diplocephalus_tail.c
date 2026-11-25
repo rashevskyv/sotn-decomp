@@ -2,22 +2,36 @@
 #include "no0.h"
 
 // Tail animations
-static u8 animTail0[] = {
-    6,  31, 6,  36, 6,  37, 6,  38, 6,  39, 6,  50, 6,  51, 6,
-    52, 6,  51, 6,  50, 6,  39, 6,  38, 6,  37, 6,  36, 0,  0,
-};
-static u8 animTail1[] = {
-    8, 30, 8, 46, 8, 47, 8, 48, 40, 49, 8, 30, 16, 24, -1, 0,
-};
-static u8 animTail2[] = {
-    8, 30, 8, 46, 2, 32, 2, 33, 2, 34, 2, 33, 2,  32, 2,  33,
-    3, 34, 3, 33, 3, 32, 3, 33, 4, 34, 5, 33, 32, 32, -1, 0,
-};
-static u8 animTail3[] = {
-    4,  25, 4,  24, 4,  23, 8,  40, 8,  41, 20, 42, 1,  23, 1,  24, 1,
-    25, 1,  26, 2,  43, 2,  44, 2,  45, 5,  27, 5,  28, 22, 29, 0,  0,
-};
-static u8 animTail4[] = {6, 19, 6, 20, 6, 21, 6, 20, 0, 0};
+#define ANIM_TAIL0                                                             \
+    6, 31, 6, 36, 6, 37, 6, 38, 6, 39, 6, 50, 6, 51, 6, 52, 6, 51, 6, 50, 6,  \
+        39, 6, 38, 6, 37, 6, 36, 0, 0
+#define ANIM_TAIL1 8, 30, 8, 46, 8, 47, 8, 48, 40, 49, 8, 30, 16, 24, -1, 0
+#define ANIM_TAIL2                                                             \
+    8, 30, 8, 46, 2, 32, 2, 33, 2, 34, 2, 33, 2, 32, 2, 33, 3, 34, 3, 33, 3,  \
+        32, 3, 33, 4, 34, 5, 33, 32, 32, -1, 0
+#define ANIM_TAIL3                                                             \
+    4, 25, 4, 24, 4, 23, 8, 40, 8, 41, 20, 42, 1, 23, 1, 24, 1, 25, 1, 26, 2,  \
+        43, 2, 44, 2, 45, 5, 27, 5, 28, 22, 29, 0, 0
+#define ANIM_TAIL4 6, 19, 6, 20, 6, 21, 6, 20, 0, 0
+#ifdef PLATFORM_PSYZ
+// On the PS1 the five tables sit back to back. The death (case 7) plays
+// animTail2 with the pose left by animTail3 (up to 16), so it reads past the
+// end of animTail2 into animTail3. Keep them in one object, in PS1 order, so
+// the port reads the same bytes.
+static u8 animTail[] = {ANIM_TAIL0, ANIM_TAIL1, ANIM_TAIL2, ANIM_TAIL3,
+                        ANIM_TAIL4};
+#define animTail0 (animTail)
+#define animTail1 (animTail + 30)
+#define animTail2 (animTail + 46)
+#define animTail3 (animTail + 78)
+#define animTail4 (animTail + 112)
+#else
+static u8 animTail0[] = {ANIM_TAIL0};
+static u8 animTail1[] = {ANIM_TAIL1};
+static u8 animTail2[] = {ANIM_TAIL2};
+static u8 animTail3[] = {ANIM_TAIL3};
+static u8 animTail4[] = {ANIM_TAIL4};
+#endif
 
 // Fireball animations
 static u8 animFire0[] = {
