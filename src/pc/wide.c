@@ -722,11 +722,12 @@ void Wide_OnFrame(void) {
            (g_GameState == Game_Play ||
             (g_GameState == Game_GameOver &&
              (g_GameStep < Gameover_6 || g_GameStep >= Gameover_Alt)));
-    // a pause (port menu, level up: Engine_5) runs no stage camera, so the
-    // clip of the last frame stays: it must not count down to the PS1 clip
+    // a pause (port menu, level up, status, menu fades, door, death) runs no
+    // stage camera, so the clip of the last frame stays: it must not count
+    // down to the PS1 clip. The map is the exception: its picture covers the
+    // rows 1..255, so all 240 rows must fit there
     if (stage_clip > 0 &&
-        !(g_GameState == Game_Play &&
-          (PortMenu_IsOpen() || g_GameEngineStep == Engine_5))) {
+        !(g_GameState == Game_Play && g_GameEngineStep != Engine_Map)) {
         stage_clip--;
     }
     if (d.w <= 0 || d.h <= 0 ||
