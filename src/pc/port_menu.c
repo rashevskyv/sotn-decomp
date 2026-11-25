@@ -2454,8 +2454,30 @@ static void DrawMain(void) {
     for (i = 0; i < n; i++) {
         it = cat_rows[cat][i];
         if (it >= ITEM_SCALE) {
-            PadTo(lines[i], col);
-            ItemValue(lines[i], it);
+            // a value too wide for the box (uk "< Додатково >") loses the
+            // spaces inside its arrows, then moves left, never into the name
+            char v[LINE_MAX];
+            int st = col, avail = FbW() - 8 - 2 * BORDER, k, n;
+            char sp = uk ? CH(' ') : ' ';
+            char lt = uk ? MENU_CELL_LT : '<', gt = uk ? MENU_CELL_GT : '>';
+            Clear(v);
+            ItemValue(v, it);
+            if (st + Width(v) > avail) {
+                n = Len(v);
+                for (k = n - 2; k > 0; k--) { // " >" before "<" " "
+                    if (v[k] == sp && v[k + 1] == gt) {
+                        memmove(v + k, v + k + 1, n - k);
+                        n--;
+                        break;
+                    }
+                }
+                if (n > 1 && v[0] == lt && v[1] == sp) {
+                    memmove(v + 1, v + 2, n - 1);
+                }
+                st = MAX(MIN(st, avail - Width(v)), Width(lines[i]));
+            }
+            PadTo(lines[i], st);
+            AddCells(lines[i], uk ? v : NULL, v);
         }
     }
     i = -1;
