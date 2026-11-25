@@ -43,16 +43,28 @@ bool QuickItem_Eligible(u32 id) {
            IsFood(id);
 }
 
-void Marquee_Str(const char* str, s32 x, s32 y, s32 w, MenuContext* ctx,
-                 u32 frame) {
-    MenuContext c = *ctx; // the window's clip rect becomes the field
-    const char* s = LANG_CELL(str);
-    s32 n = 0, over, ph, off = 0;
+// How far (px) a name of cells reaches past a field of w px: 0 = it fits (the
+// blank cells at its end are not text), else at least one cell, so a name never
+// wobbles by 1-2 px. The Pocket field is a multiple of 8, so the clamp is a net.
+s32 Marquee_Over(const char* s, s32 w) {
+    s32 n = 0, over;
 
     while ((u8)s[n] != 0xFF) {
         n++;
     }
+    while (n > 0 && s[n - 1] == 0) {
+        n--;
+    }
     over = n * 8 - w;
+    return over <= 0 ? 0 : over < 8 ? 8 : over;
+}
+
+void Marquee_Str(const char* str, s32 x, s32 y, s32 w, MenuContext* ctx,
+                 u32 frame) {
+    MenuContext c = *ctx; // the window's clip rect becomes the field
+    const char* s = LANG_CELL(str);
+    s32 over = Marquee_Over(s, w), ph, off = 0;
+
     if (over > 0) {
         ph = frame % (120 + 3 * over);
         off = ph < 60 ? 0 : ph < 60 + 3 * over ? (ph - 60) / 3 : over;
