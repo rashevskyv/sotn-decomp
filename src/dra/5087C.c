@@ -631,6 +631,11 @@ block_25:
         }
     }
 #endif
+#ifdef PLATFORM_PSYZ
+    Wide_BandClip(g_Tilemap.y + g_WideBandTop - g_Tilemap.scrollY.i.hi,
+                  g_Tilemap.height - g_WideBandBottom -
+                      g_Tilemap.scrollY.i.hi);
+#endif
     return 0;
 }
 

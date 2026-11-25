@@ -3,13 +3,16 @@
 // width (an ultrawide too), up to a 960 game pixel view. The player picks
 // an integer scale. In stage mode
 // psyz draws a canvas of (screen / scale) game pixels; the stage code reads
-// the extra pixels per side in g_WideX. The stage keeps the PS1 rows: the
-// clip of func_800E34DC (rows 20..226) touches only the left and right
-// frame edges, so psyz widens it and the rows above and below stay black
-// bars across the whole width, as on the PS1. g_WideY stays 0. Only these
-// rows must fit, so docked shows the stage at scale 5 (384x216, rows
-// 16..231). A frame without that clip and other display modes show the
-// PS1 frame at the largest integer scale that fits (docked 4).
+// the extra pixels per side in g_WideX. g_WideY stays 0. The stage clip
+// opens to the whole frame (rows 0..240, Wide_BandClip each frame): the room
+// shows in the old PS1 bar rows 0..20 and 226..240. Black bars stay only
+// where the view is past the room: above its top edge, below its bottom edge
+// (a room shorter than the view, the Saturn band, the slide into a room whose
+// top is below). Only rows 20..226 must fit, so docked shows the stage at
+// scale 5 (384x216): the canvas cuts the rows 0..16 and 231..240. A frame
+// without the stage camera (cutscene clip, menus) keeps the PS1 clip 20..226
+// and the black bars (Wide_ClearBars). Other display modes show the PS1
+// frame at the largest integer scale that fits (docked 4).
 #include <game.h>
 #include <psyz/input.h>
 #include <psyz/video.h>
@@ -21,9 +24,10 @@
 #include "wide.h"
 
 s32 g_WideX;
-s32 g_WideY; // always 0: no extra stage rows (the black bars)
+s32 g_WideY; // always 0: no extra stage rows. The rows 0..20 and 226..240
+             // show the room; black only past the room top and bottom
 s32 g_WideBandTop, g_WideBandBottom;
-static int band_clip; // Wide_BandClip narrowed the stage clip
+static int stage_clip; // frames left while Wide_BandClip sets the stage clip
 static int cfg_scale; // 0: off, the psyz default output (PC)
 static const char* ini_path; // NULL: settings are not saved (PC)
 char g_IniSpawn[48];
@@ -660,25 +664,24 @@ void Wide_ClearBars(void) {
     }
 }
 
-// The wide camera calls it on every frame with the art rows of the room on
-// the screen. Only a stage with a band (Saturn) narrows the clip, for a room
-// shorter than the view: black bars instead of the empty rows.
+// The stage camera calls it on every frame with the art rows of the room on
+// the screen (world rows minus the scroll). The clip opens to the whole
+// frame, so the room shows in the old PS1 bar rows 0..20 and 226..240. Rows
+// above the room top or below its bottom (a room shorter than the view, the
+// slide into a room whose top is below, the empty band of a Saturn room)
+// stay black. psyz extends the clip to the canvas rows.
 void Wide_BandClip(int y0, int y1) {
     DRAWENV* d0 = &g_GpuBuffers[0].draw;
     DRAWENV* d1 = &g_GpuBuffers[1].draw;
-    if ((!g_WideBandTop && !g_WideBandBottom && !band_clip) ||
-        d0->clip.y != d1->clip.y) {
-        return; // no band, or the two-page clip of 42398.c
+    if (d0->clip.y != d1->clip.y) {
+        return; // the two-page clip of 42398.c
     }
-    if (!g_WideBandTop && !g_WideBandBottom) {
-        y0 = CLIP_TOP, y1 = CLIP_BOTTOM; // the stage changed: the PS1 clip
-    }
-    y0 = Clamp(y0, CLIP_TOP, CLIP_BOTTOM);
-    y1 = Clamp(y1, y0, CLIP_BOTTOM);
-    band_clip = y0 > CLIP_TOP || y1 < CLIP_BOTTOM;
+    y0 = Clamp(y0, 0, DISP_STAGE_H);
+    y1 = Clamp(y1, y0, DISP_STAGE_H);
     d0->clip.y = d1->clip.y = y0;
     d0->clip.h = d1->clip.h = y1 - y0;
-    if (band_clip) {
+    stage_clip = 3;
+    if (y0 > 0 || y1 < DISP_STAGE_H) {
         ClearRows(0, y0);
         ClearRows(y1, DISP_STAGE_H);
     }
@@ -708,14 +711,20 @@ void Wide_OnFrame(void) {
         fbw = DISP_STAGE_W;
         fbh = DISP_STAGE_H;
     }
-    // the stage clip (a Saturn band is inside it): only the rows 20..226
-    // must fit, so docked shows the stage at scale 5 (384x216). Game over
-    // opens the clip when the melt starts (Gameover_5, game_handlers.c), and
-    // the loading screen is a full 240-row picture: all rows fit then.
-    rows = clip->y >= CLIP_TOP && clip->y + clip->h <= CLIP_BOTTOM &&
+    // a stage frame: the clip of Wide_BandClip (the art rows of the room) or
+    // the PS1 clip. Only the rows 20..226 must fit, so docked shows the stage
+    // at scale 5 (384x216): the canvas shows the rows 16..231 and cuts the
+    // rest. Game over opens the clip when the melt starts (Gameover_5,
+    // game_handlers.c), and the loading screen is a full 240-row picture:
+    // all rows fit then.
+    rows = (stage_clip > 0 || (clip->y >= CLIP_TOP &&
+                               clip->y + clip->h <= CLIP_BOTTOM)) &&
            (g_GameState == Game_Play ||
             (g_GameState == Game_GameOver &&
              (g_GameStep < Gameover_6 || g_GameStep >= Gameover_Alt)));
+    if (stage_clip > 0) {
+        stage_clip--;
+    }
     if (d.w <= 0 || d.h <= 0 ||
         (d.w == last_disp.w && d.h == last_disp.h && fbw == last_fbw &&
          fbh == last_fbh && rows == last_rows && g_MenuFill == last_fill &&
