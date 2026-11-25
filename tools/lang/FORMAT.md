@@ -177,7 +177,9 @@ no stock pixel. Without the disc they are left out and the plates stay stock.
 
 ## HD pictures (data/textures)
 
-Loose PNG files replace VRAM pictures at draw time (psyz `hdtex.h`, sdl3_gl only). Nothing goes into the exe.
+PNG (and `.hdt`) files replace VRAM pictures at draw time (psyz `hdtex.h`, sdl3_gl only).
+`tools/lang/textures/{uk,en,common}` are packed into the program at build time: the NRO RomFS on the Switch,
+linked-in bytes (`.incbin`, `build/<dir>/sotn_textures.c`) on PC and Windows. No loose folder is needed or read.
 
 ```
 <free text>__<x>_<y>_<w>x<h>_<bpp>_<hash8>[_c<clut8>].png     e.g. titlebg_uk__512_0_256x240_8_55efe6dc.png
@@ -186,8 +188,8 @@ Loose PNG files replace VRAM pictures at draw time (psyz `hdtex.h`, sdl3_gl only
 - `x y w h`: the VRAM rect in halfwords; `bpp` 4, 8 or 16. The whole PNG maps to the whole rect (any size up to 2048).
 - `hash`: FNV-1a 32 of the rect rows in VRAM, as `HashRows` above. With `language = uk` art.bin is already in VRAM,
   so a uk PNG is keyed by the uk picture. `_c<clut8>`: FNV-1a of the 16 or 256 CLUT words; none means any CLUT.
-- Folders, relative to the game folder (Switch: `sdmc:/switch/sotn-native/`): `data/textures/uk/` (or `en/`) first,
-  then `data/textures/common/`. A key found first wins.
+- Packs: `uk/` (or `en/`) first, then `common/`. A key found first wins. Only `data/textures/play/` (gameplay
+  experiment) and `data/textures/dump/` stay loose folders next to the program.
 - A rect that has a file but other content logs `[hd] 512 0 256x240 8: hash ... clut ..., no file` once per content.
   To name a new file: save it with hash `00000000`, go to that screen, copy the hash from the log line.
 - `sotn.ini`: `hd_textures = 0` turns all files off; `hd_dump = 1` writes every sampled picture to

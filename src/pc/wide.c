@@ -238,8 +238,8 @@ int g_MusicFiles; // 1 = enhanced: music/<ID>.mp3 or .flac replaces the XA track
 
 static const char ini_hd[] =
     "\n"
-    "; hd_textures: 1 = PNG files in data/textures/<language>/ and\n"
-    "; data/textures/common/ replace pictures; 0 = the original pictures.\n"
+    "; hd_textures: 1 = the HD pictures packed into the program replace\n"
+    "; the originals; 0 = the original pictures.\n"
     "; hd_dump: 1 = write every picture the game draws to data/textures/dump/\n"
     "; (for artists; slow; stock art: do not share the files).\n"
     "; hd_stats: 1 = every 2 seconds the log gets the frame times and HD\n"

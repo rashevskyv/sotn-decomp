@@ -26,6 +26,12 @@ const char* Switch_Init(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
     Wide_LoadIni(SWITCH_DIR "/sotn.ini");
+    {
+        int SwitchNx_RomfsInit(void);
+        int rc = SwitchNx_RomfsInit();
+        fprintf(stderr, "[boot] romfs (HD pictures): %s (0x%x)\n",
+                rc == 0 ? "ok" : "NOT MOUNTED, no HD pictures", rc);
+    }
     fprintf(stderr, "[boot] data dir %s: %s\n", SOTN_DATA_DIR,
             FileExists(SOTN_DATA_DIR "/DRA.BIN") ? "ok" : "DRA.BIN MISSING");
     // XA_STR1 is a raw-sector slice of the disc; with SetCdPos(0) a game

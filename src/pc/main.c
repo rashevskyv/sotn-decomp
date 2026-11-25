@@ -257,14 +257,23 @@ int Main(int argc, char* argv[]) {
     }
     Lang_Init();
     {
-        // HD pictures: loose PNG files (or their .hdt, tools/hdtex_pack.py),
-        // the language folder before common
+        // HD pictures: PNG files (or their .hdt, tools/hdtex_pack.py) packed
+        // into the program, the language pack before common
         extern int g_Lang, g_HdTextures, g_HdDump, g_HdStats;
         fprintf(stderr, "[hd] settings: hd_textures %d hd_dump %d\n",
                 g_HdTextures, g_HdDump);
         if (g_HdTextures) {
-            Psyz_HdTexAddDir(g_Lang ? "data/textures/uk" : "data/textures/en");
-            Psyz_HdTexAddDir("data/textures/common");
+            // the packs are inside the program (CMakeLists.txt): the NRO
+            // RomFS on the Switch, linked-in files elsewhere. No loose
+            // folder, so a stale file can not replace a packed one.
+#ifdef __SWITCH__
+            Psyz_HdTexAddDir(g_Lang ? "romfs:/uk" : "romfs:/en");
+            Psyz_HdTexAddDir("romfs:/common");
+#else
+            int Sotn_HdAddEmbedded(const char* lang);
+            Sotn_HdAddEmbedded(g_Lang ? "uk" : "en");
+            Sotn_HdAddEmbedded("common");
+#endif
             // gameplay backgrounds, an experiment (owner, 2026-11-21): only
             // when this folder is there; they draw in play too
             Psyz_HdTexAddPlayDir("data/textures/play");
