@@ -49,5 +49,11 @@
     "  Memory card": "Помилка",
     "  format error．": "форматування．",
     "Obtained ": "Отримано "
+  },
+  "MSGBOX": {
+    "Magically sealed\\x81\\x44": "Запечатано магією.",
+    "Mist could pass\\x81\\x44": "Пройде лише туман.",
+    "I have nothing to do\\x01with this wall\\x81\\x44\\x81\\x44\\x81\\x44": "Мені нема діла/до цієї стіни...",
+    "Something appeared near\\x01to the wooden bridge\\x81\\x44": "Щось з’явилося/біля дерев’яного мосту."
   }
 }

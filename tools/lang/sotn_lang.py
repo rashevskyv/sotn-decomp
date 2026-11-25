@@ -1743,7 +1743,17 @@ def cmd_pack(_args):
     # our English text: {"EQUIP_NAME": {en: uk}, "EQUIP_DESC": {en: uk}, "ENEMY": {en: uk}} (ENEMY: the Saturn-only enemies, gdn_entities.py)
     # and OTHER_SJIS: the Shift-JIS strings (the save room box lines, src/dra/62DEC.c; drawn
     # in the 8 px serif cells, 18 at most in the 144 px box)
-    for table, rows in load_json(os.path.join(UK, "ua_items.json")).items():
+    items = load_json(os.path.join(UK, "ua_items.json"))
+    # MSGBOX: message box labels (the text after the 2 size bytes, src/st/e_collect.h EntityMessageBox),
+    # keyed by the exact bytes of the C literal on PC (the build turns the source full stop into
+    # Shift-JIS 81 44): \xNN is a raw byte, other chars are UTF-8.
+    # "/" in the uk text is the line break (byte 1)
+    for en, text in items.pop("MSGBOX", {}).items():
+        raw = re.sub(rb"\\x([0-9A-Fa-f]{2})", lambda m: bytes([int(m.group(1), 16)]), en.encode("utf-8"))
+        data, bad = enc_bios(text.replace("/", "\x01"))
+        assert not bad, f"ua_items.json MSGBOX {en}: {bad}"
+        entries[(TABLES.index("OTHER_SJIS"), fnv(raw), NO_INDEX)] = (FONT["sjis"], 0, data)
+    for table, rows in items.items():
         font = "cell" if table in ("EQUIP_NAME", "ENEMY") else "sjis"
         for en, text in rows.items():
             data, bad = enc_cells(text, menu=table == "EQUIP_NAME") if font == "cell" else enc_bios(text)
