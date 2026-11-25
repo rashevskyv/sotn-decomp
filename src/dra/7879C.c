@@ -1219,9 +1219,9 @@ void EntityGuardText(Entity* self) {
             self->ext.guardText.halfHeight--;
         }
         self->ext.guardText.halfWidth += 5;
-        if (self->ext.guardText.str_x > FIX(0x180)) {
+        if (self->ext.guardText.str_x > FIX(0x180 + WIDE_X)) {
             self->ext.guardText.str_y = FIX(0x20);
-            self->ext.guardText.str_x = FIX(0x180);
+            self->ext.guardText.str_x = FIX(0x180 + WIDE_X);
             self->velocityX = FIX(-10);
             self->ext.guardText.halfWidth = 0x1E;
             self->step++;
@@ -1274,7 +1274,7 @@ void EntityGuardText(Entity* self) {
 
         self->ext.guardText.halfWidth += 5;
 
-        if (self->ext.guardText.str_x < FIX(-128)) {
+        if (self->ext.guardText.str_x < FIX(-128 - WIDE_X)) {
             DestroyEntity(self);
             return;
         }
