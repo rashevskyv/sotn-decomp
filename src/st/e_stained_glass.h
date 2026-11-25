@@ -83,9 +83,21 @@ void StainedGlassBlendPalette(
     }
 }
 
+// Wide view: the margin (in px) that the clip keeps pieces for. The 60 prim
+// fallback chain passes 0, so it never has to drop pieces of the 4:3 view.
+#ifdef PLATFORM_PSYZ
+#define GLASS_MARGIN_PARAM , s32 margin
+#define GLASS_MARGIN_ARG(value) , (value)
+#define GLASS_MARGIN margin
+#else
+#define GLASS_MARGIN_PARAM
+#define GLASS_MARGIN_ARG(value)
+#define GLASS_MARGIN WIDE_X
+#endif
+
 Primitive* StainedGlassRecurseDepth(
     SVECTOR* p0, SVECTOR* p1, SVECTOR* p2, SVECTOR* p3, Primitive* srcPrim,
-    s32 iterations, Primitive* dstPrim, u8* dataPtr) {
+    s32 iterations, Primitive* dstPrim, u8* dataPtr GLASS_MARGIN_PARAM) {
     s32 index0;
     s32 index1;
     s32 index2;
@@ -153,7 +165,9 @@ Primitive* StainedGlassRecurseDepth(
         UV(tempPrim->u2) = uvValues[index2];
         UV(tempPrim->u3) = uvValues[index3];
 
-        if ((tempPrim->x1 >= 0) && (tempPrim->x0 <= 256)) {
+        // wide view: keep the pieces that reach into the margins
+        if ((tempPrim->x1 >= -GLASS_MARGIN) &&
+            (tempPrim->x0 <= 256 + GLASS_MARGIN)) {
             if (iterations == 1) {
                 dstPrimNext = dstPrim->next;
                 *dstPrim = *tempPrim;
@@ -166,7 +180,7 @@ Primitive* StainedGlassRecurseDepth(
                 dstPrim = StainedGlassRecurseDepth(
                     &points[index0], &points[index1], &points[index2],
                     &points[index3], tempPrim, iterations - 1, dstPrim,
-                    dataPtr);
+                    dataPtr GLASS_MARGIN_ARG(margin));
             }
         }
     }
@@ -193,7 +207,16 @@ void EntityStainedGlass(Entity* self) {
     switch (self->step) {
     case 0: // init
         InitializeEntity(g_EInitInteractable);
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 60);
+        // 12 panes, then at most 32 pieces and 18 light prims (50, while the
+        // 4:3 view drops the ones off screen, so 48 are enough there)
+        primIndex = g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(60, 62));
+#ifdef PLATFORM_PSYZ
+        self->step_s = WIDE_X; // the margin the chain covers
+        if (primIndex == -1) {
+            self->step_s = 0;
+            primIndex = g_api.AllocPrimitives(PRIM_GT4, 60);
+        }
+#endif
         if (primIndex != -1) {
             self->flags |= FLAG_HAS_PRIMS;
             self->primIndex = primIndex;
@@ -263,7 +286,8 @@ void EntityStainedGlass(Entity* self) {
                 lightPrim = StainedGlassRecurseDepth(
                     &glass_points_0, &glass_points_1, &glass_points_2,
                     &glass_points_3, glassPrim, iterations, lightPrim,
-                    (u8*)SP(0));
+                    (u8*)SP(0)
+                        GLASS_MARGIN_ARG(MIN(WIDE_X, (s32)self->step_s)));
                 glassPrim->drawMode = DRAW_HIDE;
             }
             gte_ldv3(&glass_points_0, &glass_points_1, &glass_points_2);
@@ -360,6 +384,9 @@ void EntityStainedGlass(Entity* self) {
         }
     }
 }
+#undef GLASS_MARGIN_PARAM
+#undef GLASS_MARGIN_ARG
+#undef GLASS_MARGIN
 
 #if TARGET == TARGET_PSP
 #define SETROTMATRIX(x) SetRotMatrix(x)

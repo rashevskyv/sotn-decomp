@@ -6,11 +6,33 @@
 // has 2 more. This entity does not move with the background and stays
 // fixed in the camera - no scrolling.
 // Params = 0 in Malachi corridor, 1 in Azaghal room
+
+// Wide view: the arches stand 64 px apart (72 px wide) in rows of 8 from x 0.
+// A row gets ArchLead() arches more on the left and the ones it needs on the
+// right, to cover -WIDE_X .. 0x100 + WIDE_X. 8 arches from 0 on PS1 and in 4:3.
+#ifdef PLATFORM_PSYZ
+static s32 ArchLead(void) { return (WIDE_X + 63) >> 6; }
+static s32 ArchCols(void) {
+    s32 cols = ArchLead() + 1 + ((0x100 + WIDE_X + 63) >> 6);
+
+    return cols > 8 ? cols : 8;
+}
+#define ARCH_COL(i) ((i) % cols - lead)
+#define ARCH_ROW(i) ((i) / cols)
+#else
+#define ARCH_COL(i) ((i) & 7)
+#define ARCH_ROW(i) ((i) >> 3)
+#endif
+
 void EntityDeepBackgroundArch(Entity* self) {
     Primitive* prim;
     s16 xOffset;
     s16 yOffset;
     s32 i;
+#ifdef PLATFORM_PSYZ
+    s32 cols = ArchCols();
+    s32 lead = ArchLead();
+#endif
 
     if (self->params) {
         xOffset = 0;
@@ -23,10 +45,20 @@ void EntityDeepBackgroundArch(Entity* self) {
     if (!self->step) {
         self->step += 1;
         if (self->params) {
-            self->primIndex = g_api.AllocPrimitives(PRIM_GT4, 32);
+            self->primIndex =
+                g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(32, 4 * ArchCols()));
         } else {
-            self->primIndex = g_api.AllocPrimitives(PRIM_GT4, 8);
+            self->primIndex =
+                g_api.AllocPrimitives(PRIM_GT4, WIDE_POOL(8, ArchCols()));
         }
+#ifdef PLATFORM_PSYZ
+        if (self->primIndex == -1 && cols != 8) {
+            cols = 8; // 4:3 only
+            lead = 0;
+            self->primIndex =
+                g_api.AllocPrimitives(PRIM_GT4, self->params ? 32 : 8);
+        }
+#endif
 
         if (self->primIndex == -1) {
             DestroyEntity(self);
@@ -45,9 +77,14 @@ void EntityDeepBackgroundArch(Entity* self) {
             prim->u2 = 0xC8;
             prim->v1 = 0x68;
 
-            prim->x0 = prim->x2 = xOffset + ((i & 7) << 6);
+#ifdef PLATFORM_PSYZ
+            // ARCH_COL is negative on the left: no shift of a negative
+            prim->x0 = prim->x2 = xOffset + ARCH_COL(i) * 0x40;
+#else
+            prim->x0 = prim->x2 = xOffset + (ARCH_COL(i) << 6);
+#endif
             prim->x1 = prim->x3 = prim->x0 + 0x48;
-            prim->y1 = prim->y0 = yOffset + ((i >> 3) * 0x64);
+            prim->y1 = prim->y0 = yOffset + (ARCH_ROW(i) * 0x64);
             prim->y3 = prim->y2 = prim->y0 + 0x6C;
 
             prim->tpage = 0xF;

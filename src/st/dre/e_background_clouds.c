@@ -8,11 +8,25 @@ void EntityBackgroundClouds(Entity* self) {
     Primitive* prim;
     s32 primIndex;
     s32 camX, camY;
+#ifdef PLATFORM_PSYZ
+    s32 wx = WIDE_X; // the margin of this spawn; 0 if the pool is short
+#else
+#define wx WIDE_X
+#endif
 
     switch (self->step) {
     case 0:
         InitializeEntity(g_EInitInteractable);
-        primIndex = g_api.AllocPrimitives(PRIM_GT4, 5);
+        // wide view: the sky spans the margins and the clouds (95 px apart)
+        // start left of -WIDE_X and run past 0x100 + WIDE_X
+        primIndex = g_api.AllocPrimitives(
+            PRIM_GT4, WIDE_POOL(5, 1 + (445 + 2 * wx) / 95));
+#ifdef PLATFORM_PSYZ
+        if (primIndex == -1 && wx) {
+            wx = 0; // 4:3 only
+            primIndex = g_api.AllocPrimitives(PRIM_GT4, 5);
+        }
+#endif
         if (primIndex == -1) {
             DestroyEntity(self);
             return;
@@ -22,8 +36,8 @@ void EntityBackgroundClouds(Entity* self) {
         prim = &g_PrimBuf[primIndex];
         self->ext.prim = prim;
         prim->type = PRIM_G4;
-        prim->x0 = prim->x2 = 0;
-        prim->x1 = prim->x3 = 0x100;
+        prim->x0 = prim->x2 = -wx;
+        prim->x1 = prim->x3 = 0x100 + wx;
         prim->y0 = prim->y1 = 0x6E - g_Tilemap.scrollY.i.hi;
         prim->y2 = prim->y3 = 0xF0;
         setRGB0(prim, 16, 16, 16);
@@ -34,6 +48,14 @@ void EntityBackgroundClouds(Entity* self) {
         prim->drawMode = DRAW_DEFAULT;
         prim = prim->next;
         camX = -g_Tilemap.scrollX.i.hi;
+#ifdef PLATFORM_PSYZ
+        while (camX > -wx) {
+            camX -= 95;
+        }
+        while (camX <= -wx - 95) {
+            camX += 95;
+        }
+#endif
         camY = 32 - g_Tilemap.scrollY.i.hi;
         while (prim != NULL) {
             prim->tpage = 0xF;
@@ -63,3 +85,5 @@ void EntityBackgroundClouds(Entity* self) {
     g_GpuBuffers[1].draw.g0 = 24;
     g_GpuBuffers[1].draw.b0 = 24;
 }
+
+#undef wx
