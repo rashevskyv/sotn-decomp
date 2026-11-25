@@ -200,7 +200,7 @@ static void Wide_MarkHud(void) {
         if (idx[i] < 0 || idx[i] >= MAX_PRIM_COUNT) {
             continue;
         }
-        for (p = &g_PrimBuf[idx[i]], n = 0; p && n < 32; p = p->next, n++) {
+        for (p = &g_PrimBuf[idx[i]], n = 0; p && n < 64; p = p->next, n++) {
             g_WideHudMark[p - g_PrimBuf] = g_WideHudFrame;
         }
     }
@@ -209,15 +209,39 @@ static void Wide_MarkHud(void) {
 // Left HUD parts move left by the X margin, right parts move right. All
 // parts move up by the Y margin. The HUD prims are DRAW_ABSPOS at priority
 // 0x1EE..0x1F0, so a stale index does not move other prims.
-static void Wide_MoveHud(s32 i, Primitive* prim, POLY_GT4* p) {
-    s32 dx;
-
+static bool Wide_HudShift(s32 i, Primitive* prim, s32* dx) {
     if (g_WideHudMark[i] != g_WideHudFrame ||
         !(prim->drawMode & DRAW_ABSPOS) || prim->priority < 0x1EE ||
         prim->priority > 0x1F0) {
+        return false;
+    }
+    *dx = prim->x0 < 128 ? -WIDE_X : WIDE_X;
+    return true;
+}
+
+static void Wide_MoveHud(s32 i, Primitive* prim, POLY_GT4* p) {
+    s32 dx;
+
+    if (!Wide_HudShift(i, prim, &dx)) {
         return;
     }
-    dx = prim->x0 < 128 ? -WIDE_X : WIDE_X;
+    p->x0 += dx;
+    p->x1 += dx;
+    p->x2 += dx;
+    p->x3 += dx;
+    p->y0 -= WIDE_Y;
+    p->y1 -= WIDE_Y;
+    p->y2 -= WIDE_Y;
+    p->y3 -= WIDE_Y;
+}
+
+// the flat quads of the hearts arc (PRIM_G4)
+static void Wide_MoveHudG4(s32 i, Primitive* prim, POLY_G4* p) {
+    s32 dx;
+
+    if (!Wide_HudShift(i, prim, &dx)) {
+        return;
+    }
     p->x0 += dx;
     p->x1 += dx;
     p->x2 += dx;
@@ -464,6 +488,9 @@ void RenderPrimitives(void) {
                         primbuf->g4.x3 = prim->x3 + g_cameraOffsetX;
                         primbuf->g4.y3 = prim->y3 + g_cameraOffsetY;
                     }
+#ifdef PLATFORM_PSYZ
+                    Wide_MoveHudG4(i, prim, &primbuf->g4);
+#endif
                     *r->g4 = primbuf->g4;
 #if TARGET == TARGET_PSP
                     if (prim->priority < 0 || prim->priority >= 0x200) {

@@ -1250,11 +1250,15 @@ bool StatusPause(s32 arg0) {
 #define HUD_HP_BAR 6
 #define HUD_HEART 7
 #define HUD_THIRD_HAND 8    // the Pocket icon
-#define HUD_THIRD_DIGITS 9  // 9..12, its count
-#define HUD_HP_DIGITS 13    // 13..16
-#define HUD_HEART_DIGITS 17 // 17..20
-#define HUD_MP_DIGITS 21    // 21..24
-#define HUD_ALL (HUD_NUM_SPRITES + 11)
+// the hearts arc around the sub-weapon ring: HUD_ARC_N flat quads (PRIM_G4)
+// before the numbers, so no HD number is hidden by them
+#define HUD_ARC 9
+#define HUD_ARC_N 36
+#define HUD_THIRD_DIGITS (HUD_ARC + HUD_ARC_N) // 4 prims, its count
+#define HUD_HP_DIGITS (HUD_THIRD_DIGITS + 4)   // 4 prims
+#define HUD_HEART_DIGITS (HUD_HP_DIGITS + 4)   // 4 prims
+#define HUD_MP_DIGITS (HUD_HEART_DIGITS + 4)   // 4 prims
+#define HUD_ALL (HUD_NUM_SPRITES + 11 + HUD_ARC_N)
 // the Pocket icon: slot 0x1C of the icon page (0x1D..0x1F are the Pocket food
 // and the toast, 0x10..0x17 the Equip menu)
 #define HUD_THIRD_SLOT 0x1C
@@ -1427,6 +1431,78 @@ static void Hud_Number(Primitive** p, s32 value, s32 x, s32 y, s32 align,
     }
 }
 
+// Hearts gauge: a 270 degree horseshoe arc round the sub-weapon ring (icon
+// 90,26 16x16, centre 98,34), gap at the bottom, fills clockwise from the
+// bottom left (owner, 2026-11-25). Segment k spans 7.5 degrees.
+#define HUD_ARC_CX 98
+#define HUD_ARC_CY (23 + 8 + HUD_DY) // icon y + half its height
+#define HUD_ARC_RI 9.5f
+#define HUD_ARC_RO 11.0f
+#include <math.h>
+static s32 Hud_ArcRound(float v) {
+    return (s32)(v < 0 ? v - 0.5f : v + 0.5f);
+}
+
+static void Hud_Arc(Primitive** p, s32 cost) {
+    static float sn[HUD_ARC_N + 1], cs[HUD_ARC_N + 1];
+    s32 k, n, h, m, r, g, b;
+
+    if (!sn[HUD_ARC_N] && !cs[HUD_ARC_N]) {
+        for (k = 0; k <= HUD_ARC_N; k++) { // clockwise from up, start -135
+            float t = (-135.0f + 270.0f * k / HUD_ARC_N) * 3.14159265f / 180;
+            sn[k] = sinf(t);
+            cs[k] = cosf(t);
+        }
+    }
+    h = g_Status.hearts;
+    m = g_Status.heartsMax;
+    if (m <= 0) {
+        for (k = 0; k < HUD_ARC_N; k++) {
+            p[k]->drawMode = DRAW_HIDE;
+        }
+        return;
+    }
+    h = CLAMP(h, 0, m);
+    n = (h * HUD_ARC_N + m / 2) / m;
+    if (h && !n) {
+        n = 1;
+    }
+    r = g = b = 240; // white
+    if (h == m) {
+        r = 0, g = 224, b = 64; // full: green
+    } else if (g_Status.subWeapon && cost > 0) {
+        if (h < cost * 2) {
+            r = 240, g = 32, b = 32; // one use or less: red
+        } else if (h < cost * 3) {
+            r = 240, g = 208, b = 0; // two uses: yellow
+        }
+    }
+    for (k = 0; k < HUD_ARC_N; k++) {
+        Primitive* q = p[k];
+        s32 cx = HUD_ARC_CX, cy = HUD_ARC_CY;
+
+        q->type = PRIM_G4;
+        q->x0 = cx + Hud_ArcRound(HUD_ARC_RO * sn[k]);
+        q->y0 = cy - Hud_ArcRound(HUD_ARC_RO * cs[k]);
+        q->x1 = cx + Hud_ArcRound(HUD_ARC_RO * sn[k + 1]);
+        q->y1 = cy - Hud_ArcRound(HUD_ARC_RO * cs[k + 1]);
+        q->x2 = cx + Hud_ArcRound(HUD_ARC_RI * sn[k]);
+        q->y2 = cy - Hud_ArcRound(HUD_ARC_RI * cs[k]);
+        q->x3 = cx + Hud_ArcRound(HUD_ARC_RI * sn[k + 1]);
+        q->y3 = cy - Hud_ArcRound(HUD_ARC_RI * cs[k + 1]);
+        if (k < n) {
+            q->r0 = q->r1 = q->r2 = q->r3 = r;
+            q->g0 = q->g1 = q->g2 = q->g3 = g;
+            q->b0 = q->b1 = q->b2 = q->b3 = b;
+        } else { // dim dark-gray track
+            q->r0 = q->r1 = q->r2 = q->r3 = 56;
+            q->g0 = q->g1 = q->g2 = q->g3 = 56;
+            q->b0 = q->b1 = q->b2 = q->b3 = 56;
+        }
+        q->drawMode = DRAW_ABSPOS;
+    }
+}
+
 static void Hud_Layout(void) {
     Primitive* p[HUD_ALL];
     Primitive* prim;
@@ -1480,6 +1556,7 @@ static void Hud_Layout(void) {
     clut = g_Status.hearts == g_Status.heartsMax ? 0x193 : 0x196;
     Hud_Number(&p[HUD_HEART_DIGITS], g_Status.hearts, 101, 38 + HUD_DY, 0, true,
                3, 7, clut);
+    Hud_Arc(&p[HUD_ARC], subwpn.heartCost);
     // heart icon 1x at 80,40, left of the hearts number (owner, 2026-11-24)
     prim = p[HUD_HEART];
     Hud_Quad(
