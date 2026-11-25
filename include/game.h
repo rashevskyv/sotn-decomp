@@ -1068,6 +1068,7 @@ void PortMenu_Cell(int x, int y, int cell, u32 rgb);
 enum { VOICE_PS1, VOICE_JP, VOICE_PSP, VOICE_COUNT };
 extern int g_VoiceSet;
 extern const char* const g_VoiceSetNames[VOICE_COUNT];
+int Voice_SetAvailable(int v); // 1: the set can be offered (voice.c)
 s32 Voice_Open(s32 id, s32 isVoice);
 // Music files music/<ID>.mp3|flac in place of the XA (src/pc/music.c)
 s32 Music_Start(s32 id, s32 mode);

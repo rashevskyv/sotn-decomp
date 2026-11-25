@@ -239,23 +239,6 @@ static void LangSwap(const CutsceneSymbolRange** symbols, int* count) {
     *count += out;
 }
 
-// 1 if voice/<set>/ holds clips (358.pcm, the first voice id; voice.c);
-// without them the set plays the US voice
-static int VoiceHasClips(int v) {
-    static signed char have[VOICE_COUNT] = {1, -1, -1};
-    if (have[v] < 0) {
-        char path[32];
-        FILE* f;
-        snprintf(path, sizeof(path), "voice/%s/358.pcm", g_VoiceSetNames[v]);
-        f = fopen(path, "rb");
-        have[v] = f != NULL;
-        if (f) {
-            fclose(f);
-        }
-    }
-    return have[v];
-}
-
 typedef struct {
     const u8* old; // the stock range
     u32 off, psx;  // the stock offset in it; its PSX address
@@ -333,7 +316,7 @@ static u8* LangPick(const LangPos* at, const char* what) {
     int i, v = g_VoiceSet, t;
     const char* table = "stock";
     u8* p = (u8*)at->old + at->off;
-    if (v != VOICE_PS1 && !VoiceHasClips(v)) {
+    if (v != VOICE_PS1 && !Voice_SetAvailable(v)) {
         v = VOICE_PS1;
     }
     t = lang_table[v];

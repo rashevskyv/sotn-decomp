@@ -345,12 +345,14 @@ def generate(disc, art):
 
     # the Saturn layer: 8x8 4bpp tiles (PS1 nibble order, one u32 per row),
     # cell maps (0 = empty, n = tile n - 1), CLUT 0 header, 1 name, 2 chosen
-    lines.append("#define CHARSEL_SATURN %d" % (saturn is not None))
-    if saturn is None:
-        return lines
+    # the layout sizes of the header and the names: the card layout and the
+    # gothic captions use them with or without the Saturn art
     for name, _, _, w, h in LAYER_ELEMS:
         lines.append("#define CHARSEL_%s_W %d" % (name.upper(), w))
         lines.append("#define CHARSEL_%s_H %d" % (name.upper(), h))
+    lines.append("#define CHARSEL_SATURN %d" % (saturn is not None))
+    if saturn is None:
+        return lines
     words = []
     for t in pool:
         for y in range(8):

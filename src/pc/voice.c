@@ -13,6 +13,24 @@
 int g_VoiceSet = VOICE_PS1;
 const char* const g_VoiceSetNames[VOICE_COUNT] = {"ps1", "jp", "psp"};
 
+// 1 if voice/<set>/ holds clips (358.pcm, the first voice id). PS1 is always
+// there; JP and PSP EN need the owner's voice folder. A set without clips is
+// not offered by the port menu and the ini cannot select it.
+int Voice_SetAvailable(int v) {
+    char path[32];
+    FILE* f;
+
+    if (v == VOICE_PS1) {
+        return 1;
+    }
+    snprintf(path, sizeof(path), "voice/%s/358.pcm", g_VoiceSetNames[v]);
+    f = fopen(path, "rb");
+    if (f) {
+        fclose(f);
+    }
+    return f != NULL;
+}
+
 // CdSoundCommand4, before its CdlReadN, for every XA id. Arms the clip for
 // that read and returns its length in vsyncs; 0: play the US sector.
 s32 Voice_Open(s32 id, s32 isVoice) {

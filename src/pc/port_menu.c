@@ -1411,7 +1411,10 @@ static void Change(int dir) {
 #endif
     } else if (it == ITEM_VOICE) {
         // the next spoken line uses the new set
-        g_VoiceSet = (g_VoiceSet + dir + VOICE_COUNT) % VOICE_COUNT;
+        // only the sets whose clips are there (PS1 always)
+        do {
+            g_VoiceSet = (g_VoiceSet + dir + VOICE_COUNT) % VOICE_COUNT;
+        } while (!Voice_SetAvailable(g_VoiceSet));
         fprintf(
             stderr, "[voice] menu: voice %s\n", g_VoiceSetNames[g_VoiceSet]);
         Wide_SaveIni();
