@@ -249,8 +249,7 @@ enum {
     P_W_DEAD,
     P_W_PROLOGUE,
     P_W_OTHER_ROOM,
-    P_W_GROUND,
-    P_W_SAME_HERO,
+    P_W_SAME_HERO = 279,
 };
 static char msg[48];
 static int msg_word = -1; // its uk word (P_*), -1: none
@@ -621,7 +620,6 @@ static const struct {
                  {"you are dead", P_W_DEAD},
                  {"not in the prologue", P_W_PROLOGUE},
                  {"pick another room", P_W_OTHER_ROOM},
-                 {"stand on the ground first", P_W_GROUND},
                  {"already playing this hero", P_W_SAME_HERO}};
 
 static void MessageWhy(const char* why) {
