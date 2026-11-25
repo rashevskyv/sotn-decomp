@@ -946,6 +946,10 @@ void EntityEquipItemDrop(Entity* self) {
             g_api.AddToInventory(itemId, EQUIP_ARMOR);
         }
         BottomCornerText(name, true);
+#ifdef PLATFORM_PSYZ
+        // the port: the "Obtained" text stays 3x longer (stock 0x130)
+        g_unkGraphicsStruct.BottomCornerTextTimer = 0x130 * 3;
+#endif
         DestroyEntity(self);
         break;
     }
@@ -1659,7 +1663,14 @@ relicRetry:
         }
 #endif
         self->ext.relicOrb.unk7C++;
+#ifdef PLATFORM_PSYZ
+        // the port: the relic banner stays 3x longer (stock 0x60, ST0 0x100)
 #if STAGE == STAGE_ST0
+        if (self->ext.relicOrb.unk7C > 0x100 * 3) {
+#else
+        if (self->ext.relicOrb.unk7C > 0x60 * 3) {
+#endif
+#elif STAGE == STAGE_ST0
         if (self->ext.relicOrb.unk7C > 0x100) {
 #else
         if (self->ext.relicOrb.unk7C > 0x60) {

@@ -1496,7 +1496,11 @@ void EntityLevelUpAnimation(Entity* self) {
         }
         if (self->ext.factory.unk80 < 0) {
             self->ext.factory.unk80 = 0;
+#ifdef PLATFORM_PSYZ
+            self->ext.timer.t = 0x20 * 3; // the port: text stays 3x longer
+#else
             self->ext.timer.t = 0x20;
+#endif
             prim = &g_PrimBuf[self->primIndex];
             for (i = 0; i < 14; i++) {
                 prim->drawMode = DRAW_DEFAULT;
