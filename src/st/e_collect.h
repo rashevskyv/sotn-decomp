@@ -1014,6 +1014,7 @@ extern u16 msgBoxTpage[0x600];
 #define RELIC_DESC_PRIMS 9
 #define RELIC_ANIM_PRIMS 7  // the sparkle loop at the end of the entity
 #define RELIC_DESC_SRC 0xFA  // the text at full size: bytes of 2 px per row
+#define RELIC_DESC_LH 12 // the height of a description line, text and box
 #define RELIC_DESC_LINE 0x98 // a line at full size (228 px shrunk)
 #define RELIC_DESC_ROW 0x80  // the line textures: bytes per row
 #define RELIC_LETTER(c)                                                        \
@@ -1173,7 +1174,7 @@ static void RelicDescPrims(Primitive* prim) {
         }
         w = s_DescW[k];
         x = 0x80 - w / 2;
-        y = 0xB3 + k * 12;
+        y = 0xB3 + k * RELIC_DESC_LH;
         prim->tpage = 0x10;
         prim->clut = PAL_UNK_1A1;
         prim->u0 = prim->u2 = 0;
@@ -1183,7 +1184,7 @@ static void RelicDescPrims(Primitive* prim) {
         prim->x0 = prim->x2 = x;
         prim->x1 = prim->x3 = x + w;
         prim->y0 = prim->y1 = y;
-        prim->y2 = prim->y3 = y + 12;
+        prim->y2 = prim->y3 = y + RELIC_DESC_LH;
         PCOL(prim) = 0x80;
         prim->priority = 0x1FE;
     }
@@ -1481,7 +1482,7 @@ void EntityRelicOrb(Entity* self) {
             }
         }
 #else
-    msg = g_RelicOrbTexts[0];
+    msg = LANG_SJIS(g_RelicOrbTexts[0]);
     chPix = g_Pix[0];
     var_v0_5 = (u8*)chPix;
     for (i = 0; i < 0xC00; i++) {
@@ -1568,6 +1569,40 @@ void EntityRelicOrb(Entity* self) {
             }
             prim = prim->next;
         }
+#ifdef RELIC_DESC
+        { // the boxes grow to the name and to the description lines
+            s32 half = self->ext.relicOrb.unk7E; // the name, half in px
+            s32 e;
+
+            if (s_DescW[0] / 2 > half) {
+                half = s_DescW[0] / 2;
+            }
+            if (s_DescW[1] / 2 > half) {
+                half = s_DescW[1] / 2;
+            }
+            half += 6;
+            if (half > 0x7E) {
+                half = 0x7E; // stay inside the screen
+            }
+            e = (half > 0x60 ? half - 0x60 : 0) * (orbUnk7C + 1) / 8;
+            i = s_DescW[0] ? (RELIC_DESC_LH * (s_DescW[1] ? 2 : 1) + 2) *
+                                 (orbUnk7C + 1) / 8
+                           : 0;
+            prim = g_PrimBuf[self->primIndex].next;
+            for (iconSlot = 0; iconSlot < 2; iconSlot++) {
+                if (prim->y0 >= prim->y2) {
+                    prim->y0 = prim->y1 += i;
+                } else {
+                    prim->y2 = prim->y3 += i;
+                }
+                prim->x0 += prim->x0 < 0x80 ? -e : e;
+                prim->x1 += prim->x1 < 0x80 ? -e : e;
+                prim->x2 += prim->x2 < 0x80 ? -e : e;
+                prim->x3 += prim->x3 < 0x80 ? -e : e;
+                prim = prim->next;
+            }
+        }
+#endif
 
         if (++self->ext.relicOrb.unk7C == 8) {
             self->step++;
@@ -1584,6 +1619,9 @@ void EntityRelicOrb(Entity* self) {
 #endif
         prim->drawMode = DRAW_DEFAULT;
 #ifdef RELIC_DESC
+        if (self->ext.relicOrb.unk7E * 2 > 0xF0) { // a name over 240 px
+            prim->u1 = MIN(self->ext.relicOrb.unk7E * 2, 0xFF);
+        }
         for (i = 0; i < 2; i++) { // the description under the name
             prim = &g_PrimBuf[self->primIndex];
             for (iconSlot = 0; iconSlot < 7 + i; iconSlot++) {
@@ -1761,6 +1799,31 @@ void EntityPersistentItemDrop(Entity* self) {
 }
 
 #if VERSION >= VER_BETA_HD
+#ifdef PLATFORM_PSYZ
+// The width in px of the widest line of a message box text, a multiple of 4,
+// at most 252. The port font is wider than the PSX BIOS font, so the text can
+// be wider than the box; BlitChar then wraps its last letters into the next
+// row, over the first letter. The only place that knows the BlitChar cell.
+static u16 MessageBoxTextW(const char* str) {
+    u16 lineW = 0;
+    u16 maxW = 0;
+
+    while (*str) {
+        if (*str == 1) {
+            str++;
+            lineW = 0;
+        } else {
+            if (lineW + 6 > maxW) {
+                maxW = lineW + 6; // BlitChar copies 6 bytes per row
+            }
+            str = BlitChar(str, &lineW, (u8*)g_Pix[0], 126);
+        }
+    }
+    maxW = (maxW * 2 + 3) & ~3;
+    return maxW > 252 ? 252 : maxW;
+}
+#endif
+
 // params: message box duration, in frames
 // ext.messageBox.label: box size and text to render
 void EntityMessageBox(Entity* self) {
@@ -1814,6 +1877,13 @@ void EntityMessageBox(Entity* self) {
         self->ext.messageBox.width = *str++;
         self->ext.messageBox.height = *str++;
         self->ext.messageBox.label += 2;
+#ifdef PLATFORM_PSYZ
+        // the text can be wider than the box: widen the box to the text
+        i = MessageBoxTextW(self->ext.messageBox.label);
+        if (i > self->ext.messageBox.width) {
+            self->ext.messageBox.width = i;
+        }
+#endif
         break;
     case 1:
         rect.x = 0;
