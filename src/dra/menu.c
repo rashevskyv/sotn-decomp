@@ -3216,33 +3216,10 @@ void func_800F98AC(const char* str, u32 y) {
 #if REGION != REGION_JP
 #ifdef PLATFORM_PSYZ
 // The save and memory card box (func_800F9D88) draws its text in the agreed
-// serif menu font (the cells of the shop and the dialogue, en and uk) instead
-// of the wide 12x16 BIOS glyphs: a cell of Lang_SjisCell as a 12x16 glyph, one
-// ink (the BIOS glyphs' full shade 8), the baseline 2 rows down. NULL for a
-// code with no cell: the BIOS glyph then.
+// serif menu font (Lang_SerifGlyph: the cells of the shop and the dialogue, en
+// and uk) instead of the wide 12x16 BIOS glyphs; the BIOS glyph for a code with
+// no cell.
 static s32 g_SaveBoxSerif;
-static u8 g_SerifGlyph[16 * 6];
-static u8* SerifGlyph(s32 sj) {
-    const u8* cell = NULL;
-    s32 c = Lang_SjisCell(sj);
-    s32 y, i, ink = 0;
-
-    // < and > are the port menu's cells, as in Lang_DialogueGlyph
-    if (sj == '<' || sj == '>' || c < 0 || (c && !(cell = Lang_MenuCellAny(c)))) {
-        return NULL;
-    }
-    memset(g_SerifGlyph, 0, sizeof(g_SerifGlyph));
-    for (y = 0; c && y < 11; y++) {
-        for (i = 0; i < 8; i++) {
-            if (cell[y * 4 + i / 2] >> (i & 1) * 4 & 15) {
-                g_SerifGlyph[(y + 2) * 6 + i / 2] |= 8 << (i & 1) * 4;
-                ink = 1;
-            }
-        }
-    }
-    // a blank non-space cell would not end the stock left-shift loop
-    return ink || !c ? g_SerifGlyph : NULL;
-}
 #endif
 void func_800F99B8(const char* str, u32 y, bool arg2) {
     // See src/st/blit_char.h
@@ -3321,7 +3298,7 @@ void func_800F99B8(const char* str, u32 y, bool arg2) {
             }
         }
 #ifdef PLATFORM_PSYZ
-        var_a2 = g_SaveBoxSerif ? SerifGlyph(ch < 0x80 ? ch : ch16) : NULL;
+        var_a2 = g_SaveBoxSerif ? Lang_SerifGlyph(ch < 0x80 ? ch : ch16) : NULL;
         if (!var_a2)
 #endif
             var_a2 = func_80106A28(ch16, 0);

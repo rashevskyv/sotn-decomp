@@ -1367,6 +1367,8 @@ void Lang_MenuCellRows(int code, unsigned char rows[44]);
 void Lang_ActorName(const char* cells, Primitive* prim);
 // the atlas cell of a 12x16 font code (Shift-JIS, or an ASCII letter), or -1
 int Lang_SjisCell(int sjis);
+// that cell as a 12x16 glyph (the format of func_80106A28), or NULL
+unsigned char* Lang_SerifGlyph(int sjis);
 // the status page's words (src/dra/menu.c): 0..5 ATT DEF STR CON INT LCK in
 // full, as menu cells (FF end), uk or en
 const char* PortWord(int i);
