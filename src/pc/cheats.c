@@ -229,6 +229,28 @@ void Cheat_OnFrame(void) {
                         Cheat_Warp(st, rm, cx, cy) ?: "ok");
             }
         }
+        void func_80109328(void); void func_8010E83C(bool);
+        { // TEMP P14 test hook
+            static int fr, applied;
+            const char* f = getenv("SOTN_TEST_FORM");
+            const char* ap = getenv("SOTN_TEST_APPLY");
+            fr++;
+            if (f && fr == 300) {
+                int st = atoi(f);
+                if (st == Player_MorphWolf) func_80109328();
+                if (st == Player_Jump) func_8010E83C(0); else SetPlayerStep(st);
+                fprintf(stderr, "[t14] form step %d\n", st);
+            }
+            if (ap && fr == 300 + atoi(ap)) {
+                g_Cheat.character = CHEAT_CHAR_RICHTER;
+                fprintf(stderr, "[t14] pre status %#x step %d vram %#x pos %d,%d mp %d\n", g_Player.status, PLAYER.step, g_Player.vram_flag, PLAYER.posX.i.hi, PLAYER.posY.i.hi, g_Status.mp);
+                fprintf(stderr, "[t14] apply: %s\n", Cheat_ApplyCharacter() ?: "ok");
+                applied = fr;
+            }
+            if (applied && (fr - applied) % 120 == 60 && fr - applied < 500) {
+                fprintf(stderr, "[t14] +%d char %d status %#x step %d mistreq %d vram %#x pos %d,%d mp %d\n", fr - applied, g_PlayableCharacter, g_Player.status, PLAYER.step, g_CheatMistRequest, g_Player.vram_flag, PLAYER.posX.i.hi, PLAYER.posY.i.hi, g_Status.mp);
+            }
+        }
         // SOTN_TEST_BOSS=N: the boss list entry N, as the map menu does it
         e = getenv("SOTN_TEST_BOSS");
         if (e && ++bossWait == 400) {
@@ -709,12 +731,6 @@ const char* Cheat_ApplyCharacter(void) {
     }
     if (!why && want == g_PlayableCharacter) {
         why = "already playing this hero";
-    }
-    if (!why && (g_Player.status & PLAYER_STATUS_TRANSFORM)) {
-        why = "stand on the ground first";
-    }
-    if (!why && !(g_Player.vram_flag & TOUCHING_GROUND)) {
-        why = "stand on the ground first";
     }
     if (!why && (!g_LastRoom.active || g_LastRoom.stage != g_StageId)) {
         why = "enter a room first";
