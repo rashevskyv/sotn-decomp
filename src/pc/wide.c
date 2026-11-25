@@ -754,7 +754,13 @@ void Wide_OnFrame(void) {
     } else {
         // title, menus, movies: the PS1 frame at the largest integer scale
         // that fits, nothing around it
-        s = MAX(MIN(d.w / fbw, d.h / fbh), 1);
+        // the relic page of the pause menu is 416 wide (menu.c RELIC_WIN_W)
+        s = MAX(MIN(d.w / (g_RelicPage && fbw == DISP_MENU_W &&
+                                   fbh == DISP_MENU_H
+                               ? 416
+                               : fbw),
+                    d.h / fbh),
+                1);
         req.w = fbw * s;
         req.h = fbh * s;
         if (fbw == DISP_TITLE_W && fbh == DISP_TITLE_H) {

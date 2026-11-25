@@ -976,9 +976,10 @@ static int MainLineOf(int item) {
     int e = EditorRow();
     return e >= 0 && item > e ? item + 1 : item;
 }
-// the main page scrolls: MAIN_LINES on screen (with the hint and the help
-// line they fit the stage rows 20..226), the first is main_top
-#define MAIN_LINES 12
+// the main page scrolls: MAIN_LINES on screen (with the hint and two help
+// lines, which Box reserves on this page, they fit the stage rows 20..226 up
+// to 11 lines), the first is main_top
+#define MAIN_LINES 11
 static int main_top;
 static int MainVis(void) { return MIN(MAIN_LINES, MainLines()); }
 
@@ -2174,6 +2175,10 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     int i, x, y, w, h, lit, vis = count - sb_first, ty, th, tl;
     int bar = sb_total > vis && vis > 0;
     u8 c;
+    // the help: wider than the frame (uk: 32 cells = 256 px) it is two lines,
+    // split at the last space that fits; a still wider line scrolls (Marquee)
+    char hl[2][LINE_MAX];
+    int fw = FbW() - 8, help_h = 0;
     Clear(hint);
     Add(hint, HINT_OK);
     Add(hint, ": ");
@@ -2192,8 +2197,30 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
         w = MIN(w, FbW() - 8); // a wider line scrolls (Marquee)
     }
     h = count * LINE_H - 5 + BORDER * 2;
+    if (help_en) {
+        int n, k = -1;
+        char sp = uk ? CH(' ') : ' ', end = uk ? (char)0xFF : 0;
+        Clear(hl[0]);
+        AddW(hl[0], help_word, help_en);
+        Clear(hl[1]);
+        n = Len(hl[0]);
+        for (i = 1; i < n; i++) {
+            if (hl[0][i] == sp) {
+                hl[0][i] = end;
+                k = Width(hl[0]) <= fw ? i : k;
+                hl[0][i] = sp;
+            }
+        }
+        if (Width(hl[0]) > fw && k > 0) {
+            memcpy(hl[1], hl[0] + k + 1, n - k - 1);
+            hl[1][n - k - 1] = end;
+            hl[0][k] = end;
+        }
+    }
+    // reserved per page, not per row: the box must not move with the row
+    help_h = page == PAGE_MAIN || page == PAGE_CHEATS ? LINE_H : 0;
     x = box_left ? box_x : (FbW() - w) / 2;
-    y = box_left ? box_y : (FbH() - h) / 2;
+    y = box_left ? box_y : (FbH() - h - help_h) / 2;
     box_x = x;
     box_y = y;
     box_w = w;
@@ -2222,15 +2249,16 @@ static void Box(char lines[][LINE_MAX], int count, int hi, int info) {
     // the button hint under the box; beside the mini map the box lets the
     // rooms under it show through, so its frame is four lines
     Line(x + BORDER, y + h + 4, hint, 255, 255, 64);
-    if (help_en) { // one line of help, centred in the frame
-        char hl[LINE_MAX];
-        int hw, hx, fw = FbW() - 8;
-        Clear(hl);
-        AddW(hl, help_word, help_en);
-        hw = MIN(Width(hl), fw); // a line wider than the frame scrolls
-        hx = (FbW() - hw) / 2;
-        Marquee(hx, y + h + LINE_H + 6, hw, hl, 128, 200, 255, 1);
-        Rect(hx - 4, y + h + LINE_H + 2, hw + 8, LINE_H + 2, 8, 8, 24);
+    if (help_en) { // the help, centred in the frame (split above)
+        int hw, hx, l;
+        for (l = 0; l < 2 && Len(hl[l]); l++) {
+            hw = MIN(Width(hl[l]), fw);
+            hx = (FbW() - hw) / 2;
+            Marquee(hx, y + h + (l + 1) * LINE_H + 6, hw, hl[l], 128, 200, 255,
+                    1);
+            Rect(hx - 4, y + h + (l + 1) * LINE_H + 2, hw + 8, LINE_H + 2, 8, 8,
+                 24);
+        }
         help_en = NULL;
     }
     for (i = 0; box_left && i < count; i++) { // under the text, on the box
@@ -2426,8 +2454,30 @@ static void DrawMain(void) {
     for (i = 0; i < n; i++) {
         it = cat_rows[cat][i];
         if (it >= ITEM_SCALE) {
-            PadTo(lines[i], col);
-            ItemValue(lines[i], it);
+            // a value too wide for the box (uk "< Додатково >") loses the
+            // spaces inside its arrows, then moves left, never into the name
+            char v[LINE_MAX];
+            int st = col, avail = FbW() - 8 - 2 * BORDER, k, n;
+            char sp = uk ? CH(' ') : ' ';
+            char lt = uk ? MENU_CELL_LT : '<', gt = uk ? MENU_CELL_GT : '>';
+            Clear(v);
+            ItemValue(v, it);
+            if (st + Width(v) > avail) {
+                n = Len(v);
+                for (k = n - 2; k > 0; k--) { // " >" before "<" " "
+                    if (v[k] == sp && v[k + 1] == gt) {
+                        memmove(v + k, v + k + 1, n - k);
+                        n--;
+                        break;
+                    }
+                }
+                if (n > 1 && v[0] == lt && v[1] == sp) {
+                    memmove(v + 1, v + 2, n - 1);
+                }
+                st = MAX(MIN(st, avail - Width(v)), Width(lines[i]));
+            }
+            PadTo(lines[i], st);
+            AddCells(lines[i], uk ? v : NULL, v);
         }
     }
     i = -1;
