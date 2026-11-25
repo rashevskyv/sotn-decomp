@@ -3046,7 +3046,8 @@ add_custom_command(
         "SOTN_LANG_OUT=${CMAKE_BINARY_DIR}/lang/uk"
         "${SOTN_PYTHON3}" "${CMAKE_SOURCE_DIR}/tools/lang/sotn_lang.py" pack
         --c "${SOTN_GEN_DIR}/lang_pack_uk.c"
-    DEPENDS tools/lang/sotn_lang.py tools/lang/serif_latin.py ${SOTN_LANG_FILES}
+    DEPENDS tools/lang/sotn_lang.py tools/lang/serif_latin.py src/dra/7879C.c
+            ${SOTN_LANG_FILES}
     VERBATIM)
 target_sources(${PROJECT_NAME} PRIVATE "${SOTN_GEN_DIR}/castle_data.c"
     "${SOTN_GEN_DIR}/apron_data.c" "${SOTN_GEN_DIR}/editor_page.c"

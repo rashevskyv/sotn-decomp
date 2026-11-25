@@ -274,6 +274,23 @@ int __wrap_LoadImage(RECT* rect, u_long* p) {
     return ret;
 }
 
+// Ukrainian status popup words (src/dra/7879C.c): true when every popup_*
+// record of art.bin was placed (at least one exists), so the uk table has its
+// texels. Without them (no disc at pack time, another F_GAME) the English
+// table stays.
+int Lang_Popups(void) {
+    int i, n = 0;
+    for (i = 0; i < n_art; i++) {
+        if (art[i].name[-1] >= 6 && !strncmp(art[i].name, "popup_", 6)) {
+            if (!art[i].hits) {
+                return 0;
+            }
+            n++;
+        }
+    }
+    return n > 0;
+}
+
 // "АТК" and "ЗАХ" from the five glyphs func_800F98AC loads for the status
 // page: А Т К З Х (Shift-JIS 8440 8453 844B 8448 8456).
 static const char status_glyphs[] = "\x84\x40\x84\x53\x84\x4B\x84\x48\x84\x56";
