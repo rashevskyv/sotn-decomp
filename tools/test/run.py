@@ -10,6 +10,7 @@ Levels "game" and "build" are PLANNED (docs/TESTING.md).
 Each test prints PASS, FAIL or SKIP. Exit code 1 if a test fails.
 """
 import glob
+import hashlib
 import json
 import os
 import re
@@ -18,6 +19,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
@@ -38,6 +40,7 @@ UNPLACED = {
 HD_NAME = re.compile(r"^(?P<free>.+?)__(?P<rect>\d+_\d+_\d+x\d+_(?:4|8|16))_(?P<hash>[0-9a-f]{8})"
                      r"(?:_c(?P<clut>[0-9a-f]{8}))?\.png$")
 HD_MAX = 2048
+HD_PACK_DIRS = {"tools/lang/textures/uk", "tools/lang/textures/en", "tools/lang/textures/common"}
 NO_GIT_EXT = (".pcm", ".mp3", ".flac", ".at3", ".at9", ".wav", ".xa")
 NO_GIT_NAMES = ("art.bin", "ps1vram_uk.bin")
 
@@ -178,9 +181,11 @@ def t_hd_parity(o):
         names[d] = [m for m in (HD_NAME.match(os.path.basename(p)) for p in glob.glob(os.path.join(path, "*.png"))) if m]
     pair = {d: {(m["free"], m["rect"], m["clut"]) for m in names[d]} for d in ("uk", "en")}
     bad = []
+    title = {"uk": "titlebg_uk", "en": "titlebg_en"}
     for a, b in (("uk", "en"), ("en", "uk")):
-        for free, rect, clut in sorted(pair[a] - pair[b]):
-            if free not in exc:
+        for free, rect, clut in sorted(pair[a], key=lambda k: (k[0], k[1], k[2] or "")):
+            counterpart = title[b] if free == title[a] else free
+            if (counterpart, rect, clut) not in pair[b] and free not in exc:
                 bad.append(f"{a}/{free}__{rect} c{clut}: no {b} file")
     key = {d: {(m["rect"], m["hash"], m["clut"]) for m in names[d]} for d in dirs}
     for d in ("uk", "en"):
@@ -190,13 +195,72 @@ def t_hd_parity(o):
     return f"uk {len(names['uk'])}, en {len(names['en'])}, common {len(names.get('common', []))} files"
 
 
+def git_blob_sha1(data):
+    header = f"blob {len(data)}\0".encode("ascii")
+    return hashlib.sha1(header + data, usedforsecurity=False).hexdigest()
+
+
+def is_unapproved_stock(repo, path, index_blob, approved):
+    lower = path.lower()
+    parent, _, name = lower.rpartition("/")
+    if name.endswith(NO_GIT_EXT) or name in NO_GIT_NAMES or (
+        lower.startswith("tools/lang/") and name.endswith(".bin")
+    ):
+        return True
+
+    hdt = name.endswith(".hdt")
+    hd_name = HD_NAME.fullmatch(name[:-4] + ".png" if hdt else name)
+    loose_png = name.endswith(".png") and (
+        lower.startswith(("tools/lang/textures/", "data/textures/"))
+        or any(part in ("dump", "play") or part.startswith("_bak_") for part in lower.split("/"))
+    )
+    if not (hdt or hd_name or loose_png):
+        return False
+
+    expected = approved.get(path)
+    if parent not in HD_PACK_DIRS or name.startswith("_bak_") or not hd_name:
+        return True
+    if not expected or index_blob != expected:
+        return True
+
+    file = repo / path
+    return file.is_symlink() or not file.is_file() or git_blob_sha1(file.read_bytes()) != expected
+
+
+def t_stock_guard_selftest(_o):
+    path = "tools/lang/textures/uk/sample__0_0_1x1_4_12345678.png"
+    data = b"approved example"
+    blob = git_blob_sha1(data)
+    approved = {path: blob}
+    with tempfile.TemporaryDirectory() as tmp:
+        repo = Path(tmp)
+        fixture = repo / path
+        fixture.parent.mkdir(parents=True)
+        fixture.write_bytes(data)
+        assert not is_unapproved_stock(repo, path, blob, approved), "approved image rejected"
+        other = path.replace("sample__", "other__")
+        (repo / other).write_bytes(data)
+        assert is_unapproved_stock(repo, other, blob, approved), "unlisted image accepted"
+        for folder in ("dump", "play", "_bak_textures"):
+            assert is_unapproved_stock(repo, f"{folder}/image.png", blob, approved), folder
+        assert is_unapproved_stock(repo, path, git_blob_sha1(b"changed"), approved), "changed index accepted"
+        fixture.write_bytes(b"changed")
+        assert is_unapproved_stock(repo, path, blob, approved), "changed file accepted"
+    return "approved image passes, unlisted path and changed bytes fail"
+
+
 def t_no_stock_in_git(_o):
-    r = sh(["git", "-C", REPO, "ls-files"])
+    approved = read_list("hd_approved.txt")
+    repo = Path(REPO)
+    r = sh(["git", "-C", REPO, "ls-files", "--stage", "-z"], encoding="utf-8")
     assert r.returncode == 0, r.stderr
-    bad = [p for p in r.stdout.splitlines()
-           if p.lower().endswith(NO_GIT_EXT) or os.path.basename(p) in NO_GIT_NAMES
-           or HD_NAME.match(os.path.basename(p))
-           or (p.startswith("tools/lang/") and p.endswith(".bin"))]
+    bad = []
+    for entry in r.stdout.split("\0")[:-1]:
+        metadata, path = entry.split("\t", 1)
+        mode, blob, stage = metadata.split()
+        index_blob = blob if mode in ("100644", "100755") and stage == "0" else None
+        if is_unapproved_stock(repo, path, index_blob, approved):
+            bad.append(path)
     assert not bad, f"tracked stock files: {bad[:20]}"
     if not os.environ.get("SOTN_LANG_XBLA"):
         return "tracked files clean; guard skipped (SOTN_LANG_XBLA not set)"
@@ -205,7 +269,8 @@ def t_no_stock_in_git(_o):
     return "tracked files clean; " + r.stdout.strip().splitlines()[-1]
 
 
-OFFLINE = [t_lang_selftest, t_wide_maths, t_script_tables, t_hd_names, t_hd_parity, t_no_stock_in_git]
+OFFLINE = [t_lang_selftest, t_wide_maths, t_script_tables, t_hd_names, t_hd_parity,
+           t_stock_guard_selftest, t_no_stock_in_git]
 
 
 def main(argv):
