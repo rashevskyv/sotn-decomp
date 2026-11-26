@@ -100,7 +100,9 @@ void EntityBackgroundBushes(Entity* self) {
         xPos -= var_s5[3];
         // wide view: start whole pattern periods further left (the period
         // is var_s5[3]) and run WIDE_X further right
+#ifdef PLATFORM_PSYZ
         xPos -= (WIDE_X + var_s5[3] - 1) / var_s5[3] * var_s5[3];
+#endif
         yPos = self->posY.i.hi;
         var_s4 = *var_s8;
         while (xPos < 0x140 + WIDE_X) {

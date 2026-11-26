@@ -799,10 +799,17 @@ void func_us_801B7188(Entity* self) {
                 D_us_801D6328[i] += 16;
                 D_us_801D6334[i] += 16;
             }
+#ifdef PLATFORM_PSYZ
             posX = -(g_Tilemap.scrollX.i.hi * 5) / 4 - FOG_LEAD(self) * 0x90;
             while (posX < -0x90 - FOG_LEAD(self) * 0x90) {
                 posX += 0x90;
             }
+#else
+            posX = -(g_Tilemap.scrollX.i.hi * 5) / 4;
+            while (posX < -0x90) {
+                posX += 0x90;
+            }
+#endif
             posY = -(g_Tilemap.scrollY.i.hi * 5) / 4;
             while (posY < -0x14A) {
                 posY += 0x14A;

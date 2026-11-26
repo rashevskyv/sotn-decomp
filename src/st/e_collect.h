@@ -1492,7 +1492,9 @@ relicRetry:
     }
 
     msgLen = 0;
-    isObtainedTextStored = false;
+#ifdef PLATFORM_PSYZ
+    isObtainedTextStored = false; // the retry above runs the loop again
+#endif
     while (true) {
         if (*msg == 0) {
             if (isObtainedTextStored) {
@@ -1752,7 +1754,11 @@ relicRetry:
         prim = prim->next;
     }
 
+#ifdef PLATFORM_PSYZ
     for (i = 3; prim != NULL && i < RELIC_ANIM_PRIMS; i++) {
+#else
+    while (prim != NULL) {
+#endif
         if (prim->drawMode != DRAW_HIDE) {
             if (prim->p1 & 3) {
                 prim->y0 = prim->y1--;

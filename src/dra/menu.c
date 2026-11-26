@@ -62,6 +62,7 @@ static u32 g_MenuTint;
                          : ((up) ? CH('+') : CH('-')))
 // The status page in the layout of the PSP version: STPOS(ps1, psp)
 #define STPOS(ps1, psp) (psp)
+#define STAT_SIGN_DX 51
 // The cloak colour rows have their own window right of the settings list (the
 // uk labels reach x 184), over the preview window (g_MenuInit); stock x 168
 #define CLOAK_WIN_X 194
@@ -70,6 +71,7 @@ static u32 g_MenuTint;
 #define MENU_TINT(rgb)
 #define STAT_SIGN(up) ((up) ? CH('+') : CH('-'))
 #define STPOS(ps1, psp) (ps1)
+#define STAT_SIGN_DX 52
 #endif
 
 extern s32 g_PrevEquippedWeapons[2];
@@ -2134,11 +2136,11 @@ void MenuDrawStats(s32 menuDialogue) {
             // port: the bonus is an arrow and a number, blue up, red down
             if (g_Status.statsEquip[i] > 0) {
                 MENU_TINT(TINT_BONUS_UP);
-                MenuDrawChar(STAT_SIGN(1), x + 51, y + i * 12, ctx);
+                MenuDrawChar(STAT_SIGN(1), x + STAT_SIGN_DX, y + i * 12, ctx);
                 phi_a0_5 = g_Status.statsEquip[i];
             } else {
                 MENU_TINT(TINT_BONUS_DOWN);
-                MenuDrawChar(STAT_SIGN(0), x + 51, y + i * 12, ctx);
+                MenuDrawChar(STAT_SIGN(0), x + STAT_SIGN_DX, y + i * 12, ctx);
                 phi_a0_5 = -g_Status.statsEquip[i];
             }
             MenuDrawInt(phi_a0_5, x + 68, y + i * 12, ctx);
@@ -5423,8 +5425,12 @@ block_4:
         if (var_s1 != g_MenuNavigation.cursorEquip) {
             func_800FADC0();
         }
+#ifdef PLATFORM_PSYZ
         if (g_pads[0].tapped & PAD_MENU_SORT && D_801375CC == EQUIP_HAND &&
             !g_QuickMode) {
+#else
+        if (g_pads[0].tapped & PAD_MENU_SORT && D_801375CC == EQUIP_HAND) {
+#endif
             PlaySfx(SFX_UI_CONFIRM);
             MenuShow(MENU_DG_EQUIP_SORT);
             g_MenuStep = MENU_STEP_EQUIP_SORT;
