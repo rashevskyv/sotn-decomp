@@ -369,14 +369,14 @@ int PortMenu_ConfirmEast(void) {
 int Psyz_ControllerBlocked(void); // psyz: no controller while unfocused
 
 #ifdef __SWITCH__
-unsigned SwitchNx_HandheldPad(int sticks[2][2]);
-static unsigned handheld_buttons;
-static int handheld_sticks[2][2];
+unsigned SwitchNx_Pad(int sticks[2][2]);
+static int switch_sticks[2][2];
 #endif
 
 // One snapshot for the game's first pad, independent of SDL's slot order.
 static unsigned gamepad_buttons;
 
+#ifndef __SWITCH__
 static unsigned GamepadButtons(void) {
     _Static_assert(SDL_GAMEPAD_BUTTON_COUNT + 2 <= 32, "gamepad button mask");
     unsigned pressed = 0;
@@ -407,12 +407,17 @@ static unsigned GamepadButtons(void) {
     SDL_free(ids);
     return pressed;
 }
+#endif
 
 // The sticks: psyz maps them to no PS button. The left stick works as the
 // D-pad everywhere (stick_dpad), the right stick moves the view (WideCamera
 // in src/dra/5087C.c). Of several pads, the one whose stick is out the most
 // counts.
 static void ReadStick(int right, int* x, int* y) {
+#ifdef __SWITCH__
+    *x = switch_sticks[right][0];
+    *y = switch_sticks[right][1];
+#else
     static int logged[2], seen = -1;
     int n = 0, i, ax, ay, best = 0;
     SDL_Gamepad* from = NULL;
@@ -442,22 +447,12 @@ static void ReadStick(int right, int* x, int* y) {
         }
     }
     SDL_free(ids);
-#ifdef __SWITCH__
-    ax = handheld_sticks[right][0];
-    ay = handheld_sticks[right][1];
-    if (abs(ax) + abs(ay) > best) {
-        best = abs(ax) + abs(ay);
-        *x = ax;
-        *y = ay;
-        from = NULL;
-    }
-#endif
     if (!logged[right] && best > 12000) {
         logged[right] = 1;
         fprintf(stderr, "[stick] %s stick x %d y %d on '%s'\n",
-                right ? "right" : "left", *x, *y,
-                from ? SDL_GetGamepadName(from) : "handheld Joy-Con");
+                right ? "right" : "left", *x, *y, SDL_GetGamepadName(from));
     }
+#endif
 }
 
 // The left stick as D-pad bits (Wide_StickDirs: dead zone stick_dead,
@@ -1678,11 +1673,10 @@ static void Bind(PsyzInputDevice dev, int code) {
 // or gamepad button pressed. The time out keeps the old input.
 static void Capture(void) {
     int key = CTL_KEYS ? Psyz_PadsHeld(PSYZ_INPUT_KEY) : PSYZ_INPUT_NONE;
-    int pad = Psyz_PadsHeld(PSYZ_INPUT_GAMEPAD);
 #ifdef __SWITCH__
-    if (pad == PSYZ_INPUT_NONE && handheld_buttons) {
-        pad = __builtin_ctz(handheld_buttons);
-    }
+    int pad = gamepad_buttons ? __builtin_ctz(gamepad_buttons) : PSYZ_INPUT_NONE;
+#else
+    int pad = Psyz_PadsHeld(PSYZ_INPUT_GAMEPAD);
 #endif
     if (--capture <= 0) {
         capture = 0;
@@ -1742,15 +1736,21 @@ static void MapPad(u16 pressed, u16 tap) {
 u16 PortMenu_Pad(u16 pressed) {
     u16 tap;
     int count;
-    gamepad_buttons = GamepadButtons();
 #ifdef __SWITCH__
-    static int logged_handheld;
-    handheld_buttons = SwitchNx_HandheldPad(handheld_sticks);
-    if (handheld_buttons && !logged_handheld) {
-        fprintf(stderr, "[pad] Switch handheld input active\n");
-        logged_handheld = 1;
+    int key_count;
+    const bool* keys = SDL_GetKeyboardState(&key_count);
+    gamepad_buttons = SwitchNx_Pad(switch_sticks);
+    // The psyz P1 word includes SDL's combined handheld/No. 1 slot.
+    // Rebuild it from the physical pad and keep any mapped keyboard keys.
+    pressed = 0;
+    for (int bit = 0; keys && bit < PSYZ_PAD_BUTTONS; bit++) {
+        int key = Psyz_PadsMap(PSYZ_INPUT_KEY, bit, PSYZ_INPUT_QUERY);
+        if (key >= 0 && key < key_count && keys[key]) {
+            pressed |= 1u << bit;
+        }
     }
-    gamepad_buttons |= handheld_buttons;
+#else
+    gamepad_buttons = GamepadButtons();
 #endif
     for (int bit = 0; gamepad_buttons && bit < PSYZ_PAD_BUTTONS; bit++) {
         int code = Psyz_PadsMap(PSYZ_INPUT_GAMEPAD, bit, PSYZ_INPUT_QUERY);
