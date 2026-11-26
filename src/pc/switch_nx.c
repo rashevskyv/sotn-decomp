@@ -22,6 +22,26 @@ int SwitchNx_Touches(float* x, float* y, int max) {
     return n;
 }
 
+// Restart: asks the loader to start this NRO again with the same arguments
+// once it ends (argv[0] is its path). 0 on success; nonzero when the loader
+// cannot do it (the NRO was not started by hbloader).
+int SwitchNx_Relaunch(int argc, char** argv) {
+    char args[1024];
+    size_t n = 0;
+    int i;
+    if (argc < 1 || !envHasNextLoad()) {
+        return -1;
+    }
+    for (i = 0; i < argc && n < sizeof(args); i++) {
+        n += snprintf(args + n, sizeof(args) - n, "%s\"%s\"", i ? " " : "",
+                      argv[i]);
+    }
+    if (n >= sizeof(args)) {
+        return -1;
+    }
+    return R_FAILED(envSetNextLoad(argv[0], args)) ? -1 : 0;
+}
+
 // The RomFS of the NRO (the HD picture packs): romfs:/ . 0 on success.
 int SwitchNx_RomfsInit(void) {
     return (int)romfsInit();

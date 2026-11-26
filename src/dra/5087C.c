@@ -1488,7 +1488,7 @@ static void LogCdRooms(void) {
     }
 }
 
-// sotn.ini skip_cd_rooms = 1: the door into a CD room takes its exit teleport
+// sotn.ini skip_cd_rooms = 1 (default 0): the door into a CD room takes its exit teleport
 // at once. The room's cells go on the map, as the walk through it would do.
 static s32 SkipCdRoom(void) {
     RoomHeader* room = (RoomHeader*)(D_801375BC.def - 1);

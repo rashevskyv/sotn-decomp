@@ -314,7 +314,8 @@ static const char ini_overlay[] =
     "; fps: 1 = a corner shows the frames per second.\n"
     "; controller_background: 1 = the controller works while the window has no\n"
     "; focus (the keyboard never does); 0 = no controller then.\n"
-    "; warp_map: 1 = the warp portal shows the map and you pick the room;\n"
+    "; warp_map: 1 = the warp portal shows the map and you pick the room (with\n"
+    "; only two warp rooms open it goes to the other one at once);\n"
     "; 0 = the portal cycles through the open rooms, as on the PS1.\n";
 
 static const char ini_spawn[] =
@@ -426,7 +427,7 @@ void Wide_SaveIni(void) {
 // jp_cards = extra|jp|off, relic_toggle = modern|stock,
 // spawn = <spawn point name>, cheat_* = 0|1 (cheat_character 0..2, 4), editor, overlay, fps = 0|1,
 // hd_textures = 0|1 (missing: 1), hd_dump = 0|1, music_source = original|enhanced (original; music_files = 0|1 is read too),
-// room_stitch = 0|1 (0), room_edge_fade = 0|1 (1), skip_cd_rooms = 0|1 (1),
+// room_stitch = 0|1 (0), room_edge_fade = 0|1 (1), skip_cd_rooms = 0|1 (0), warp_map = 0|1 (1),
 // show_loading_text = 0|1 (1).
 // aspect = auto|4:3|16:10|16:9|21:9|2.39:1|32:9 (auto),
 // menu_confirm = auto|east|south (auto; right, bottom: the 0.8.68 names).

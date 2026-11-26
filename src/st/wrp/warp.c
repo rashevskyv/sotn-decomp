@@ -50,6 +50,18 @@ int PortMenu_WarpPick(int here);
 static s32 PickedWarpRoom = -1;
 #endif
 
+#ifdef PLATFORM_PSYZ
+// The white quad of the warp fade reaches m pixels past the 4:3 frame on each
+// side. It moves by step (+ widens, - narrows) and stops at 0 or WIDE_X.
+static void WarpWhiteSide(Primitive* prim, s32 step) {
+    s32 m = -prim->x0 + step;
+    m = m < 0 ? 0 : m > WIDE_X ? WIDE_X : m;
+    prim->x0 = prim->x2 = -m;
+    prim->x1 = prim->x3 = 256 + m;
+}
+#define WARP_WIDE_STEP ((WIDE_X + WARP_WIDE_FRAMES - 1) / WARP_WIDE_FRAMES)
+#endif
+
 // Mask for all of the statuses where the UP button will
 // be ignored when in warp position or on the warp platform
 //
@@ -248,6 +260,10 @@ void EntityWarpRoom(Entity* self) {
         prim->drawMode = DRAW_TRANSP | DRAW_TPAGE | DRAW_TPAGE2;
         if (prim->r0 < 0xF8) {
             prim->g0 = prim->b0 = prim->r0 += 2;
+#ifdef PLATFORM_PSYZ
+        } else if (-prim->x0 < WIDE_X) { // the white widens to the wide view
+            WarpWhiteSide(prim, WARP_WIDE_STEP);
+#endif
         } else {
             self->step++;
         }
@@ -308,6 +324,9 @@ void EntityWarpRoom(Entity* self) {
         LOW(prim->r2) = LOW(prim->r0);
         LOW(prim->r3) = LOW(prim->r0);
         prim->drawMode = DRAW_TRANSP | DRAW_TPAGE | DRAW_TPAGE2;
+#ifdef PLATFORM_PSYZ
+        WarpWhiteSide(prim, WIDE_X); // wide white, as the room load left it
+#endif
         g_api.func_800EA5AC(0, 0, 0, 0);
         self->step++;
     case 6:
@@ -317,6 +336,12 @@ void EntityWarpRoom(Entity* self) {
         g_PauseAllowed = false;
         prim = self->ext.warpRoom.primFade;
         prim = prim->next;
+#ifdef PLATFORM_PSYZ
+        if (prim->x0 < 0) { // the white narrows to the 4:3 frame first
+            WarpWhiteSide(prim, -WARP_WIDE_STEP);
+            break;
+        }
+#endif
         move_room = prim->r0;
         move_room -= 4;
         if (move_room < 0) {
