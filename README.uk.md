@@ -9,7 +9,8 @@ English: [README.md](README.md). README оригінального проєкт�
 
 **Посібник зі встановлення:** [README_INSTALL.uk.md](README_INSTALL.uk.md) (крок за кроком, Windows і Switch,
 [English](README_INSTALL.md)). HD-пакети картинок для uk, en і для обох мов лежать у
-`tools/lang/textures/`. Збірка копіює їх у `data/textures/`.
+`tools/lang/textures/`. Збірка вбудовує їх у `sotn.exe` та в NRO.
+Вона не створює теку `data/textures/`.
 
 **У цьому репозиторії немає даних гри.** Потрібні ваші власні, легально придбані диски.
 Збирання читає їх із вашого диска і створює файли гри на вашому комп'ютері.
@@ -110,6 +111,9 @@ English: [README.md](README.md). README оригінального проєкт�
 - CMake 3.28 або новіший, Ninja, компілятор C і C++ (GCC або Clang).
 - Rust (`rustup`, стабільний `cargo`). Потрібен для будь-якого збирання.
 - Go 1.24 або новіший. Потрібен для будь-якого збирання (інструменти для дисків і ресурсів написано на Go).
+  Перевірте `command -v go`, `go version` і `cargo --version`.
+  Якщо команди немає, додайте її теку до `PATH` перед розпакуванням.
+  Інакше розпакування падає з `go: command not found`.
 - `xxd` (голос Марії), `7z` (PSP), `bchunk` (Saturn), `ffmpeg` з декодером ATRAC3plus (набори голосів).
 - Python 3 з Pillow (з FreeType і libraqm), PyYAML і numpy:
   `sudo apt install python3-pil python3-yaml python3-numpy libraqm0`.
@@ -164,8 +168,14 @@ cd sotn-native
 
 - PS1: файл `.cue` і його доріжки `.bin`. Перейменуйте cue-файл на `disks/sotn.us.cue`.
   Рядки `FILE` у cue мають вказувати на файли `.bin` (відносно `disks/`).
-- PSP: `disks/sotn.pspeu.iso`.
-- Saturn: `disks/sotn.saturn.bin` і `disks/sotn.saturn.cue`.
+- PSP: `disks/sotn.pspeu.iso`. Якщо розпаковані файли вже є, скопіюйте теку
+  `PSP_GAME` у `disks/pspeu/PSP_GAME/`. Збірці потрібні
+  `PSP_GAME/USRDIR/res/ps/PSPBIN/dra.bin`, `PSP_GAME/USRDIR/res/ps/PSPBIN/maria.bin`
+  та `PSP_GAME/USRDIR/res/ps/snd_e/SE/sd_mar2.spk`.
+- Saturn: `disks/sotn.saturn.bin` і `disks/sotn.saturn.cue`. Якщо розпаковані файли
+  вже є, скопіюйте їх у `disks/saturn/`. Збірка читає звідти `TITLE.PRG`,
+  `TITLE.CHR`, `TITLE.MAP`, `SUB_DISP.MAP`, `0.BIN`, `STAGE_15.PRG`, `STAGE_16.PRG`,
+  файли `SD_*.CRT` та `SD2B.PCM`.
 
 ### 3. Розпакуйте диски
 
@@ -185,11 +195,15 @@ make build_assets                       # assets -> src/**/gen/ (файли C, �
 
 ```sh
 cmake -S . -B build/pc -G Ninja -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl \
-      -DENABLE_SATURN_STAGES=ON
+      -DENABLE_SATURN_STAGES=ON -DSATURN_STAGE_AUDIO=ON
 cmake --build build/pc
 ```
 
-- Приберіть `-DENABLE_SATURN_STAGES=ON`, якщо диска Saturn немає.
+- Приберіть `-DENABLE_SATURN_STAGES=ON -DSATURN_STAGE_AUDIO=ON`, якщо файлів Saturn немає.
+  Для звуку потрібен підмодуль `tools/saturn/sound-player`
+  (`git submodule update --init --recursive tools/saturn/sound-player`).
+- Використовуйте нову теку `build/`, коли додаєте або прибираєте диск. Стара тека
+  лишає файли, зроблені з попереднього набору дисків.
 - Марія вмикається сама, коли є `disks/pspeu/.../maria.bin` (`-DUSE_PLAYER_MARIA=OFF` вимикає її).
 - Необов'язково: `-DSOTN_CHARSEL_ART=<тека>` з вашими портретами для екрана вибору персонажа
   (`alucard.webp`, `richter.webp`, `maria_psp.png`, `maria_psx.png`). Замість відсутнього файлу буде портрет із Saturn.
@@ -212,7 +226,7 @@ export DEVKITPRO=/opt/devkitpro
 cmake -S . -B build/switch -G Ninja \
       -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/cmake/Switch.cmake -DCMAKE_BUILD_TYPE=Release \
       -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl -DPSYZ_SDL_DIR=$HOME/SDL-switch \
-      -DENABLE_SATURN_STAGES=ON
+      -DENABLE_SATURN_STAGES=ON -DSATURN_STAGE_AUDIO=ON
 cmake --build build/switch
 ```
 
@@ -226,12 +240,13 @@ cmake --build build/switch
 cmake -S . -B build/win -G Ninja \
       -DCMAKE_TOOLCHAIN_FILE=tools/psyz/psyz/cmake/windows-x86_64.cmake -DCMAKE_BUILD_TYPE=Release \
       -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl -DPSYZ_STATIC_MODULES=ON -DSOTN_PC_DATA_DIR=data \
-      -DENABLE_SATURN_STAGES=ON
+      -DENABLE_SATURN_STAGES=ON -DSATURN_STAGE_AUDIO=ON
 cmake --build build/win
 ```
 
 Результат — `build/win/sotn.exe`: один файл, без DLL, без вікна консолі.
 Покладіть його в теку з файлами гри в `data/` (як `out/pc/`). Журнал — `sotn.log` поруч із ним.
+Збірка вбудовує HD-пакети в програму. Вона не створює теку `data/textures/`.
 
 ### 6. Встановлення на Switch
 
@@ -245,7 +260,8 @@ cmake --build build/win
 | `/switch/sotn-native/voice/jp/`, `voice/psp/` | Набори голосів (необов'язково) | див. «Набори голосів» |
 | `/switch/sotn-native/sotn.ini` | Налаштування | гра пише його під час першого запуску |
 
-Гра також пише туди: `sotn-xa.cue` (музика; вказує на `data/SD/XA_STR1`),
+Гра також пише туди: `sotn-xa.cue` (музика; вказує на `data/SD/XA_STR1`
+або `data/SD/XA_STR1.`, якщо розпакування зберегло крапку),
 `sotn.log`, `sotn.prev.log`, `sotn.out.log` і картки пам'яті `bu00/` та `bu10/`.
 Інших файлів не потрібно. Запускайте порт із меню homebrew.
 

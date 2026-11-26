@@ -9,7 +9,8 @@ The port adds content from the Sega Saturn and PSP versions and a Ukrainian tran
 
 **Install guide:** [README_INSTALL.md](README_INSTALL.md) (step by step, Windows and Switch, in
 [Ukrainian](README_INSTALL.uk.md)). The HD picture packs for uk, en and both languages are in
-`tools/lang/textures/`. The build copies them to `data/textures/`.
+`tools/lang/textures/`. The build embeds them in `sotn.exe` and in the NRO.
+It makes no folder `data/textures/`.
 
 **No game data is in this repository.** You need your own, legally obtained discs.
 The build reads them from your disk and makes the game files on your machine.
@@ -110,6 +111,9 @@ The build checks only that the files it needs exist. Other releases of the discs
 - CMake 3.28 or later, Ninja, a C and C++ compiler (GCC or Clang).
 - Rust (`rustup`, stable `cargo`). Every build needs it.
 - Go 1.24 or later. Every build needs it (the disc and asset tools are in Go).
+  Check with `command -v go`, `go version` and `cargo --version`.
+  If a command is not found, add its folder to `PATH` first.
+  Disc extraction fails with `go: command not found` otherwise.
 - `xxd` (Maria's voice), `7z` (PSP), `bchunk` (Saturn), `ffmpeg` with the ATRAC3plus decoder (voice sets).
 - Python 3 with Pillow (with FreeType and libraqm), PyYAML and numpy:
   `sudo apt install python3-pil python3-yaml python3-numpy libraqm0`.
@@ -164,8 +168,14 @@ cd sotn-native
 
 - PS1: the `.cue` file and its `.bin` tracks. Rename the cue file to `disks/sotn.us.cue`.
   The `FILE` lines in the cue must point at the `.bin` files (relative to `disks/`).
-- PSP: `disks/sotn.pspeu.iso`.
-- Saturn: `disks/sotn.saturn.bin` and `disks/sotn.saturn.cue`.
+- PSP: `disks/sotn.pspeu.iso`. If you already have the extracted files, copy the
+  folder `PSP_GAME` to `disks/pspeu/PSP_GAME/`. The build needs
+  `PSP_GAME/USRDIR/res/ps/PSPBIN/dra.bin`, `PSP_GAME/USRDIR/res/ps/PSPBIN/maria.bin`
+  and `PSP_GAME/USRDIR/res/ps/snd_e/SE/sd_mar2.spk`.
+- Saturn: `disks/sotn.saturn.bin` and `disks/sotn.saturn.cue`. If you already have
+  the extracted files, copy them to `disks/saturn/`. The build reads `TITLE.PRG`,
+  `TITLE.CHR`, `TITLE.MAP`, `SUB_DISP.MAP`, `0.BIN`, `STAGE_15.PRG`, `STAGE_16.PRG`,
+  the `SD_*.CRT` files and `SD2B.PCM` from there.
 
 ### 3. Extract the discs
 
@@ -185,11 +195,15 @@ The PSP step needs only these files from the image:
 
 ```sh
 cmake -S . -B build/pc -G Ninja -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl \
-      -DENABLE_SATURN_STAGES=ON
+      -DENABLE_SATURN_STAGES=ON -DSATURN_STAGE_AUDIO=ON
 cmake --build build/pc
 ```
 
-- Leave out `-DENABLE_SATURN_STAGES=ON` if you have no Saturn disc.
+- Leave out `-DENABLE_SATURN_STAGES=ON -DSATURN_STAGE_AUDIO=ON` if you have no Saturn files.
+  The sound step needs the submodule `tools/saturn/sound-player`
+  (`git submodule update --init --recursive tools/saturn/sound-player`).
+- Use a new `build/` folder when you add or remove a disc. An old build folder keeps
+  files made from the old disc set.
 - Maria is switched on by itself when `disks/pspeu/.../maria.bin` exists (`-DUSE_PLAYER_MARIA=OFF` to switch her off).
 - Optional: `-DSOTN_CHARSEL_ART=<folder>` with your own portraits for the character select screen
   (`alucard.webp`, `richter.webp`, `maria_psp.png`, `maria_psx.png`). A missing file uses the Saturn portrait.
@@ -212,7 +226,7 @@ export DEVKITPRO=/opt/devkitpro
 cmake -S . -B build/switch -G Ninja \
       -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/cmake/Switch.cmake -DCMAKE_BUILD_TYPE=Release \
       -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl -DPSYZ_SDL_DIR=$HOME/SDL-switch \
-      -DENABLE_SATURN_STAGES=ON
+      -DENABLE_SATURN_STAGES=ON -DSATURN_STAGE_AUDIO=ON
 cmake --build build/switch
 ```
 
@@ -226,12 +240,13 @@ The Windows build is a cross build with MinGW-w64 (`sudo apt install mingw-w64`)
 cmake -S . -B build/win -G Ninja \
       -DCMAKE_TOOLCHAIN_FILE=tools/psyz/psyz/cmake/windows-x86_64.cmake -DCMAKE_BUILD_TYPE=Release \
       -DENABLE_ASAN=OFF -DPSYZ_RENDERER=sdl3_gl -DPSYZ_STATIC_MODULES=ON -DSOTN_PC_DATA_DIR=data \
-      -DENABLE_SATURN_STAGES=ON
+      -DENABLE_SATURN_STAGES=ON -DSATURN_STAGE_AUDIO=ON
 cmake --build build/win
 ```
 
 The result is `build/win/sotn.exe`: one file, no DLLs, no console window.
 Put it in a folder with the game files in `data/` (as `out/pc/`). The log is `sotn.log` next to it.
+The build embeds the HD packs in the program. It makes no loose `data/textures/` folder.
 
 ### 6. Install on the Switch
 
@@ -246,7 +261,8 @@ The port uses its own folder, `/switch/sotn-native/`, on the SD card:
 | `/switch/sotn-native/music/` | Music files (optional) | see "Music files" |
 | `/switch/sotn-native/sotn.ini` | Settings | written by the game at the first start |
 
-The game also writes these files there: `sotn-xa.cue` (music; it points at `data/SD/XA_STR1`),
+The game also writes these files there: `sotn-xa.cue` (music; it points at `data/SD/XA_STR1`
+or `data/SD/XA_STR1.` when the extractor kept the dot),
 `sotn.log`, `sotn.prev.log`, `sotn.out.log` and the memory cards `bu00/` and `bu10/`.
 No other files are needed. Start the port from the homebrew menu.
 
