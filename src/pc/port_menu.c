@@ -179,9 +179,7 @@ static const s8 cat_rows[][16] = {
     [CAT_TOP] = {ITEM_LANGUAGE, ITEM_CAT_DISPLAY, ITEM_CAT_LANG,
                  ITEM_CAT_CONTROLS, ITEM_CAT_QOL, ITEM_CAT_CHEATS,
                  ITEM_CAT_DEV,
-#ifndef __SWITCH__
-                 ITEM_RESTART, // Switch: no restart (hbmenu starts it)
-#endif
+                 ITEM_RESTART,
                  ITEM_EXIT, ITEM_CLOSE, -1},
     [CAT_DISPLAY] = {ITEM_SCALE, ITEM_ASPECT,
 #ifndef __SWITCH__
@@ -194,7 +192,7 @@ static const s8 cat_rows[][16] = {
                       ITEM_STICKDEAD, ITEM_LOOKRANGE, ITEM_LOOKDEAD,
                       ITEM_PADBG, ITEM_BACK, -1},
     [CAT_QOL] = {ITEM_SKIPPROLOGUE, ITEM_PROLOGUEFF, ITEM_CDROOMS,
-                 ITEM_WARPMAP, ITEM_DIALOGSKIP, ITEM_MAP100, ITEM_HEROPULSE,
+                 ITEM_WARPMAP, ITEM_DIALOGSKIP, ITEM_HEROPULSE,
                  ITEM_RELICTOG, ITEM_RELICHINT, ITEM_JPCARDS, ITEM_BACK, -1},
     [CAT_DEV] = {ITEM_OVERLAY, ITEM_FPS, ITEM_EDITOR, ITEM_HDDUMP,
                  ITEM_HDSTATS, ITEM_STITCH, ITEM_BACK, -1},
@@ -209,6 +207,7 @@ enum {
     CH_ITEMS,
     CH_CHARACTER,
     CH_TELEPORT,
+    CH_MAP, // 100% map: the key cheat_map; texts of ITEM_MAP100
     CH_BACK,
     N_CHEATS
 };
@@ -509,8 +508,12 @@ static void Quit(void) {
 }
 
 // Restart: the same program with the same arguments, then the quit above.
-// Switch: no row (hbmenu starts the program).
+// Switch: no new process; the loader (hbloader) starts the NRO again after
+// this one ends (libnx envSetNextLoad, switch_nx.c).
 extern int g_ArgC;
+#ifdef __SWITCH__
+int SwitchNx_Relaunch(int argc, char** argv);
+#endif
 extern char** g_ArgV;
 static void Message(const char* s);
 // g_ArgV: the arguments as the user gave them (main.c saves them before
@@ -519,7 +522,13 @@ static void Message(const char* s);
 // then saves sotn.ini. If it cannot start, the menu stays open and says so.
 // ponytail: an argument with a quote inside is not escaped on Windows
 static void Restart(void) {
-#ifndef __SWITCH__
+#ifdef __SWITCH__
+    if (SwitchNx_Relaunch(g_ArgC, g_ArgV)) {
+        Message("could not restart");
+        return;
+    }
+    fprintf(stderr, "[menu] restart\n");
+#else
     char** av = calloc(g_ArgC + 1, sizeof(char*));
     char pid[16];
     int i, rc;
@@ -1375,6 +1384,7 @@ static void Change(int dir) {
                : sel == CH_INVINCIBLE ? &g_Cheat.invincible
                : sel == CH_WALLS      ? &g_Cheat.walls
                : sel == CH_ITEMS      ? &g_Cheat.items
+               : sel == CH_MAP        ? &g_Cheat.map
                                       : NULL;
         if (sel == CH_CHARACTER) {
             // only the values that work; the rest are kept for later
@@ -2750,10 +2760,19 @@ static void DrawCheats(void) {
     }
     Clear(lines[CH_TELEPORT]);
     AddW(lines[CH_TELEPORT], P_TELEPORT, "TELEPORT");
+    Clear(lines[CH_MAP]);
+    AddW(lines[CH_MAP], menu_items[ITEM_MAP100].word, "100% MAP");
+    PadTo(lines[CH_MAP], col);
+    AddValue(lines[CH_MAP], g_Cheat.map ? P_ON : P_OFF, g_Cheat.map ? "ON" : "OFF");
     Clear(lines[CH_BACK]);
     AddW(lines[CH_BACK], P_BACK, "BACK");
-    help_word = CHEAT_HELP_WORD + sel;
-    help_en = hints[sel];
+    if (sel == CH_MAP) {
+        help_word = menu_items[ITEM_MAP100].help;
+        help_en = menu_items[ITEM_MAP100].help_en;
+    } else { // the help words and hints of the other rows keep their numbers
+        help_word = CHEAT_HELP_WORD + sel - (sel > CH_MAP);
+        help_en = hints[sel - (sel > CH_MAP)];
+    }
     if (g_GameState != Game_Play) { // no game: the teleport has nowhere to go
         box_off = CH_TELEPORT;
         if (sel == CH_TELEPORT) {
@@ -3431,7 +3450,7 @@ static void DrawMap(void) {
 // ---- debug overlay ------------------------------------------------------------
 
 int g_OverlayOn, g_FpsOn;
-int g_SkipCdRooms = 1, g_ShowLoadingText = 1; // sotn.ini, game.h
+int g_SkipCdRooms = 0, g_ShowLoadingText = 1; // sotn.ini, game.h
 int g_RoomEdgeFade = 1;                       // sotn.ini, game.h
 int g_ElevatorFront = 1;                      // sotn.ini, game.h
 u32 g_ElevatorOrnTimer;                       // the elevator entity, game.h
@@ -3616,9 +3635,11 @@ static int WarpZone(int room) {
 }
 
 // Opens the map with the cursor on this portal room; warp_none is set when no
-// other room is open (the map then shows the place and a message). Always 1.
+// other room is open (the map then shows the place and a message). Returns 1.
+// With exactly one other room open (two in all) there is nothing to pick:
+// returns 0 and the portal goes there by its own cycle, as on the PS1.
 int PortMenu_WarpOpen(int here) {
-    int r;
+    int r, open = 0, other = -1;
     warp_inv = (g_StageId & STAGE_INVERTEDCASTLE_FLAG) != 0;
     warp_arm = 0;
     warp_click = -1;
@@ -3628,17 +3649,23 @@ int PortMenu_WarpOpen(int here) {
     }
     warp_here = here;
     warp_cur = here;
-    warp_none = 1;
     for (r = 1; r < WARP_COUNT(); r++) {
         if (WarpOpen((here + r) % WARP_COUNT())) {
-            warp_none = 0;
-            break;
+            open++;
+            other = other < 0 ? (here + r) % WARP_COUNT() : other;
         }
     }
+    warp_none = open == 0;
     fprintf(stderr, "[warp] portal %d cell %d,%d, open mask %#x, %s\n", here,
             WARP_CELL(here)[0], WARP_CELL(here)[1],
             g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS],
             warp_none ? "no other room open" : "other rooms open");
+    if (open == 1) {
+        // a room open only by its map cell has no castle flag: set it, so the
+        // cycle of the portal finds it
+        g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS] |= 1 << other;
+        return 0;
+    }
     g_api.SetFadeMode(FADE_SHOW_MAP);
     D_800974A4 = 1;
     g_GameEngineStep = Engine_Map;

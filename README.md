@@ -264,7 +264,7 @@ The port menu changes most of them in the game. A missing key keeps its default.
 | `buttons` | `switch`, `xbox`, `psx` | `switch` on Switch, `xbox` on PC | The button icons in the menus. |
 | `jp_cards` | `extra`, `jp`, `off` | `extra` | The two JP familiar cards: added next to the US items, in the JP/PSP places, or not at all. Read at start. |
 | `relic_toggle` | `modern`, `stock` | `modern` | The picture of the relic switch. |
-| `skip_cd_rooms` | 0, 1 | 1 | 1: a door into a CD loading room (the corridor between two areas) goes on to the next area at once. 0: walk through the room, as on the disc. |
+| `skip_cd_rooms` | 0, 1 | 0 | 1: a door into a CD loading room (the corridor between two areas) goes on to the next area at once. 0: walk through the room, as on the disc. |
 | `quick_item` | 0, 1 | 1 | 1: the Pocket. A food, a medicine or the Library card, chosen on the Equip screen (top right, next to the hands), is used with L2 (ZL on Switch, key W). 0: off. |
 | `show_loading_text` | 0, 1 | 1 | 1: the NOW LOADING word and logo show while a stage loads. 0: the screen stays black. |
 | `room_edge_fade` | 0, 1 | 1 | 1: in a room narrower than the wide view, nothing shows past its left and right edge (black), and the edge tile fades to black over its outer 8 pixels. 0: the old fill (the next room, a mirror image) under a wide dark gradient. |

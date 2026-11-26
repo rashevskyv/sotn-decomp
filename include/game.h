@@ -1166,7 +1166,7 @@ extern int g_EditorOn;         // editor = 1 in sotn.ini, or --editor (PC)
 // Debug overlay (src/pc/port_menu.c): overlay = 1 shows the stage, room,
 // map cell and cheats in a corner; fps = 1 shows the frame rate.
 extern int g_OverlayOn, g_FpsOn;
-// sotn.ini skip_cd_rooms = 1 (default): a door into a CD loading room takes
+// sotn.ini skip_cd_rooms = 1 (default 0): a door into a CD loading room takes
 // the teleport on its far side at once (5087C.c). show_loading_text = 0: the
 // NOW LOADING word and logo stay hidden, the screen is black (game_handlers.c)
 extern int g_SkipCdRooms, g_ShowLoadingText;
@@ -1321,6 +1321,9 @@ void Editor_RefreshAddress(void);
 #define WIDE_NO_PRIM(prim) ((prim) == NULL)
 #define WIDE_POOL(ps1, wide) (wide)
 void Wide_MoveCornerText(s32 prims, s32 left);
+// The white of a warp room (src/st/wrp, src/st/rwrp) grows from the 4:3 frame
+// to the wide view in this many frames, and shrinks back the same way.
+#define WARP_WIDE_FRAMES 16
 // The language of this run (src/pc/lang.c): 0 English, 1 Ukrainian.
 // Under English every Lang_ lookup returns its argument.
 extern int g_Lang, g_LangNext;
