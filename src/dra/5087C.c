@@ -701,7 +701,8 @@ void func_800F14CC(void) {
     // Saturn hatch (tiles col 7-8 = x 112..143, row 42). The port keeps it
     // open when IVE_BEEN_ROBBED is set, which a non-Alucard game sets at
     // start, so the player falls in at once: start past the hatch instead
-    if (g_StageId == STAGE_NO3 && D_8006C374 == 0x11 &&
+    if ((g_StageId == STAGE_NO3 || g_StageId == STAGE_NP3) &&
+        D_8006C374 == 0x11 &&
         g_PlayableCharacter != PLAYER_ALUCARD) {
         PLAYER.posX.i.hi = 176;
     }

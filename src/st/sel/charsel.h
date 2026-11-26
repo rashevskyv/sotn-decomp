@@ -64,6 +64,8 @@ static const Charsel g_Charsel[] = {
 // Maria's versions, Up/Down on her card: PSP is this port's player, PSX is
 // the classic art of the PSX/Saturn Maria. Roadmap C2 (the Saturn Maria's
 // player) starts the game for PSX in CharselLocked; until then it refuses.
+// off until a second Maria player exists: one card, no arrows
+#define CHARSEL_MARIA_VARIANTS 0
 #if CHARSEL_MARIA
 enum { CHARSEL_MARIA_PSP, CHARSEL_MARIA_PSX };
 static s32 s_CharselMariaVariant; // kept while the cursor is elsewhere
@@ -271,7 +273,7 @@ static void CharselDrawCard(s32 id, s32 x, s32 sel) {
                 CHARSEL_FRAME_W, CHARSEL_FRAME_H, CS_ART_TPAGE,
                 getClut(CS_FRAME_CLUT_X + (sel ? 16 : 0), CS_CLUT4_Y), 0x80,
                 0x20);
-#if CHARSEL_MARIA
+#if CHARSEL_MARIA && CHARSEL_MARIA_VARIANTS
     if (g_Charsel[id].player == PLAYER_MARIA) {
         CharselArrows(x, sel);
     }
@@ -350,7 +352,8 @@ static void CharselStartGame(void) {
     if (g_PlayableCharacter == PLAYER_ALUCARD) {
         g_StageId = STAGE_ST0;
     } else {
-        g_StageId = STAGE_NO3;
+        // NP3: the entrance with the shaft to the Saturn garden
+        g_StageId = STAGE_NP3;
     }
     D_8003C730 = 0;
     D_8006C378 = -1;
@@ -371,7 +374,7 @@ static void CharselUpdate(void) {
         s_CharselCursor += g_pads[0].tapped & PAD_LEFT ? 1 : CS_N - 1;
         s_CharselCursor %= CS_N;
     }
-#if CHARSEL_MARIA
+#if CHARSEL_MARIA && CHARSEL_MARIA_VARIANTS
     // two versions: Up goes PSP -> PSX, Down goes back; the arrow shows the way
     if ((g_pads[0].tapped &
          (s_CharselMariaVariant == CHARSEL_MARIA_PSP ? PAD_UP : PAD_DOWN)) &&
