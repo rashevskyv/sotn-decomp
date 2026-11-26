@@ -513,7 +513,9 @@ static int ElevatorOrnaments(void) {
 #endif
 
 void RenderTilemap(void) {
+#ifdef PLATFORM_PSYZ
     s32 fgpass, fgpasses = 1;
+#endif
     s32 i, j;
     s32 l;
     BgLayer* bg;
@@ -592,11 +594,11 @@ void RenderTilemap(void) {
 #endif
 #ifdef PLATFORM_PSYZ
             fgpasses = ElevatorOrnaments() ? 2 : 1;
-#endif
             for (fgpass = 0; fgpass < fgpasses; fgpass++) {
             if (fgpasses == 2) {
                 r->order = fgpass ? ELEV_ORN_ORDER : t->order;
             }
+#endif
             y0 = r->y - subY - WIDE_ROWS * TILE_SIZE;
             for (i = -WIDE_ROWS; i < N_VERTI_TILES + WIDE_ROWS;
                  i++, y0 += TILE_SIZE) {
@@ -638,10 +640,12 @@ void RenderTilemap(void) {
                     if (tile == 0) {
                         continue;
                     }
+#ifdef PLATFORM_PSYZ
                     if (fgpasses == 2 &&
                         (tile >= 0x59B && tile <= 0x5AF) != fgpass) {
                         continue;
                     }
+#endif
                     u = r->gfx[tile] << 0x4;
                     v = r->gfx[tile] & 0xF0;
                     page = r->page[tile];
@@ -684,7 +688,9 @@ void RenderTilemap(void) {
                 r->dr++;
                 g_GpuUsage.drawModes++;
             }
+#ifdef PLATFORM_PSYZ
             }
+#endif
         }
     }
 

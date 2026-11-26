@@ -116,8 +116,12 @@ static u16 g_testCollEnemyLookup[] = {
 #endif
 
 // the Saturn stages' enemies (ids 400 on) have no bestiary entry
+#ifdef PLATFORM_PSYZ
 #define COLL_ENEMY_LOOKUP(id)                                                  \
     ((id) < LEN(g_testCollEnemyLookup) ? g_testCollEnemyLookup[id] : 0)
+#else
+#define COLL_ENEMY_LOOKUP(id) g_testCollEnemyLookup[id]
+#endif
 
 static u8 g_testCollLuckCutoff[] = {0x00, 0x40, 0x20, 0x10};
 

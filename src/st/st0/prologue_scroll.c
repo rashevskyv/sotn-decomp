@@ -263,7 +263,9 @@ void PrologueScroll(void) {
     s32 skip;
     Entity* entity;
     s32 primIndex;
+#ifdef PLATFORM_PSYZ
     s32 ffn, ffTimes;
+#endif
 
 #if TARGET == TARGET_PSP
     const int EndTimer = 0x14C0; // approximately 110 seconds
@@ -430,8 +432,10 @@ void PrologueScroll(void) {
         // Switch) is held, this step runs PROLOGUE_FF times a frame: the text,
         // the picture and the end timer keep one speed. The music goes on at
         // its own pace; the fade of step 16 ends it after the scroll.
+#ifdef PLATFORM_PSYZ
         ffTimes = PrologueFFTimes();
         for (ffn = 0; ffn < ffTimes && g_GameStep == 6; ffn++) {
+#endif
         func_801B1298(entity);
         D_801BEDFC++;
         D_801BEE04++;
@@ -475,7 +479,9 @@ void PrologueScroll(void) {
         if (skip) {
             g_GameStep = Play_16;
         }
+#ifdef PLATFORM_PSYZ
         }
+#endif
         break;
     case 7: // 0x801B0AE8
         // scroll finished, fade in castlevania

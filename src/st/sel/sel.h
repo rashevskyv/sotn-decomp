@@ -32,7 +32,9 @@ typedef enum {
     Tips_Input,
     Tips_YesNo,
     Tips_Confirm,
+#ifdef PLATFORM_PSYZ
     Tips_ConfirmBack,
+#endif
     Tips_MenuNavigation,
 #if IS_VER_INTL
     Tips_NoYes, // inverted X/O on INTL versions
