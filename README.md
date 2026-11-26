@@ -77,6 +77,7 @@ If you clone with Git for Windows, switch off the line end change: `git clone -c
 | Saturn stages: Underground Garden, Cursed Prison and their inverted versions; stitched rooms | Experimental. Enemies and bosses are ported by hand and can differ from the Saturn game. |
 | Saturn character select screen | Works. Needs the Saturn disc for its art. |
 | Maria as a player (from the PSP version) | Experimental. |
+| Maria as a player (from the Saturn version, her own moves) | Coming soon. |
 | PSP familiar names, the two JP familiar cards | Works (the cards are an option). |
 | Voice sets (Japanese and PSP English) | Works, but see "Voice sets" below: the pack cannot be made from this repository alone yet. |
 | Ukrainian language | Works. Without `ps1vram_uk.bin` ten labels stay in English (see "Ukrainian language" below). |
