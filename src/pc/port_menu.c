@@ -368,25 +368,56 @@ int PortMenu_ConfirmEast(void) {
 
 int Psyz_ControllerBlocked(void); // psyz: no controller while unfocused
 
-static int GamepadDown(SDL_GamepadButton b) {
-    int n = 0, i, r = 0;
+#ifdef __SWITCH__
+unsigned SwitchNx_Pad(int sticks[2][2]);
+static int switch_sticks[2][2];
+#endif
+
+// One snapshot for the game's first pad, independent of SDL's slot order.
+static unsigned gamepad_buttons;
+
+#ifndef __SWITCH__
+static unsigned GamepadButtons(void) {
+    _Static_assert(SDL_GAMEPAD_BUTTON_COUNT + 2 <= 32, "gamepad button mask");
+    unsigned pressed = 0;
+    int n = 0;
+
     if (Psyz_ControllerBlocked()) {
         return 0;
     }
     SDL_JoystickID* ids = SDL_GetGamepads(&n);
-    for (i = 0; ids && i < n && !r; i++) {
-        SDL_Gamepad* g = SDL_GetGamepadFromID(ids[i]);
-        r = g && SDL_GetGamepadButton(g, b);
+    for (int i = 0; ids && i < n; i++) {
+        SDL_Gamepad* pad = SDL_GetGamepadFromID(ids[i]);
+        if (!pad) {
+            continue;
+        }
+        for (int code = 0; code < SDL_GAMEPAD_BUTTON_COUNT; code++) {
+            if (SDL_GetGamepadButton(pad, (SDL_GamepadButton)code)) {
+                pressed |= 1u << code;
+            }
+        }
+        // Psyz exposes the triggers as the following two gamepad input codes.
+        if (SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 8000) {
+            pressed |= 1u << SDL_GAMEPAD_BUTTON_COUNT;
+        }
+        if (SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 8000) {
+            pressed |= 1u << (SDL_GAMEPAD_BUTTON_COUNT + 1);
+        }
     }
     SDL_free(ids);
-    return r;
+    return pressed;
 }
+#endif
 
 // The sticks: psyz maps them to no PS button. The left stick works as the
 // D-pad everywhere (stick_dpad), the right stick moves the view (WideCamera
 // in src/dra/5087C.c). Of several pads, the one whose stick is out the most
 // counts.
 static void ReadStick(int right, int* x, int* y) {
+#ifdef __SWITCH__
+    *x = switch_sticks[right][0];
+    *y = switch_sticks[right][1];
+#else
     static int logged[2], seen = -1;
     int n = 0, i, ax, ay, best = 0;
     SDL_Gamepad* from = NULL;
@@ -421,6 +452,7 @@ static void ReadStick(int right, int* x, int* y) {
         fprintf(stderr, "[stick] %s stick x %d y %d on '%s'\n",
                 right ? "right" : "left", *x, *y, SDL_GetGamepadName(from));
     }
+#endif
 }
 
 // The left stick as D-pad bits (Wide_StickDirs: dead zone stick_dead,
@@ -462,7 +494,7 @@ static u16 MenuButtons(u16 pressed, int open) {
         menu_pad--;
     }
     for (i = 0; i < 2; i++) {
-        if (!GamepadDown(btn[i])) {
+        if (!(gamepad_buttons & (1u << btn[i]))) {
             down[i] = 0;
             continue;
         }
@@ -1229,7 +1261,8 @@ static int mouse_down, mouse_x, mouse_y;
 static int mouse_seen = 1; // 0: a press not seen by a frame yet (fast click)
 
 // SOTN_TEST_PAD=switch|xbox|ps|other (tests; any other value: switch): an
-// SDL virtual pad of that type (vendor and product ids). Keypad 6, 2, 8, 4
+// SDL virtual pad of that type (vendor and product ids). switch-pair adds
+// an idle pad first. Keypad 6, 2, 8, 4
 // hold its right, bottom, top, left face button, keypad 5 its Start; keypad
 // 1, 3, 7, 9 push its left stick left, right, up, down; keypad /, *, -, +
 // its right stick.
@@ -1254,12 +1287,22 @@ static void TestPadInit(void) {
     t = strcmp(want, types[t].name) ? 0 : t;
     SDL_INIT_INTERFACE(&d);
     d.type = SDL_JOYSTICK_TYPE_GAMEPAD;
-    d.vendor_id = types[t].vendor;
-    d.product_id = types[t].product;
     d.naxes = SDL_GAMEPAD_AXIS_COUNT;
     d.nbuttons = SDL_GAMEPAD_BUTTON_COUNT;
     d.button_mask = (1u << SDL_GAMEPAD_BUTTON_COUNT) - 1;
     d.axis_mask = (1u << SDL_GAMEPAD_AXIS_COUNT) - 1;
+    if (!strcmp(want, "switch-pair")) {
+        // Leave slot one idle so keypad input exercises a later SDL device.
+        d.name = "sotn idle test pad";
+        d.vendor_id = types[1].vendor;
+        d.product_id = types[1].product;
+        if (!SDL_AttachVirtualJoystick(&d)) {
+            fprintf(stderr, "[pad] idle test pad: %s\n", SDL_GetError());
+            return;
+        }
+    }
+    d.vendor_id = types[t].vendor;
+    d.product_id = types[t].product;
     d.name = "sotn test pad";
     test_pad = SDL_OpenJoystick(SDL_AttachVirtualJoystick(&d));
     fprintf(stderr, "[pad] test pad %s: %s\n", types[t].name,
@@ -1630,7 +1673,11 @@ static void Bind(PsyzInputDevice dev, int code) {
 // or gamepad button pressed. The time out keeps the old input.
 static void Capture(void) {
     int key = CTL_KEYS ? Psyz_PadsHeld(PSYZ_INPUT_KEY) : PSYZ_INPUT_NONE;
+#ifdef __SWITCH__
+    int pad = gamepad_buttons ? __builtin_ctz(gamepad_buttons) : PSYZ_INPUT_NONE;
+#else
     int pad = Psyz_PadsHeld(PSYZ_INPUT_GAMEPAD);
+#endif
     if (--capture <= 0) {
         capture = 0;
         prev = 0xFFFF;
@@ -1689,6 +1736,29 @@ static void MapPad(u16 pressed, u16 tap) {
 u16 PortMenu_Pad(u16 pressed) {
     u16 tap;
     int count;
+#ifdef __SWITCH__
+    int key_count;
+    const bool* keys = SDL_GetKeyboardState(&key_count);
+    gamepad_buttons = SwitchNx_Pad(switch_sticks);
+    // The psyz P1 word includes SDL's combined handheld/No. 1 slot.
+    // Rebuild it from the physical pad and keep any mapped keyboard keys.
+    pressed = 0;
+    for (int bit = 0; keys && bit < PSYZ_PAD_BUTTONS; bit++) {
+        int key = Psyz_PadsMap(PSYZ_INPUT_KEY, bit, PSYZ_INPUT_QUERY);
+        if (key >= 0 && key < key_count && keys[key]) {
+            pressed |= 1u << bit;
+        }
+    }
+#else
+    gamepad_buttons = GamepadButtons();
+#endif
+    for (int bit = 0; gamepad_buttons && bit < PSYZ_PAD_BUTTONS; bit++) {
+        int code = Psyz_PadsMap(PSYZ_INPUT_GAMEPAD, bit, PSYZ_INPUT_QUERY);
+        if (code >= 0 && code < SDL_GAMEPAD_BUTTON_COUNT + 2 &&
+            (gamepad_buttons & (1u << code))) {
+            pressed |= 1u << bit;
+        }
+    }
     pressed = MenuButtons(pressed, is_open);
     // the stick in the game and in every menu; the D-pad and the keys win,
     // so the game never sees left and right (or up and down) at once
