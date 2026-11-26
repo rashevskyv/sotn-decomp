@@ -35,7 +35,7 @@ wsl --install -d Ubuntu-24.04
 Далі в Ubuntu (WSL) або в Linux:
 
 ```sh
-git clone -c core.autocrlf=false --recurse-submodules -b switch https://github.com/rashevskyv/sotn-native.git ~/sotn-native
+git clone -c core.autocrlf=false --recurse-submodules -b switch https://github.com/rashevskyv/sotn-decomp.git ~/sotn-native
 cd ~/sotn-native
 # покладіть образи дисків у games/ (будь-які імена файлів). Диск C: у WSL — це /mnt/c/
 cp "/mnt/c/Users/<ви>/Downloads/Castlevania SOTN (USA) (Track 1).bin" games/
@@ -122,8 +122,8 @@ FILE "data/SD/XA_STR1" BINARY
     INDEX 01 00:00:00
 ```
 
-У cue можна вказати `data/SD/XA_STR1` або `data/SD/XA_STR1.`.
-Гра відкриває ту назву, яка існує.
+У WSL перейменуйте `data/SD/XA_STR1.` на `data/SD/XA_STR1` перед копіюванням.
+У cue вказуйте `data/SD/XA_STR1`.
 
 ## 4. Nintendo Switch
 
@@ -137,10 +137,13 @@ FILE "data/SD/XA_STR1" BINARY
 |-- music/            необов'язково (крок 5)
 |-- voice/            необов'язково (крок 5)
 |-- sotn.ini          гра створює його при першому запуску
-|-- sotn-xa.cue       гра пише його при кожному запуску
+|-- sotn-xa.cue       гра переписує його під час запуску, якщо є назва XA
 |-- bu00/ bu10/       збереження карти пам'яті
 `-- sotn.log, sotn.prev.log, sotn.out.log
 ```
+
+Гра переписує `sotn-xa.cue` під час запуску, якщо існує одна з двох назв XA.
+Потрібен файл cue, до якого можна писати (`src/pc/switch.c:40-58`).
 
 1. Вставте SD-карту в консоль. Запустіть Atmosphère.
 2. Відкрийте hbmenu і запустіть «Castlevania: SOTN». `[unverified]` Запускайте hbmenu через ігровий тайтл (повна пам'ять). Режим аплету альбому не тестували.
