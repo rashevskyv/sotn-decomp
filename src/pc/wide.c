@@ -308,7 +308,7 @@ static const char ini_loading[] =
     "; show_loading_text: 1 = the NOW LOADING word and logo show while a stage\n"
     "; loads. 0 = the screen stays black.\n"
     "; quick_item: 1 = the Pocket: a food, medicine or the Library card,\n"
-    "; picked on the Equip screen, is used with L2 (ZL, key W). 0 = off.\n";
+    "; picked on the Equip screen, is used with L1 by default (L, key Q). 0 = off.\n";
 
 static const char ini_overlay[] =
     "\n"
