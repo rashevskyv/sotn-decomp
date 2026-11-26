@@ -100,6 +100,34 @@ int main(void) {
         assert(lo == 4 && hi == 260);
     }
 
+    // PS1 bars only where the room ends (clip rows 20..227)
+    {
+        int y0, y1;
+        // a one-screen room (lo == hi == 4): the PS1 bars
+        y0 = 0 - 4, y1 = 256 - 4;
+        Wide_PsxRows(4, 4, 4, 20, 227, &y0, &y1);
+        assert(y0 == 20 && y1 == 227);
+        // a 512-row room in the middle: no bars
+        y0 = 0 - 130, y1 = 512 - 130;
+        Wide_PsxRows(4, 260, 130, 20, 227, &y0, &y1);
+        assert(y0 < 0 && y1 > 240);
+        // at its top: the top bar only; 10 px down it is 10 px thinner
+        y0 = 0 - 4, y1 = 512 - 4;
+        Wide_PsxRows(4, 260, 4, 20, 227, &y0, &y1);
+        assert(y0 == 20 && y1 > 240);
+        y0 = 0 - 14;
+        Wide_PsxRows(4, 260, 14, 20, 227, &y0, &y1);
+        assert(y0 == 10);
+        // at its bottom: the bottom bar
+        y0 = 0 - 260, y1 = 512 - 260;
+        Wide_PsxRows(4, 260, 260, 20, 227, &y0, &y1);
+        assert(y0 < 0 && y1 == 227);
+        // no bar (Saturn band): the one-screen room keeps its art rows
+        y0 = 16 - 8, y1 = 240 - 8;
+        Wide_PsxRows(8, 8, 8, -240, 480, &y0, &y1);
+        assert(y0 == 8 && y1 == 232);
+    }
+
     // edge fill: a true mirror image, the art flipped next to the edge,
     // upright again past one room width
     {
