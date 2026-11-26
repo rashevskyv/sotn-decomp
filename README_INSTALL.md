@@ -90,7 +90,6 @@ cmake --build build/win
 mkdir -p /mnt/c/Games/sotn-native
 cp build/win/sotn.exe /mnt/c/Games/sotn-native/
 cp -r build/win/data /mnt/c/Games/sotn-native/
-cp out/pc/sotn-xa.cue /mnt/c/Games/sotn-native/
 # only with the Saturn disc: the stitched rooms replace the files in data/ST
 cp -r build/win/saturn_stitches/disks/us/ST/. /mnt/c/Games/sotn-native/data/ST/
 ```
@@ -101,7 +100,7 @@ Start `C:\Games\sotn-native\sotn.exe`. `sotn.ini` is made at the first start wit
 C:\Games\sotn-native\
 |-- sotn.exe          the program
 |-- sotn.ini          settings; the game makes it, the port menu writes it
-|-- sotn-xa.cue       3 lines that point at data\SD\XA_STR1 (disc music)
+|-- sotn-xa.cue       the game writes it at the first start (disc music)
 |-- data\             game data from your disc
 |   `-- BIN\ BOSS\ SD\ SERVANT\ ST\ VAB\ XA\ and the disc files (DRA.BIN, ...)
 |-- music\            optional, enhanced music (step 5)
@@ -113,16 +112,8 @@ C:\Games\sotn-native\
 If the game finds no `data\BIN\F_TITLE0.BIN` it shows the message "Game data not found" and stops.
 That file is the only one the start check needs. `sotn-xa.cue`, `music\` and `voice\` are optional.
 The build embeds the HD packs in the program. It makes no `data\textures\` folder.
-Without `sotn-xa.cue` the game plays no disc music. The text of the cue file:
-
-```text
-FILE "data/SD/XA_STR1" BINARY
-  TRACK 01 MODE2/2352
-    INDEX 01 00:00:00
-```
-
 In WSL, rename `data/SD/XA_STR1.` to `data/SD/XA_STR1` before you copy the folder.
-Use the cue name `data/SD/XA_STR1`.
+The game writes `sotn-xa.cue` at the first start.
 
 ## 4. Nintendo Switch
 
@@ -142,7 +133,7 @@ By hand, the result must be:
 ```
 
 The game rewrites `sotn-xa.cue` at start when one of the two XA names exists.
-It needs a writable cue file (`src/pc/switch.c:40-58`).
+The cue must be writable.
 
 1. Put the SD card in the console. Start Atmosphère.
 2. Open hbmenu and start "Castlevania: SOTN". `[unverified]` Start hbmenu through a game title (full memory). The album applet mode was not tested.
@@ -220,7 +211,7 @@ The first line shows the version. Send both files with a bug report. Do not send
 | `build.py` says "Missing tools" | Run `python3 build.py --install-deps`, or the commands it prints. |
 | `build.py` says "Windows line ends" | Clone again with `-c core.autocrlf=false`. |
 | Build is very slow | The clone is on a Windows drive. Clone inside WSL (`~/`). |
-| No music | `sotn-xa.cue` is missing, or `data\SD\XA_STR1` is missing. Copy `out/pc/sotn-xa.cue` next to the program. |
+| No music | `data\SD\XA_STR1` is missing. Rename the dotted name in WSL before you copy. |
 | The window does not open | Update the video driver (OpenGL 3.3). Read `sotn.log`. |
 | No HD pictures | `hd_textures = 1`? Is there `data\textures\<language>\`? Look for `[hd]` lines in `sotn.log`. |
 | Game closes at `Esc` | `Esc` quits the game in a window. Use `F11` for fullscreen. |

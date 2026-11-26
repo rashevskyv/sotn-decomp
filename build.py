@@ -46,7 +46,7 @@ WANT = {
                "Saturn stages, character select art"),
 }
 KIND = {"us": "PlayStation", "pspeu": "PSP", "saturn": "Sega Saturn"}
-# the cue sheet that switch.c writes on every boot: music from data/SD/XA_STR1
+# the cue sheet written at start on Switch and Windows: music from data/SD/XA_STR1
 XA_CUE = 'FILE "data/SD/XA_STR1" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n'
 SYNC = b"\x00" + b"\xff" * 10 + b"\x00"
 
@@ -441,6 +441,11 @@ def assemble(build, dest, program, saturn):
     if saturn:  # the stitched Saturn rooms replace their PS1 files
         link_tree(os.path.join(build, "saturn_stitches", "disks", "us", "ST"),
                   os.path.join(dest, "data", "ST"))
+    # Win32 cannot open a name with a trailing dot. Rename in the package only.
+    dotted = os.path.join(dest, "data", "SD", "XA_STR1.")
+    plain = os.path.join(dest, "data", "SD", "XA_STR1")
+    if os.path.exists(dotted) and not os.path.exists(plain):
+        os.replace(dotted, plain)
     shutil.copy2(os.path.join(build, program), os.path.join(dest, program))
     write(os.path.join(dest, "sotn-xa.cue"), XA_CUE)
     if os.path.isdir(os.path.join(DISKS, "voice", "voice")):

@@ -91,7 +91,6 @@ cmake --build build/win
 mkdir -p /mnt/c/Games/sotn-native
 cp build/win/sotn.exe /mnt/c/Games/sotn-native/
 cp -r build/win/data /mnt/c/Games/sotn-native/
-cp out/pc/sotn-xa.cue /mnt/c/Games/sotn-native/
 # лише з диском Saturn: зшиті кімнати замінюють файли в data/ST
 cp -r build/win/saturn_stitches/disks/us/ST/. /mnt/c/Games/sotn-native/data/ST/
 ```
@@ -102,7 +101,7 @@ cp -r build/win/saturn_stitches/disks/us/ST/. /mnt/c/Games/sotn-native/data/ST/
 C:\Games\sotn-native\
 |-- sotn.exe          програма
 |-- sotn.ini          налаштування; створює гра, пише меню порту
-|-- sotn-xa.cue       3 рядки, що вказують на data\SD\XA_STR1 (музика диска)
+|-- sotn-xa.cue       гра записує його під час першого запуску (музика диска)
 |-- data\             ігрові дані з вашого диска
 |   `-- BIN\ BOSS\ SD\ SERVANT\ ST\ VAB\ XA\ і файли диска (DRA.BIN, ...)
 |-- music\            необов'язково, покращена музика (крок 5)
@@ -114,16 +113,8 @@ C:\Games\sotn-native\
 Якщо гра не знаходить `data\BIN\F_TITLE0.BIN`, вона показує повідомлення «Game data not found» і зупиняється.
 Лише цей файл перевіряється при запуску. `sotn-xa.cue`, `music\` і `voice\` необов'язкові.
 Збірка вбудовує HD-пакети в програму. Вона не створює теку `data\textures\`.
-Без `sotn-xa.cue` гра не відтворює музику диска. Вміст файла cue:
-
-```text
-FILE "data/SD/XA_STR1" BINARY
-  TRACK 01 MODE2/2352
-    INDEX 01 00:00:00
-```
-
 У WSL перейменуйте `data/SD/XA_STR1.` на `data/SD/XA_STR1` перед копіюванням.
-У cue вказуйте `data/SD/XA_STR1`.
+Гра записує `sotn-xa.cue` під час першого запуску.
 
 ## 4. Nintendo Switch
 
@@ -143,7 +134,7 @@ FILE "data/SD/XA_STR1" BINARY
 ```
 
 Гра переписує `sotn-xa.cue` під час запуску, якщо існує одна з двох назв XA.
-Потрібен файл cue, до якого можна писати (`src/pc/switch.c:40-58`).
+Файл cue має бути доступним для запису.
 
 1. Вставте SD-карту в консоль. Запустіть Atmosphère.
 2. Відкрийте hbmenu і запустіть «Castlevania: SOTN». `[unverified]` Запускайте hbmenu через ігровий тайтл (повна пам'ять). Режим аплету альбому не тестували.
@@ -221,7 +212,7 @@ HD-картинки є частиною цього репозиторію: `tool
 | `build.py` пише «Missing tools» | Запустіть `python3 build.py --install-deps` або надруковані команди. |
 | `build.py` пише про «Windows line ends» | Склонуйте знову з `-c core.autocrlf=false`. |
 | Збірка дуже повільна | Клон лежить на диску Windows. Клонуйте всередині WSL (`~/`). |
-| Немає музики | Немає `sotn-xa.cue` або `data\SD\XA_STR1`. Скопіюйте `out/pc/sotn-xa.cue` поруч із програмою. |
+| Немає музики | Немає `data\SD\XA_STR1`. Перейменуйте назву з крапкою у WSL перед копіюванням. |
 | Вікно не відкривається | Оновіть драйвер відео (OpenGL 3.3). Прочитайте `sotn.log`. |
 | Немає HD-картинок | Чи `hd_textures = 1`? Чи є `data\textures\<мова>\`? Шукайте рядки `[hd]` у `sotn.log`. |
 | Гра закривається на `Esc` | У вікні `Esc` закриває гру. Для повного екрана використовуйте `F11`. |

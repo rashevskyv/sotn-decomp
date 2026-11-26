@@ -45,10 +45,26 @@ void Win_Init(int* argc, char*** argv) {
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
     SDL_SetLogOutputFunction(LogToStderr, NULL); // psyz logs via SDL_Log
+    // Win32 cannot open a name with a trailing dot. The package holds
+    // data/SD/XA_STR1. Write the cue once here, as switch.c does, if absent.
+    const char* cue = "sotn-xa.cue";
+    const char* xa = "data/SD/XA_STR1";
+    bool audio = FileExists(cue);
+    if (!audio && FileExists(xa)) {
+        FILE* f = fopen(cue, "w");
+        if (f) {
+            fprintf(f, "FILE \"%s\" BINARY\n"
+                       "  TRACK 01 MODE2/2352\n"
+                       "    INDEX 01 00:00:00\n", xa);
+            audio = fclose(f) == 0;
+        }
+    }
+    fprintf(stderr, "[boot] cd audio %s -> %s: %s\n", cue, xa,
+            audio ? "found" : "MISSING, music off");
     static char* args[64];
     int n = 0;
     args[n++] = (*argv)[0];
-    if (FileExists("sotn-xa.cue")) {
+    if (audio) {
         args[n++] = "--disk";
         args[n++] = "sotn-xa.cue";
     }
