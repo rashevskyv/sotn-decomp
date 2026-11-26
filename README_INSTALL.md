@@ -34,7 +34,7 @@ wsl --install -d Ubuntu-24.04
 Then, in Ubuntu (WSL) or on Linux:
 
 ```sh
-git clone -c core.autocrlf=false --recurse-submodules -b switch https://github.com/rashevskyv/sotn-native.git ~/sotn-native
+git clone -c core.autocrlf=false --recurse-submodules -b switch https://github.com/rashevskyv/sotn-decomp.git ~/sotn-native
 cd ~/sotn-native
 # put your disc images into games/ (any file names). Windows drive C: is /mnt/c/
 cp "/mnt/c/Users/<you>/Downloads/Castlevania SOTN (USA) (Track 1).bin" games/
@@ -121,7 +121,8 @@ FILE "data/SD/XA_STR1" BINARY
     INDEX 01 00:00:00
 ```
 
-Both `data/SD/XA_STR1` and `data/SD/XA_STR1.` work in the cue. The port opens the name that exists.
+In WSL, rename `data/SD/XA_STR1.` to `data/SD/XA_STR1` before you copy the folder.
+Use the cue name `data/SD/XA_STR1`.
 
 ## 4. Nintendo Switch
 
@@ -135,10 +136,13 @@ By hand, the result must be:
 |-- music/            optional (step 5)
 |-- voice/            optional (step 5)
 |-- sotn.ini          the game makes it at the first start
-|-- sotn-xa.cue       the game writes it at every start
+|-- sotn-xa.cue       the game rewrites it at start when an XA name exists
 |-- bu00/ bu10/       memory card saves
 `-- sotn.log, sotn.prev.log, sotn.out.log
 ```
+
+The game rewrites `sotn-xa.cue` at start when one of the two XA names exists.
+It needs a writable cue file (`src/pc/switch.c:40-58`).
 
 1. Put the SD card in the console. Start Atmosphère.
 2. Open hbmenu and start "Castlevania: SOTN". `[unverified]` Start hbmenu through a game title (full memory). The album applet mode was not tested.

@@ -20,7 +20,7 @@ English: [README.md](README.md). README оригінального проєкт�
 1. Отримайте код. Клонуйте його в Linux або у WSL 2 (див. «Windows» нижче):
 
    ```sh
-   git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-native.git
+   git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-decomp.git sotn-native
    ```
 
 2. Покладіть образи своїх дисків у папку `games/` цього клону. Назви файлів не важливі.
@@ -127,6 +127,8 @@ English: [README.md](README.md). README оригінального проєкт�
   (`sudo dkp-pacman -S switch-dev switch-mesa switch-libdrm_nouveau`).
 - Форк SDL3 від devkitPro, гілка `switch-sdl-3.4`, з латкою з цього репозиторію:
 
+  Перед `git am` налаштуйте ім'я та пошту Git. Використовуйте `~/SDL-switch` в обох командах.
+
   ```sh
   git clone -b switch-sdl-3.4 https://github.com/devkitPro/SDL.git ~/SDL-switch
   git -C ~/SDL-switch am "$PWD/tools/sdl-switch/0001-switch-SetWindowSize-uses-the-pending-size.patch"
@@ -160,7 +162,7 @@ flowchart LR
 ### 1. Отримайте код
 
 ```sh
-git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-native.git
+git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-decomp.git sotn-native
 cd sotn-native
 ```
 
@@ -176,6 +178,7 @@ cd sotn-native
   вже є, скопіюйте їх у `disks/saturn/`. Збірка читає звідти `TITLE.PRG`,
   `TITLE.CHR`, `TITLE.MAP`, `SUB_DISP.MAP`, `0.BIN`, `STAGE_15.PRG`, `STAGE_16.PRG`,
   файли `SD_*.CRT` та `SD2B.PCM`.
+  Пропустіть команду розпакування образу платформи, якщо скопіювали її розпаковану теку.
 
 ### 3. Розпакуйте диски
 
@@ -260,9 +263,11 @@ cmake --build build/win
 | `/switch/sotn-native/voice/jp/`, `voice/psp/` | Набори голосів (необов'язково) | див. «Набори голосів» |
 | `/switch/sotn-native/sotn.ini` | Налаштування | гра пише його під час першого запуску |
 
-Гра також пише туди: `sotn-xa.cue` (музика; вказує на `data/SD/XA_STR1`
-або `data/SD/XA_STR1.`, якщо розпакування зберегло крапку),
-`sotn.log`, `sotn.prev.log`, `sotn.out.log` і картки пам'яті `bu00/` та `bu10/`.
+Гра переписує `sotn-xa.cue` під час запуску, якщо існує одна з двох назв XA.
+Потрібен файл cue, до якого можна писати (`src/pc/switch.c:40-58`). Він вказує на
+`data/SD/XA_STR1` або `data/SD/XA_STR1.`.
+Гра також пише туди: `sotn.log`, `sotn.prev.log`, `sotn.out.log`
+і картки пам'яті `bu00/` та `bu10/`.
 Інших файлів не потрібно. Запускайте порт із меню homebrew.
 
 ## Налаштування (`sotn.ini`)

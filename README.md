@@ -20,7 +20,7 @@ The build reads them from your disk and makes the game files on your machine.
 1. Get the source. Clone it in Linux or in WSL 2 (see "Windows" below):
 
    ```sh
-   git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-native.git
+   git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-decomp.git sotn-native
    ```
 
 2. Put your disc images into the folder `games/` of the clone. The file names do not matter.
@@ -127,6 +127,8 @@ For the Switch build you also need:
   (`sudo dkp-pacman -S switch-dev switch-mesa switch-libdrm_nouveau`).
 - The devkitPro fork of SDL3, branch `switch-sdl-3.4`, with the patch from this repository:
 
+  Set a Git name and email before `git am`. Use `~/SDL-switch` in both commands.
+
   ```sh
   git clone -b switch-sdl-3.4 https://github.com/devkitPro/SDL.git ~/SDL-switch
   git -C ~/SDL-switch am "$PWD/tools/sdl-switch/0001-switch-SetWindowSize-uses-the-pending-size.patch"
@@ -160,7 +162,7 @@ These are the steps that `build.py` does for you.
 ### 1. Get the source
 
 ```sh
-git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-native.git
+git clone --recurse-submodules -b switch https://github.com/rashevskyv/sotn-decomp.git sotn-native
 cd sotn-native
 ```
 
@@ -176,6 +178,7 @@ cd sotn-native
   the extracted files, copy them to `disks/saturn/`. The build reads `TITLE.PRG`,
   `TITLE.CHR`, `TITLE.MAP`, `SUB_DISP.MAP`, `0.BIN`, `STAGE_15.PRG`, `STAGE_16.PRG`,
   the `SD_*.CRT` files and `SD2B.PCM` from there.
+  Skip a platform's image extraction command when you copied its extracted folder.
 
 ### 3. Extract the discs
 
@@ -261,9 +264,11 @@ The port uses its own folder, `/switch/sotn-native/`, on the SD card:
 | `/switch/sotn-native/music/` | Music files (optional) | see "Music files" |
 | `/switch/sotn-native/sotn.ini` | Settings | written by the game at the first start |
 
-The game also writes these files there: `sotn-xa.cue` (music; it points at `data/SD/XA_STR1`
-or `data/SD/XA_STR1.` when the extractor kept the dot),
-`sotn.log`, `sotn.prev.log`, `sotn.out.log` and the memory cards `bu00/` and `bu10/`.
+The game rewrites `sotn-xa.cue` at start when one of the two XA names exists.
+It needs a writable cue file (`src/pc/switch.c:40-58`). The cue points at `data/SD/XA_STR1`
+or `data/SD/XA_STR1.`.
+The game also writes these files there: `sotn.log`, `sotn.prev.log`, `sotn.out.log`
+and the memory cards `bu00/` and `bu10/`.
 No other files are needed. Start the port from the homebrew menu.
 
 ## Settings (`sotn.ini`)
