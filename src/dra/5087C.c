@@ -4,6 +4,9 @@
 #include "dra_bss.h"
 #include "menu.h"
 #include "servant.h" // for InitializeMode enum
+#ifdef PLATFORM_PSYZ
+#include "../pc/pc.h"
+#endif
 
 // fake struct for D_801375BC
 typedef struct {
@@ -332,6 +335,12 @@ s32 SetNextRoomToLoad(u32 x, u32 y) {
             if (tele->stageId == STAGE_ST0) {
                 return 0;
             }
+#ifdef PLATFORM_PSYZ
+            if (SaturnStageMissing(
+                    tele->stageId ^ (g_StageId & STAGE_INVERTEDCASTLE_FLAG))) {
+                return 0;
+            }
+#endif
         }
         // Finally set this to the room we found, and return a success.
         D_801375BC.def = &room->load;

@@ -14,6 +14,7 @@
 // and the black bars (Wide_ClearBars). Other display modes show the PS1
 // frame at the largest integer scale that fits (docked 4).
 #include <game.h>
+#include "pc.h"
 #include <psyz/input.h>
 #include <psyz/video.h>
 #include <math.h>
@@ -124,8 +125,9 @@ static const char ini_cheats[] =
     "; Use a spare save: a save keeps the items, relics and map.\n"
     "; cheat_refill: HP, MP and hearts stay full.\n"
     "; cheat_invincible: hits do nothing.\n"
-    "; cheat_walls: mist form passes every wall, mist does not end, no MP drain.\n"
-    "; cheat_items: all weapons, items and relics.\n"
+    "; cheat_walls: mist form passes every wall, mist does not end, no MP drain.\n";
+
+static const char ini_cheat_keys[] =
     "; cheat_map: the whole map of both castles explored (the room count too).\n"
     "; cheat_skip_prologue: a new game starts as Alucard at the castle gate.\n"
     "; cheat_character: who plays a loaded save, and the first card of the\n"
@@ -384,6 +386,10 @@ void Wide_SaveIni(void) {
     fputs(ini_spawn, f);
     fprintf(f, "spawn = %s\n", g_IniSpawn);
     fputs(ini_cheats, f);
+    fputs(Saturn_Installed() ? "; cheat_items: all weapons, items and relics.\n"
+                            : "; cheat_items: all PS1 weapons, items and relics.\n",
+          f);
+    fputs(ini_cheat_keys, f);
     for (i = 0; i < LEN(ini_flags); i++) {
         if (!strncmp(ini_flags[i].key, "cheat_", 6)) {
             fprintf(f, "%s = %d\n", ini_flags[i].key, *ini_flags[i].value);

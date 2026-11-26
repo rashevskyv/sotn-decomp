@@ -119,6 +119,7 @@ enum {
     N_MAIN
 };
 #define CHEAT_HELP_WORD 344 // the help words of the cheats page
+#define CHEAT_PS1_ITEMS_HELP_WORD 351
 // one row of the menu: its label word, English label, one line of help
 static const struct {
     s16 word;
@@ -249,6 +250,7 @@ enum {
     P_W_DEAD,
     P_W_PROLOGUE,
     P_W_OTHER_ROOM,
+    P_W_STAGE_MISSING,
     P_W_SAME_HERO = 279,
 };
 static char msg[48];
@@ -630,6 +632,7 @@ static const struct {
                  {"you are dead", P_W_DEAD},
                  {"not in the prologue", P_W_PROLOGUE},
                  {"pick another room", P_W_OTHER_ROOM},
+                 {"that stage is not installed", P_W_STAGE_MISSING},
                  {"already playing this hero", P_W_SAME_HERO}};
 
 static void MessageWhy(const char* why) {
@@ -2754,8 +2757,8 @@ static void DrawCheats(void) {
             Clear(lines[i]);
             AddW(lines[i], msg_word, msg);
         } else {
-            AddValue(lines[i], chars[g_Cheat.character].word,
-                     chars[g_Cheat.character].en);
+            int shown = Cheat_CharacterNext(g_Cheat.character, 0);
+            AddValue(lines[i], chars[shown].word, chars[shown].en);
         }
     }
     Clear(lines[CH_TELEPORT]);
@@ -2772,6 +2775,10 @@ static void DrawCheats(void) {
     } else { // the help words and hints of the other rows keep their numbers
         help_word = CHEAT_HELP_WORD + sel - (sel > CH_MAP);
         help_en = hints[sel - (sel > CH_MAP)];
+    }
+    if (sel == CH_ITEMS && !Saturn_Installed()) {
+        help_word = CHEAT_PS1_ITEMS_HELP_WORD;
+        help_en = "YOU HAVE ALL PS1 WEAPONS, ITEMS AND RELICS.";
     }
     if (g_GameState != Game_Play) { // no game: the teleport has nowhere to go
         box_off = CH_TELEPORT;
@@ -3601,11 +3608,9 @@ static int WarpOpen(int room) {
     if (room < 0 || room >= WARP_COUNT()) {
         return 0;
     }
-#ifndef ENABLE_SATURN_STAGES
-    if (!warp_inv && room == 5) { // the Saturn warp room needs its stages
+    if (!warp_inv && room == 5 && !SaturnStageHere(STAGE_ID_SATURN_WARP)) {
         return 0;
     }
-#endif
     if (g_CastleFlags[warp_inv ? RWRP_UNLOCKS : WRP_UNLOCKS] & (1 << room)) {
         return 1;
     }

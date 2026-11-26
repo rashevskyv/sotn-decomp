@@ -5,6 +5,7 @@
 // items go to a block right after SaveData, in the zeroed tail of the card
 // block (StoreSaveData clears 0x2000 bytes).
 #include "game.h"
+#include "pc.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -104,23 +105,25 @@ void Status_FromPs1(
     memcpy(dst->saveName, src->saveName, TAIL_SIZE);
 
     if (sat && sat->magic == SATURN_SAVE_MAGIC && OrderOk(sat->handOrder)) {
-        memcpy(dst->equipHandOrder, sat->handOrder, NUM_HAND_ORDER);
-        memcpy(&dst->equipHandCount[ITEM_ASTRAL_DAGGER], sat->handCount,
-               NUM_SATURN_HAND_ITEMS);
-        for (i = 0; i < 2; i++) {
-            u32 id = sat->equipment[i];
-            // an older build saved over it: its own item stays
-            if (IS_SATURN_HAND_ITEM(id) &&
-                dst->equipment[i] == StandIn[id - ITEM_ASTRAL_DAGGER]) {
-                dst->equipment[i] = id;
-            }
-        }
         i = sat->quickItem;
         if (QuickItem_Eligible(i) && src->equipHandCount[i] == sat->quickStock + 1) {
             dst->equipHandCount[i]--;
             g_QuickItem = i;
         }
-        return;
+        if (Saturn_Installed()) {
+            memcpy(dst->equipHandOrder, sat->handOrder, NUM_HAND_ORDER);
+            memcpy(&dst->equipHandCount[ITEM_ASTRAL_DAGGER], sat->handCount,
+                   NUM_SATURN_HAND_ITEMS);
+            for (i = 0; i < 2; i++) {
+                u32 id = sat->equipment[i];
+                // an older build saved over it: its own item stays
+                if (IS_SATURN_HAND_ITEM(id) &&
+                    dst->equipment[i] == StandIn[id - ITEM_ASTRAL_DAGGER]) {
+                    dst->equipment[i] = id;
+                }
+            }
+            return;
+        }
     }
     // a PS1 or 0.8.60 save: the Saturn items go last, none owned
     memcpy(dst->equipHandOrder, src->equipHandOrder, NUM_HAND_ITEMS);

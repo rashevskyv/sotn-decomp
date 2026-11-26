@@ -3,6 +3,9 @@
 #include "dra_bss.h"
 #include "menu.h"
 #include "servant.h" // for InitializeMode enum
+#ifdef PLATFORM_PSYZ
+#include "../pc/pc.h"
+#endif
 
 #if REGION != REGION_JP
 #define ShowText(str, y) func_800F99B8(str, y, false);
@@ -99,6 +102,7 @@ extern s32 g_PrevEquippedWeapons[2];
      (g_Menus[MENU_DG_EQUIP_SELECTOR].unk1C || !D_80137948))
 #define IS_QUICK_SLOT() (g_MenuNavigation.cursorEquip == QUICK_SLOT)
 s32 g_QuickMode, g_QuickListN;
+s32 g_HandListN = NUM_HAND_ORDER;
 static s32 s_QuickNav, s_QuickFrom;
 #else
 #define EQUIP_ROWS NUM_ITEM_SLOTS
@@ -4114,10 +4118,20 @@ void func_800FAF44(bool isAccessory) {
                 g_Menus[MENU_DG_EQUIP_SELECTOR].unk16 = 0;
             return;
         }
+        const bool saturnInstalled = Saturn_Installed();
 #endif
         for (i = 0; i < NUM_HAND_ORDER; i++) {
+#ifdef PLATFORM_PSYZ
+            if (!saturnInstalled &&
+                IS_SATURN_HAND_ITEM(g_Status.equipHandOrder[i])) {
+                continue;
+            }
+#endif
             *ptr++ = i;
         }
+#ifdef PLATFORM_PSYZ
+        g_HandListN = ptr - (s32*)g_Pix[3];
+#endif
         g_Menus[MENU_DG_EQUIP_SELECTOR].h =
             g_Menus[MENU_DG_EQUIP_SELECTOR].unk16 =
                 g_MenuNavigation.scrollEquipType[EQUIP_HAND];
@@ -5455,6 +5469,9 @@ block_4:
 #endif
             PlaySfx(SFX_UI_CONFIRM);
             func_800FBAC4();
+#ifdef PLATFORM_PSYZ
+            func_800FAF44(false);
+#endif
             g_Menus[MENU_DG_EQUIP_SELECTOR].unk16 = 0;
             g_MenuNavigation.cursorHandEquipType = 0;
             func_800FB0FC();
@@ -5470,12 +5487,25 @@ block_4:
             break;
         }
 #endif
+#ifdef PLATFORM_PSYZ
+        func_800FAF44(false);
+        if (g_MenuNavigation.cursorHandEquipType >= g_HandListN) {
+            g_MenuNavigation.cursorHandEquipType = 0;
+            g_Menus[MENU_DG_EQUIP_SELECTOR].h =
+                g_Menus[MENU_DG_EQUIP_SELECTOR].unk16 = 0;
+        }
+        equipId =
+            g_Status.equipHandOrder[D_801375D8[g_MenuNavigation.cursorHandEquipType]];
+#else
         equipId = g_Status.equipHandOrder[g_MenuNavigation.cursorHandEquipType];
+#endif
         func_800FAEC4(
             &g_MenuNavigation.cursorHandEquipType,
             g_Status.equipHandCount[equipId], g_EquipDefs[equipId].description,
             g_EquipDefs[equipId].icon, g_EquipDefs[equipId].iconPalette);
+#ifndef PLATFORM_PSYZ
         func_800FAF44(false);
+#endif
     case MENU_STEP_EQUIP_HAND:
 #ifdef PLATFORM_PSYZ
         if (IS_QUICK_SLOT()) {
@@ -5494,8 +5524,13 @@ block_4:
             &g_MenuNavigation.cursorHandEquipType, g_Status.equipHandOrder,
             g_Status.equipHandCount, &g_Status.equipment[D_801375D0]);
         if (i == 2) {
+#ifdef PLATFORM_PSYZ
+            equipId = g_Status.equipHandOrder
+                [D_801375D8[g_MenuNavigation.cursorHandEquipType]];
+#else
             equipId =
                 g_Status.equipHandOrder[g_MenuNavigation.cursorHandEquipType];
+#endif
             func_800FAD34(
                 g_EquipDefs[equipId].description,
                 g_Status.equipHandCount[equipId], g_EquipDefs[equipId].icon,

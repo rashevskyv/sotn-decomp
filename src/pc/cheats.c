@@ -461,6 +461,9 @@ const char* Cheat_Warp(int stage, int room, int cx, int cy) {
     const struct CastleRoom* r = FindRoom(stage, room);
     const char* why = Cheat_WarpRefusal();
 
+    if (!why && SaturnStageMissing(stage)) {
+        why = "that stage is not installed";
+    }
     if (!why && !r) {
         why = "pick another room";
     }
@@ -489,6 +492,9 @@ const char* Cheat_WarpStart(int stage) {
     static const u8 start[][2] = {
         {STAGE_DAI, 11}, {STAGE_NZ1, 11}, {STAGE_RNZ1, 11}};
     int i, want = -1;
+    if (SaturnStageMissing(stage)) {
+        return "that stage is not installed";
+    }
     for (i = 0; i < LEN(start); i++) {
         if (stage == start[i][0]) {
             want = start[i][1];
@@ -652,6 +658,9 @@ const char* Cheat_WarpBoss(int i) {
     const struct CheatBoss* b = &g_CheatBosses[i];
     const char* why = Cheat_WarpRefusal();
     int k;
+    if (!why && SaturnStageMissing(b->stage)) {
+        why = "that stage is not installed";
+    }
     if (why) {
         fprintf(stderr, "[cheat] boss %d: refused, %s\n", i, why);
         return why;
