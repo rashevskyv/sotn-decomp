@@ -239,7 +239,7 @@ int Main(int argc, char* argv[]) {
                 "Game data not found: " SOTN_DATA_DIR "/BIN/F_TITLE0.BIN\n"
                 "Put the files of your own Castlevania: Symphony of the Night "
                 "disc (PS1, USA, SLUS-00067) in the folder \"" SOTN_DATA_DIR
-                "\" next to the program.\nSee README_INSTALL.md.";
+                "\" next to the program.\nSee README.md.";
             fprintf(stderr, "[boot] %s\n", msg);
 #ifdef _WIN32
             {
