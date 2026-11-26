@@ -2,6 +2,7 @@
 // libnx calls for switch.c. Kept apart because <switch.h> and <game.h>
 // define the same type names (see switch_crash.c).
 #include <switch.h>
+#include <SDL3/SDL_gamepad.h>
 #include <arpa/inet.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -20,6 +21,49 @@ int SwitchNx_Touches(float* x, float* y, int max) {
         y[i] = st.touches[i].y;
     }
     return n;
+}
+
+// Read the built-in pair independently of the SDL joystick slot order.
+unsigned SwitchNx_HandheldPad(int sticks[2][2]) {
+    static const HidNpadButton mapping[] = {
+        [SDL_GAMEPAD_BUTTON_EAST] = HidNpadButton_A,
+        [SDL_GAMEPAD_BUTTON_SOUTH] = HidNpadButton_B,
+        [SDL_GAMEPAD_BUTTON_NORTH] = HidNpadButton_X,
+        [SDL_GAMEPAD_BUTTON_WEST] = HidNpadButton_Y,
+        [SDL_GAMEPAD_BUTTON_LEFT_SHOULDER] = HidNpadButton_L,
+        [SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER] = HidNpadButton_R,
+        [SDL_GAMEPAD_BUTTON_LEFT_STICK] = HidNpadButton_StickL,
+        [SDL_GAMEPAD_BUTTON_RIGHT_STICK] = HidNpadButton_StickR,
+        [SDL_GAMEPAD_BUTTON_START] = HidNpadButton_Plus,
+        [SDL_GAMEPAD_BUTTON_BACK] = HidNpadButton_Minus,
+        [SDL_GAMEPAD_BUTTON_DPAD_UP] = HidNpadButton_Up,
+        [SDL_GAMEPAD_BUTTON_DPAD_DOWN] = HidNpadButton_Down,
+        [SDL_GAMEPAD_BUTTON_DPAD_LEFT] = HidNpadButton_Left,
+        [SDL_GAMEPAD_BUTTON_DPAD_RIGHT] = HidNpadButton_Right,
+        // Psyz uses the two codes after the SDL buttons for L2 and R2.
+        [SDL_GAMEPAD_BUTTON_COUNT] = HidNpadButton_ZL,
+        [SDL_GAMEPAD_BUTTON_COUNT + 1] = HidNpadButton_ZR,
+    };
+    _Static_assert(SDL_GAMEPAD_BUTTON_COUNT + 2 <= 32, "handheld button mask");
+    unsigned bits = 0;
+    int i;
+
+    HidNpadHandheldState state;
+    if (!hidGetNpadStatesHandheld(HidNpadIdType_Handheld, &state, 1) ||
+        !(state.attributes & HidNpadAttribute_IsConnected)) {
+        sticks[0][0] = sticks[0][1] = sticks[1][0] = sticks[1][1] = 0;
+        return 0;
+    }
+    sticks[0][0] = state.analog_stick_l.x;
+    sticks[0][1] = state.analog_stick_l.y == -32768 ? 32767 : -state.analog_stick_l.y;
+    sticks[1][0] = state.analog_stick_r.x;
+    sticks[1][1] = state.analog_stick_r.y == -32768 ? 32767 : -state.analog_stick_r.y;
+    for (i = 0; i < (int)(sizeof(mapping) / sizeof(mapping[0])); i++) {
+        if (state.buttons & mapping[i]) {
+            bits |= 1u << i;
+        }
+    }
+    return bits;
 }
 
 // Restart: asks the loader to start this NRO again with the same arguments

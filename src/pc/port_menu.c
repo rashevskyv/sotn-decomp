@@ -368,18 +368,44 @@ int PortMenu_ConfirmEast(void) {
 
 int Psyz_ControllerBlocked(void); // psyz: no controller while unfocused
 
-static int GamepadDown(SDL_GamepadButton b) {
-    int n = 0, i, r = 0;
+#ifdef __SWITCH__
+unsigned SwitchNx_HandheldPad(int sticks[2][2]);
+static unsigned handheld_buttons;
+static int handheld_sticks[2][2];
+#endif
+
+// One snapshot for the game's first pad, independent of SDL's slot order.
+static unsigned gamepad_buttons;
+
+static unsigned GamepadButtons(void) {
+    _Static_assert(SDL_GAMEPAD_BUTTON_COUNT + 2 <= 32, "gamepad button mask");
+    unsigned pressed = 0;
+    int n = 0;
+
     if (Psyz_ControllerBlocked()) {
         return 0;
     }
     SDL_JoystickID* ids = SDL_GetGamepads(&n);
-    for (i = 0; ids && i < n && !r; i++) {
-        SDL_Gamepad* g = SDL_GetGamepadFromID(ids[i]);
-        r = g && SDL_GetGamepadButton(g, b);
+    for (int i = 0; ids && i < n; i++) {
+        SDL_Gamepad* pad = SDL_GetGamepadFromID(ids[i]);
+        if (!pad) {
+            continue;
+        }
+        for (int code = 0; code < SDL_GAMEPAD_BUTTON_COUNT; code++) {
+            if (SDL_GetGamepadButton(pad, (SDL_GamepadButton)code)) {
+                pressed |= 1u << code;
+            }
+        }
+        // Psyz exposes the triggers as the following two gamepad input codes.
+        if (SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 8000) {
+            pressed |= 1u << SDL_GAMEPAD_BUTTON_COUNT;
+        }
+        if (SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 8000) {
+            pressed |= 1u << (SDL_GAMEPAD_BUTTON_COUNT + 1);
+        }
     }
     SDL_free(ids);
-    return r;
+    return pressed;
 }
 
 // The sticks: psyz maps them to no PS button. The left stick works as the
@@ -416,10 +442,21 @@ static void ReadStick(int right, int* x, int* y) {
         }
     }
     SDL_free(ids);
+#ifdef __SWITCH__
+    ax = handheld_sticks[right][0];
+    ay = handheld_sticks[right][1];
+    if (abs(ax) + abs(ay) > best) {
+        best = abs(ax) + abs(ay);
+        *x = ax;
+        *y = ay;
+        from = NULL;
+    }
+#endif
     if (!logged[right] && best > 12000) {
         logged[right] = 1;
         fprintf(stderr, "[stick] %s stick x %d y %d on '%s'\n",
-                right ? "right" : "left", *x, *y, SDL_GetGamepadName(from));
+                right ? "right" : "left", *x, *y,
+                from ? SDL_GetGamepadName(from) : "handheld Joy-Con");
     }
 }
 
@@ -462,7 +499,7 @@ static u16 MenuButtons(u16 pressed, int open) {
         menu_pad--;
     }
     for (i = 0; i < 2; i++) {
-        if (!GamepadDown(btn[i])) {
+        if (!(gamepad_buttons & (1u << btn[i]))) {
             down[i] = 0;
             continue;
         }
@@ -1229,7 +1266,8 @@ static int mouse_down, mouse_x, mouse_y;
 static int mouse_seen = 1; // 0: a press not seen by a frame yet (fast click)
 
 // SOTN_TEST_PAD=switch|xbox|ps|other (tests; any other value: switch): an
-// SDL virtual pad of that type (vendor and product ids). Keypad 6, 2, 8, 4
+// SDL virtual pad of that type (vendor and product ids). switch-pair adds
+// an idle pad first. Keypad 6, 2, 8, 4
 // hold its right, bottom, top, left face button, keypad 5 its Start; keypad
 // 1, 3, 7, 9 push its left stick left, right, up, down; keypad /, *, -, +
 // its right stick.
@@ -1254,12 +1292,22 @@ static void TestPadInit(void) {
     t = strcmp(want, types[t].name) ? 0 : t;
     SDL_INIT_INTERFACE(&d);
     d.type = SDL_JOYSTICK_TYPE_GAMEPAD;
-    d.vendor_id = types[t].vendor;
-    d.product_id = types[t].product;
     d.naxes = SDL_GAMEPAD_AXIS_COUNT;
     d.nbuttons = SDL_GAMEPAD_BUTTON_COUNT;
     d.button_mask = (1u << SDL_GAMEPAD_BUTTON_COUNT) - 1;
     d.axis_mask = (1u << SDL_GAMEPAD_AXIS_COUNT) - 1;
+    if (!strcmp(want, "switch-pair")) {
+        // Leave slot one idle so keypad input exercises a later SDL device.
+        d.name = "sotn idle test pad";
+        d.vendor_id = types[1].vendor;
+        d.product_id = types[1].product;
+        if (!SDL_AttachVirtualJoystick(&d)) {
+            fprintf(stderr, "[pad] idle test pad: %s\n", SDL_GetError());
+            return;
+        }
+    }
+    d.vendor_id = types[t].vendor;
+    d.product_id = types[t].product;
     d.name = "sotn test pad";
     test_pad = SDL_OpenJoystick(SDL_AttachVirtualJoystick(&d));
     fprintf(stderr, "[pad] test pad %s: %s\n", types[t].name,
@@ -1631,6 +1679,11 @@ static void Bind(PsyzInputDevice dev, int code) {
 static void Capture(void) {
     int key = CTL_KEYS ? Psyz_PadsHeld(PSYZ_INPUT_KEY) : PSYZ_INPUT_NONE;
     int pad = Psyz_PadsHeld(PSYZ_INPUT_GAMEPAD);
+#ifdef __SWITCH__
+    if (pad == PSYZ_INPUT_NONE && handheld_buttons) {
+        pad = __builtin_ctz(handheld_buttons);
+    }
+#endif
     if (--capture <= 0) {
         capture = 0;
         prev = 0xFFFF;
@@ -1689,6 +1742,23 @@ static void MapPad(u16 pressed, u16 tap) {
 u16 PortMenu_Pad(u16 pressed) {
     u16 tap;
     int count;
+    gamepad_buttons = GamepadButtons();
+#ifdef __SWITCH__
+    static int logged_handheld;
+    handheld_buttons = SwitchNx_HandheldPad(handheld_sticks);
+    if (handheld_buttons && !logged_handheld) {
+        fprintf(stderr, "[pad] Switch handheld input active\n");
+        logged_handheld = 1;
+    }
+    gamepad_buttons |= handheld_buttons;
+#endif
+    for (int bit = 0; gamepad_buttons && bit < PSYZ_PAD_BUTTONS; bit++) {
+        int code = Psyz_PadsMap(PSYZ_INPUT_GAMEPAD, bit, PSYZ_INPUT_QUERY);
+        if (code >= 0 && code < SDL_GAMEPAD_BUTTON_COUNT + 2 &&
+            (gamepad_buttons & (1u << code))) {
+            pressed |= 1u << bit;
+        }
+    }
     pressed = MenuButtons(pressed, is_open);
     // the stick in the game and in every menu; the D-pad and the keys win,
     // so the game never sees left and right (or up and down) at once
