@@ -203,7 +203,11 @@ void EntityRedDoor(Entity* self) {
             }
         }
         if (self->ext.redDoor.isBackgroundDoor && self->step == 3) {
+#ifndef PLATFORM_PSYZ
+            // The lock cuts the view at 0x98. The wide view, which shows more
+            // to the left, would jump to it. The hand-off below needs no lock.
             g_Tilemap.x = 0x98;
+#endif
             PLAYER.zPriority = 0x5C;
         }
         g_unkGraphicsStruct.unk20 = 1;
@@ -218,7 +222,14 @@ void EntityRedDoor(Entity* self) {
             g_Player.padSim = PAD_RIGHT;
         }
         g_Player.demo_timer = 3;
+#ifdef PLATFORM_PSYZ
+        // The screen position moves with the wide camera. The original frame
+        // sits at the lock (0x98), so 0x64 in it is 0x98 + 0x64 in the room:
+        // the player must be left of the room edge (0x100) for the hand-off.
+        if (g_PlayerX < 0x98 + 0x64 && self->ext.redDoor.isBackgroundDoor) {
+#else
         if (PLAYER.posX.i.hi < 0x64 && self->ext.redDoor.isBackgroundDoor) {
+#endif
             g_Tilemap.left++;
             g_PlayerX -= 0x100;
             g_Tilemap.x = 0x100;
