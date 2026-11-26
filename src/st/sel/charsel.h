@@ -340,13 +340,9 @@ static void CharselDraw(void) {
 
 // 1 when the card under the cursor cannot start a game yet
 static s32 CharselLocked(void) {
-#if CHARSEL_MARIA
-    // C2: the Saturn Maria's player goes here
-    return g_Charsel[s_CharselCursor].player == PLAYER_MARIA &&
-           s_CharselMariaVariant == CHARSEL_MARIA_PSX;
-#else
+    // both Maria cards start the PSP Maria player; the PSX card is her
+    // classic look (C2, a Saturn Maria player, would go here)
     return 0;
-#endif
 }
 
 // the retail name entry's last steps (Upd_Eng_17) for the chosen character
