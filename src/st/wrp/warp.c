@@ -302,6 +302,11 @@ void EntityWarpRoom(Entity* self) {
                 break;
             }
         }
+#ifdef PLATFORM_PSYZ
+        if (move_room >= LEN(WarpRoomCoords)) { // no room is free: stay here
+            move_room = self->params;
+        }
+#endif
         DestinationWarpRoom = move_room;
 #ifdef ENABLE_SATURN_STAGES
         if (move_room == SATURN_SIXTH_ROOM) {
