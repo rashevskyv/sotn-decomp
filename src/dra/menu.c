@@ -1727,8 +1727,11 @@ static s32 MenuStrWidth(const char* s) {
 // the cell tops (MenuDrawStr draws a cell 3 rows above its y, so y = top + 3);
 // a value "ends at" x when its last cell ends there (MenuDrawInt: x - 8).
 // Every box has the same gap above its first row and under its last one.
-//   name (10,20); portrait frame (9,31)-(72,126); level (10,131)
-//   right panel (82,20)-(376,140): rows 26/38/50 HP MP hearts (values end at
+//   name (10,20); portrait frame (9,31)-(72,126); level (10,131), its
+//     number ending at 76 (uk РІВЕНЬ ends at 58)
+//   right panel (78,20)-(376,140), labels at 82 so a 12-cell word
+//     (Constitution, Витривалість) ends a cell before a base of two digits
+//     with a bonus: rows 26/38/50 HP MP hearts (values end at
 //     226; bars 238..370), status; dots 65; rows 71..107 STR CON INT LCK
 //     (end 226), attack (two hands), defense (end 370); dots 120; row 124
 //     exp, next
@@ -1856,22 +1859,22 @@ static void MenuDrawStatusPage(MenuContext* ctx) {
     MenuDrawSprite(ctx, 10, 95, 62, 31, 1, 0xC0, 0x150, 0x9C, 0, 0, 1);
     if (ctx->unk1C == 0) {
         MenuDrawFrame(9, 31, 64, 96);
-        MenuDrawFrame(82, 20, 295, 121);
+        MenuDrawFrame(78, 20, 299, 121);
         MenuDrawFrame(102, 146, 275, 47);
         MenuDrawFrame(102, 198, 275, 25);
     }
     MenuDrawStr(g_MenuStr[IsAlucart() ? 42 : 0], 10, ST_Y(20), ctx);
     MenuDrawStr(Label(8), 10, ST_Y(131), ctx);
-    MenuDrawInt(g_Status.level, 72, ST_Y(131), ctx);
+    MenuDrawInt(g_Status.level, 68, ST_Y(131), ctx);
 
     // HP, MP (labels in the colour of their bars), hearts; the bars; the
     // status word in the colour of the state
     MENU_TINT(ST_RGB_HP);
-    MenuDrawStr(g_MenuStr[12], 90, ST_Y(26), ctx);
+    MenuDrawStr(g_MenuStr[12], 82, ST_Y(26), ctx);
     MENU_TINT(ST_RGB_MP);
-    MenuDrawStr(g_MenuStr[13], 90, ST_Y(38), ctx);
+    MenuDrawStr(g_MenuStr[13], 82, ST_Y(38), ctx);
     MENU_TINT(0);
-    MenuDrawStr(Label(14), 90, ST_Y(50), ctx);
+    MenuDrawStr(Label(14), 82, ST_Y(50), ctx);
     MenuDrawPair(ctx, g_Status.hp, g_Status.hpMax, ST_Y(26));
     MenuDrawPair(ctx, g_Status.mp, g_Status.mpMax, ST_Y(38));
     MenuDrawPair(ctx, g_Status.hearts, g_Status.heartsMax, ST_Y(50));
@@ -1894,12 +1897,12 @@ static void MenuDrawStatusPage(MenuContext* ctx) {
     MENU_TINT(i == 38 ? 0x30FF30 : i == 40 ? 0x7020FF : i == 39 ? 0x606060 : 0);
     MenuDrawStr(Label(i), 370 - MenuStrWidth(Label(i)), ST_Y(50), ctx);
     MENU_TINT(0);
-    MenuDrawDots(ctx, 86, 372, 65);
+    MenuDrawDots(ctx, 82, 372, 65);
 
     // STR..LCK: the base, then the bonus as an arrow and a number (red up,
     // blue down) ending at 226; with no bonus the base ends there
     for (i = 0, y = ST_Y(71); i < 4; i++, y += 12) {
-        MenuDrawStr(PortWord(i + 2), 90, y, ctx);
+        MenuDrawStr(PortWord(i + 2), 82, y, ctx);
         v = g_Status.statsEquip[i];
         MenuDrawInt(g_Status.statsBase[i], v ? 194 : 218, y, ctx);
         if (v != 0) {
@@ -1926,8 +1929,8 @@ static void MenuDrawStatusPage(MenuContext* ctx) {
     }
     MenuDrawStr(PortWord(1), 238, ST_Y(95), ctx);
     MenuDrawInt(g_Status.defenseEquip, 362, ST_Y(95), ctx);
-    MenuDrawDots(ctx, 86, 372, 120);
-    MenuDrawStr(Label(5), 90, ST_Y(124), ctx);
+    MenuDrawDots(ctx, 82, 372, 120);
+    MenuDrawStr(Label(5), 82, ST_Y(124), ctx);
     MenuDrawInt(g_Status.exp, 218, ST_Y(124), ctx);
     MENU_TINT(TINT_NEXT);
     MenuDrawStr(Label(6), 238, ST_Y(124), ctx);
