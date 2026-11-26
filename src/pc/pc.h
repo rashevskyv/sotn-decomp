@@ -89,6 +89,8 @@ bool PcLoadStageChr(const char* path);
 bool FileOpenRead(
     bool (*cb)(const struct FileOpenRead*), const char* filename, void* param);
 int FileReadToBuf(const char* filename, void* dst, int offset, size_t maxlen);
+bool Io_FileExists(const char* filename);
+bool Saturn_Installed(void); // sim_pc.c
 bool FileAsString(bool (*cb)(const struct FileAsString* file),
                   const char* filename, void* param);
 bool FileUseContent(bool (*cb)(const struct FileUseContent* file, void* param),
