@@ -696,6 +696,16 @@ void func_800F14CC(void) {
         &((RoomHeader*)((u8*)g_api.o.rooms + temp_a2->roomId))->load;
     PLAYER.posX.i.hi = temp_a2->x;
     PLAYER.posY.i.hi = temp_a2->y;
+#ifdef PLATFORM_PSYZ
+    // Richter/Maria new game (row 0x11, NO3 room 0, x 112) stands on the
+    // Saturn hatch (tiles col 7-8 = x 112..143, row 42). The port keeps it
+    // open when IVE_BEEN_ROBBED is set, which a non-Alucard game sets at
+    // start, so the player falls in at once: start past the hatch instead
+    if (g_StageId == STAGE_NO3 && D_8006C374 == 0x11 &&
+        g_PlayableCharacter != PLAYER_ALUCARD) {
+        PLAYER.posX.i.hi = 176;
+    }
+#endif
 
     if (g_StageId & STAGE_INVERTEDCASTLE_FLAG) {
         temp_a1 =
