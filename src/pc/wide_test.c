@@ -122,6 +122,10 @@ int main(void) {
         y0 = 0 - 260, y1 = 512 - 260;
         Wide_PsxRows(4, 260, 260, 20, 227, &y0, &y1);
         assert(y0 < 0 && y1 == 227);
+        // no bar (Saturn band): the one-screen room keeps its art rows
+        y0 = 16 - 8, y1 = 240 - 8;
+        Wide_PsxRows(8, 8, 8, -240, 480, &y0, &y1);
+        assert(y0 == 8 && y1 == 232);
     }
 
     // edge fill: a true mirror image, the art flipped next to the edge,

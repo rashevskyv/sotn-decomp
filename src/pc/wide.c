@@ -690,8 +690,14 @@ void Wide_BandClip(int y0, int y1) {
     }
     Wide_BandRange(g_Tilemap.y, g_Tilemap.height, 240, g_WideY, 4, 252,
                    g_WideBandTop, g_WideBandBottom, &lo, &hi);
-    Wide_PsxRows(lo, hi, g_Tilemap.scrollY.i.hi, CLIP_TOP, CLIP_BOTTOM, &y0,
-                 &y1);
+    // no PS1 bar on a Saturn band side (art up to the band) or where a
+    // camera lock (g_Tilemap.y, height) stops inside the room
+    Wide_PsxRows(lo, hi, g_Tilemap.scrollY.i.hi,
+                 g_WideBandTop || g_Tilemap.y > 0 ? -DISP_STAGE_H : CLIP_TOP,
+                 g_WideBandBottom || g_Tilemap.height < g_Tilemap.vSize * 256
+                     ? 2 * DISP_STAGE_H
+                     : CLIP_BOTTOM,
+                 &y0, &y1);
     y0 = Clamp(y0, 0, DISP_STAGE_H);
     y1 = Clamp(y1, y0, DISP_STAGE_H);
     d0->clip.y = d1->clip.y = y0;
