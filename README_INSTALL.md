@@ -195,7 +195,7 @@ at build time. Without it they stay English.
 | D-pad | Arrow keys | D-pad | D-pad |
 
 - **L3 + R3 (keyboard `1` + `2`) opens the port menu**: language, display, key bindings, quality of life, cheats, teleport map.
-- L2 (ZL, `W`) uses the Pocket item. The left stick works as the D-pad. The right stick moves the view.
+- L1 (L, `Q`) uses the Pocket item. The left stick works as the D-pad. The right stick moves the view.
 - `F11` or `F4`: window or fullscreen. `Esc` leaves fullscreen. In a window `Esc` quits the game.
 - Keys and pad buttons can be changed in the port menu: CONTROLS > KEY BINDINGS.
 

@@ -460,9 +460,9 @@ void HandlePlay(void) {
 
 #ifdef PLATFORM_PSYZ
             {
-                // port: right hand Y, left hand R, jump B, special L, wolf X,
-                // mist ZR, bat A, Pocket ZL (button ids: src/pc/buttons.c)
-                static const u8 dflt[BUTTON_COUNT] = {0, 6, 2, 5, 3, 4, 1, 7};
+                // port: right hand Y, left hand ZR, jump B, special ZL, wolf X,
+                // mist R, bat A, Pocket L (button ids: src/pc/buttons.c)
+                static const u8 dflt[BUTTON_COUNT] = {0, 4, 2, 7, 3, 6, 1, 5};
                 for (i = 0; i < BUTTON_COUNT; i++) {
                     g_Settings.buttonConfig[i] = dflt[i];
                     g_Settings.buttonMask[i] = g_ButtonMask[dflt[i]];

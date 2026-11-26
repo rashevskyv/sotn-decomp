@@ -4054,10 +4054,10 @@ void func_800FADC0(void) {
     if (IS_QUICK_SLOT()) {
 #ifdef __SWITCH__
         const char* hint = Lang_Port(382);
-#define POCKET_HINT _S("Pocket: food, medicine or Library card on ZL")
+#define POCKET_HINT _S("Pocket: food, medicine or Library card on L")
 #else
         const char* hint = Lang_Port(381);
-#define POCKET_HINT _S("Pocket: food, medicine or Library card on L2")
+#define POCKET_HINT _S("Pocket: food, medicine or Library card on L1")
 #endif
         func_800FAD34(g_QuickItem ? g_EquipDefs[g_QuickItem].description
                       : hint ? hint : POCKET_HINT,
