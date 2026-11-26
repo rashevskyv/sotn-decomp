@@ -38,18 +38,22 @@ const char* Switch_Init(void) {
     // sector is a sector inside it. Own cue name, rewritten every boot, so an
     // old full-disc sotn.cue can not take its place.
     const char* cue = SWITCH_DIR "/sotn-xa.cue";
+    const char* xa = "data/SD/XA_STR1";
     bool ok = FileExists(SOTN_DATA_DIR "/SD/XA_STR1");
+    if (!ok && FileExists(SOTN_DATA_DIR "/SD/XA_STR1.")) {
+        xa = "data/SD/XA_STR1."; // the extractor keeps the ISO 9660 dot
+        ok = true;
+    }
     FILE* f = ok ? fopen(cue, "w") : NULL;
     if (f) {
-        fputs("FILE \"data/SD/XA_STR1\" BINARY\n"
-              "  TRACK 01 MODE2/2352\n"
-              "    INDEX 01 00:00:00\n",
-              f);
+        fprintf(f, "FILE \"%s\" BINARY\n"
+                   "  TRACK 01 MODE2/2352\n"
+                   "    INDEX 01 00:00:00\n", xa);
         ok = fclose(f) == 0;
     } else {
         ok = false;
     }
-    fprintf(stderr, "[boot] cd audio %s -> data/SD/XA_STR1: %s\n", cue,
+    fprintf(stderr, "[boot] cd audio %s -> %s: %s\n", cue, xa,
             ok ? "found" : "MISSING, music off");
     return ok ? cue : NULL;
 }

@@ -103,8 +103,7 @@ C:\Games\sotn-native\
 |-- sotn.ini          settings; the game makes it, the port menu writes it
 |-- sotn-xa.cue       3 lines that point at data\SD\XA_STR1 (disc music)
 |-- data\             game data from your disc
-|   |-- BIN\ BOSS\ SD\ SERVANT\ ST\ VAB\ XA\ and the disc files (DRA.BIN, ...)
-|   `-- textures\     HD pictures: en\ uk\ common\ (from this repository)
+|   `-- BIN\ BOSS\ SD\ SERVANT\ ST\ VAB\ XA\ and the disc files (DRA.BIN, ...)
 |-- music\            optional, enhanced music (step 5)
 |-- voice\            optional, voice sets jp\ psp\ (step 5)
 |-- bu00\ bu10\       memory card saves (the game makes them)
@@ -112,7 +111,8 @@ C:\Games\sotn-native\
 ```
 
 If the game finds no `data\BIN\F_TITLE0.BIN` it shows the message "Game data not found" and stops.
-That file is the only one the start check needs. `sotn-xa.cue`, `music\`, `voice\` and `textures\` are optional.
+That file is the only one the start check needs. `sotn-xa.cue`, `music\` and `voice\` are optional.
+The build embeds the HD packs in the program. It makes no `data\textures\` folder.
 Without `sotn-xa.cue` the game plays no disc music. The text of the cue file:
 
 ```text
@@ -120,6 +120,8 @@ FILE "data/SD/XA_STR1" BINARY
   TRACK 01 MODE2/2352
     INDEX 01 00:00:00
 ```
+
+Both `data/SD/XA_STR1` and `data/SD/XA_STR1.` work in the cue. The port opens the name that exists.
 
 ## 4. Nintendo Switch
 

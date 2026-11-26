@@ -104,8 +104,7 @@ C:\Games\sotn-native\
 |-- sotn.ini          налаштування; створює гра, пише меню порту
 |-- sotn-xa.cue       3 рядки, що вказують на data\SD\XA_STR1 (музика диска)
 |-- data\             ігрові дані з вашого диска
-|   |-- BIN\ BOSS\ SD\ SERVANT\ ST\ VAB\ XA\ і файли диска (DRA.BIN, ...)
-|   `-- textures\     HD-картинки: en\ uk\ common\ (з цього репозиторію)
+|   `-- BIN\ BOSS\ SD\ SERVANT\ ST\ VAB\ XA\ і файли диска (DRA.BIN, ...)
 |-- music\            необов'язково, покращена музика (крок 5)
 |-- voice\            необов'язково, набори голосів jp\ psp\ (крок 5)
 |-- bu00\ bu10\       збереження карти пам'яті (створює гра)
@@ -113,7 +112,8 @@ C:\Games\sotn-native\
 ```
 
 Якщо гра не знаходить `data\BIN\F_TITLE0.BIN`, вона показує повідомлення «Game data not found» і зупиняється.
-Лише цей файл перевіряється при запуску. `sotn-xa.cue`, `music\`, `voice\` і `textures\` необов'язкові.
+Лише цей файл перевіряється при запуску. `sotn-xa.cue`, `music\` і `voice\` необов'язкові.
+Збірка вбудовує HD-пакети в програму. Вона не створює теку `data\textures\`.
 Без `sotn-xa.cue` гра не відтворює музику диска. Вміст файла cue:
 
 ```text
@@ -121,6 +121,9 @@ FILE "data/SD/XA_STR1" BINARY
   TRACK 01 MODE2/2352
     INDEX 01 00:00:00
 ```
+
+У cue можна вказати `data/SD/XA_STR1` або `data/SD/XA_STR1.`.
+Гра відкриває ту назву, яка існує.
 
 ## 4. Nintendo Switch
 
