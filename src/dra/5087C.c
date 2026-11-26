@@ -287,6 +287,16 @@ void func_800F0940(void) {
     default:
         g_BgLayers[0].scrollX.i.hi = 0;
         g_BgLayers[0].scrollY.i.hi = 4;
+#ifdef PLATFORM_PSYZ
+        // NO3/NP3 room 0 (castle entrance): tile row 0 of the still storm
+        // cloud backdrop is empty, under the PS1 bar (frame rows -4..12).
+        // The port shows the bar rows in a tall room: move the backdrop up
+        // 12 px, so the clouds (tile row 1) start at frame row 0.
+        if ((g_StageId == STAGE_NO3 || g_StageId == STAGE_NP3) &&
+            g_Tilemap.left == 2 && g_Tilemap.top == 38) {
+            g_BgLayers[0].scrollY.i.hi = 16;
+        }
+#endif
         break;
     }
 }

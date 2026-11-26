@@ -4,11 +4,11 @@
 // an integer scale. In stage mode
 // psyz draws a canvas of (screen / scale) game pixels; the stage code reads
 // the extra pixels per side in g_WideX. g_WideY stays 0. The stage clip
-// opens to the whole frame (rows 0..240, Wide_BandClip each frame): the room
-// shows in the old PS1 bar rows 0..20 and 226..240. Black bars stay only
-// where the view is past the room: above its top edge, below its bottom edge
-// (a room shorter than the view, the Saturn band, the slide into a room whose
-// top is below). Only rows 20..226 must fit, so docked shows the stage at
+// opens to the whole frame (rows 0..240, Wide_BandClip each frame): a tall
+// room shows in the old PS1 bar rows 0..20 and 226..240. Black bars stay
+// where the PS1 view never went: a one-screen room keeps the PS1 bars, a tall
+// room shows them only at its top and bottom (and the Saturn band, the slide
+// into a room whose top is below). Only rows 20..226 must fit, so docked shows the stage at
 // scale 5 (384x216): the canvas cuts the rows 0..16 and 231..240. A frame
 // without the stage camera (cutscene clip, menus) keeps the PS1 clip 20..226
 // and the black bars (Wide_ClearBars). Other display modes show the PS1
@@ -674,16 +674,24 @@ void Wide_ClearBars(void) {
 
 // The stage camera calls it on every frame with the art rows of the room on
 // the screen (world rows minus the scroll). The clip opens to the whole
-// frame, so the room shows in the old PS1 bar rows 0..20 and 226..240. Rows
-// above the room top or below its bottom (a room shorter than the view, the
-// slide into a room whose top is below, the empty band of a Saturn room)
-// stay black. psyz extends the clip to the canvas rows.
+// frame where the room goes on above or below the view, so a tall room
+// shows in the old PS1 bar rows 0..20 and 226..240. Where the PS1 view
+// never went (the rows above the top or below the bottom of the camera
+// range, plus the PS1 bars) the rows stay black: a one-screen room keeps the
+// PS1 bars, a tall room shows them only at its top and bottom (owner). The
+// slide into a room whose top is below and the empty band of a Saturn room
+// stay black too. psyz extends the clip to the canvas rows.
 void Wide_BandClip(int y0, int y1) {
     DRAWENV* d0 = &g_GpuBuffers[0].draw;
     DRAWENV* d1 = &g_GpuBuffers[1].draw;
+    int lo, hi;
     if (d0->clip.y != d1->clip.y) {
         return; // the two-page clip of 42398.c
     }
+    Wide_BandRange(g_Tilemap.y, g_Tilemap.height, 240, g_WideY, 4, 252,
+                   g_WideBandTop, g_WideBandBottom, &lo, &hi);
+    Wide_PsxRows(lo, hi, g_Tilemap.scrollY.i.hi, CLIP_TOP, CLIP_BOTTOM, &y0,
+                 &y1);
     y0 = Clamp(y0, 0, DISP_STAGE_H);
     y1 = Clamp(y1, y0, DISP_STAGE_H);
     d0->clip.y = d1->clip.y = y0;

@@ -43,6 +43,22 @@ static inline void Wide_BandRange(int start, int end, int fb, int m, int pad0,
                      bb ? fb : pad1, lo, hi);
 }
 
+// The PS1 bars at the room top and bottom. The PS1 shows only the frame
+// rows c0..c1, at a scroll in [lo, hi]: no room row above lo + c0 or below
+// hi + c1 was ever shown. Narrow the clip rows *y0..*y1 (frame rows at this
+// scroll) to the rows the PS1 shows. A one-screen room (lo == hi) keeps the
+// bars c0..c1; a tall room shows them only at its top and bottom, and they
+// scroll away with the room.
+static inline void Wide_PsxRows(
+    int lo, int hi, int scroll, int c0, int c1, int* y0, int* y1) {
+    if (*y0 < lo + c0 - scroll) {
+        *y0 = lo + c0 - scroll;
+    }
+    if (*y1 > hi + c1 - scroll) {
+        *y1 = hi + c1 - scroll;
+    }
+}
+
 // A large screen tile (fade, flash) that touches an edge of the 256x240
 // frame grows by the margin on that side, so it covers the wide view.
 static inline void Wide_StretchRect(
