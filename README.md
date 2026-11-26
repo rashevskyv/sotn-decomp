@@ -249,6 +249,8 @@ cmake --build build/win
 
 The result is `build/win/sotn.exe`: one file, no DLLs, no console window.
 Put it in a folder with the game files in `data/` (as `out/pc/`). The log is `sotn.log` next to it.
+In WSL, rename `data/SD/XA_STR1.` to `XA_STR1` before you copy the folder.
+The game writes `sotn-xa.cue` at the first start.
 The build embeds the HD packs in the program. It makes no loose `data/textures/` folder.
 
 ### 6. Install on the Switch
@@ -264,9 +266,8 @@ The port uses its own folder, `/switch/sotn-native/`, on the SD card:
 | `/switch/sotn-native/music/` | Music files (optional) | see "Music files" |
 | `/switch/sotn-native/sotn.ini` | Settings | written by the game at the first start |
 
-The game rewrites `sotn-xa.cue` at start when one of the two XA names exists.
-It needs a writable cue file (`src/pc/switch.c:40-58`). The cue points at `data/SD/XA_STR1`
-or `data/SD/XA_STR1.`.
+The game rewrites `sotn-xa.cue` at start when one XA name exists.
+The cue must be writable. It points at `data/SD/XA_STR1` or `data/SD/XA_STR1.`.
 The game also writes these files there: `sotn.log`, `sotn.prev.log`, `sotn.out.log`
 and the memory cards `bu00/` and `bu10/`.
 No other files are needed. Start the port from the homebrew menu.
