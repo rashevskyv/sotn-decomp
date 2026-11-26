@@ -221,12 +221,17 @@ static void CharselArrows(s32 x, s32 sel) {
     s32 bob = sel && (s_CharselTimer & 0x10) ? 1 : 0;
 
     x += (CHARSEL_FRAME_W - CHARSEL_ARROW_W) / 2;
-    CharselQuad(x, CS_FRAME_Y - CHARSEL_ARROW_H - 2 - bob, CHARSEL_ARROW_W,
-                CHARSEL_ARROW_H, 0, CS_ARROW_V, CHARSEL_ARROW_W,
-                CHARSEL_ARROW_H, CS_ART_TPAGE, clut, 0x80, 0x20);
-    CharselQuad(x, CS_NAME_Y + 26 + bob, CHARSEL_ARROW_W, CHARSEL_ARROW_H, 0,
-                CS_ARROW_V + 8, CHARSEL_ARROW_W, CHARSEL_ARROW_H, CS_ART_TPAGE,
-                clut, 0x80, 0x20);
+    // only the arrow that leads to the other version: Up on PSP, Down on PSX
+    if (s_CharselMariaVariant == CHARSEL_MARIA_PSP) {
+        CharselQuad(x, CS_FRAME_Y - CHARSEL_ARROW_H - 2 - bob,
+                    CHARSEL_ARROW_W, CHARSEL_ARROW_H, 0, CS_ARROW_V,
+                    CHARSEL_ARROW_W, CHARSEL_ARROW_H, CS_ART_TPAGE, clut, 0x80,
+                    0x20);
+    } else {
+        CharselQuad(x, CS_NAME_Y + 26 + bob, CHARSEL_ARROW_W, CHARSEL_ARROW_H,
+                    0, CS_ARROW_V + 8, CHARSEL_ARROW_W, CHARSEL_ARROW_H,
+                    CS_ART_TPAGE, clut, 0x80, 0x20);
+    }
 }
 #endif
 
@@ -371,10 +376,12 @@ static void CharselUpdate(void) {
         s_CharselCursor %= CS_N;
     }
 #if CHARSEL_MARIA
-    if ((g_pads[0].tapped & (PAD_UP | PAD_DOWN)) &&
+    // two versions: Up goes PSP -> PSX, Down goes back; the arrow shows the way
+    if ((g_pads[0].tapped &
+         (s_CharselMariaVariant == CHARSEL_MARIA_PSP ? PAD_UP : PAD_DOWN)) &&
         g_Charsel[s_CharselCursor].player == PLAYER_MARIA) {
         g_api.PlaySfx(SFX_UI_MOVE);
-        s_CharselMariaVariant ^= 1; // two versions: Up and Down both switch
+        s_CharselMariaVariant ^= 1;
         CharselUploadPortrait(s_CharselCursor);
     }
 #endif
