@@ -2,6 +2,7 @@
 #include <dra.h>
 #include "dra_bss.h"
 #include <psyz/log.h>
+#include <psyz/video.h>
 #include "pc.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -527,12 +528,15 @@ const char* SaturnStageOverlay(int stageId) {
 // A Saturn stage works when its converted files (data/ST/<STAGE>/F_STAGE.BIN)
 // are there. A build without ENABLE_SATURN_STAGES has neither the module nor
 // the files.
-static bool SaturnStageHere(int stageId) {
+bool SaturnStageHere(int stageId) {
 #ifdef ENABLE_SATURN_STAGES
+    const char* overlay = SaturnStageOverlay(stageId);
     char path[96];
     char* p;
-    snprintf(path, sizeof(path), SOTN_DATA_DIR "/ST/%s/F_STAGE.BIN",
-             SaturnStageOverlay(stageId));
+    if (!overlay) {
+        return false;
+    }
+    snprintf(path, sizeof(path), SOTN_DATA_DIR "/ST/%s/F_STAGE.BIN", overlay);
     for (p = path + sizeof(SOTN_DATA_DIR "/ST/") - 1; *p && *p != '/'; p++) {
         *p = (char)toupper((unsigned char)*p);
     }
@@ -541,6 +545,10 @@ static bool SaturnStageHere(int stageId) {
     (void)stageId;
     return false;
 #endif
+}
+
+bool SaturnStageMissing(int stageId) {
+    return SaturnStageOverlay(stageId) != NULL && !SaturnStageHere(stageId);
 }
 
 // Does this install hold the Saturn's stages? Without them nothing drops the
@@ -569,7 +577,7 @@ void Save_FitInstall(void) {
     };
     int i;
 
-    if (SaturnStageOverlay(g_StageId) != NULL && !SaturnStageHere(g_StageId)) {
+    if (SaturnStageMissing(g_StageId)) {
         for (i = 0; i < LEN(save_rooms); i++) {
             if (save_rooms[i].saturn == g_StageId) {
                 WARNF("save in Saturn stage %02X, not installed: back to "
@@ -808,6 +816,19 @@ s32 LoadFileSim(s32 fileId, SimFileType type) {
                         // user stage
                         g_GameParams.stage = 0x51;
                         g_GameParams.stageOwnsAssets = true;
+                    }
+                }
+                if (SaturnStageMissing(g_GameParams.stage)) {
+                    WARNF("stage %02X is not installed: using the castle start",
+                          g_GameParams.stage);
+                    g_GameParams.stage = STAGE_NP3;
+                    g_GameParams.stageName = NULL;
+                    g_GameParams.stageOwnsAssets = false;
+                    if (g_GameParams.replayPath) {
+                        Replay_Reset();
+                        if (g_GameParams.replayBoundlessFramerate) {
+                            Psyz_VideoSetVsyncMode(PSYZ_VSYNC_AUTO);
+                        }
                     }
                 }
                 g_StageId = (Stages)g_GameParams.stage;

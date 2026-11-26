@@ -3,6 +3,9 @@
 #include "dra.h"
 #include "dra_bss.h"
 #include "servant.h"
+#ifdef PLATFORM_PSYZ
+#include "../pc/pc.h"
+#endif
 
 // BSS
 static s32 D_8013640C;
@@ -32,6 +35,13 @@ void func_800E414C(void) {
         return;
     }
 
+#ifdef PLATFORM_PSYZ
+    if (D_8003C708.unk2 == 0 &&
+        SaturnStageMissing(ROOM_TELEPORT(D_8003C708.zPriority)->stageId ^
+                           (g_StageId & STAGE_INVERTEDCASTLE_FLAG))) {
+        return;
+    }
+#endif
     func_8010DFF0(1, 1);
     if (D_8003C708.unk2 &&
         !(PLAYER.posX.i.hi >= 8 && PLAYER.posX.i.hi <= 248)) {

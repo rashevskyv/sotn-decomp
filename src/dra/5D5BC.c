@@ -66,7 +66,7 @@ ItemCategory GetEquipItemCategory(s32 equipId) {
 }
 
 #ifdef PLATFORM_PSYZ
-extern s32 g_QuickMode, g_QuickListN;
+extern s32 g_QuickMode, g_QuickListN, g_HandListN;
 #endif
 s32 func_800FD6C4(EquipKind equipTypeFilter) {
     s32 itemCount;
@@ -79,8 +79,10 @@ s32 func_800FD6C4(EquipKind equipTypeFilter) {
         if (g_QuickMode) { // the third hand's list (menu.c)
             return g_QuickListN;
         }
-#endif
+        return g_HandListN;
+#else
         return NUM_HAND_ORDER;
+#endif
     case EQUIP_HEAD:
         equipType = EQUIP_HEAD - 1;
         break;

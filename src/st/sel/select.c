@@ -692,8 +692,20 @@ void func_801ACFBC(s32 port, s32 slot, s32 textId) {
     func_801B263C(playerName, textId);
 #if REGION == REGION_JP
     func_801B25D4(g_SaveAreaNames[g_SaveSummary[port].stage[slot]], textId + 1);
+#ifdef PLATFORM_PSYZ
+    if (g_SaveSummary[port].character[slot] == PLAYER_RICHTER) {
+#else
     if (g_SaveSummary[port].character[slot]) {
+#endif
         func_801B25D4("リヒター", textId + 2);
+#ifdef PLATFORM_PSYZ
+    } else if (g_SaveSummary[port].character[slot] == PLAYER_MARIA) {
+#ifdef USE_PLAYER_MARIA
+        func_801B25D4("マリア", textId + 2);
+#else
+        func_801B25D4("　", textId + 2);
+#endif
+#endif
     } else if (g_SaveSummary[port].kind[slot] & SAVE_FLAG_CLEAR) {
         func_801B25D4("クリアー", textId + 2);
     } else if (g_SaveSummary[port].kind[slot] & SAVE_FLAG_REPLAY) {
@@ -708,8 +720,16 @@ void func_801ACFBC(s32 port, s32 slot, s32 textId) {
         func_801B2608("Maria", textId + 2);
     } else
 #endif
+#ifdef PLATFORM_PSYZ
+    if (g_SaveSummary[port].character[slot] == PLAYER_RICHTER) {
+#else
     if (g_SaveSummary[port].character[slot]) {
+#endif
         func_801B2608("Richter", textId + 2);
+#if defined(PLATFORM_PSYZ) && !defined(USE_PLAYER_MARIA)
+    } else if (g_SaveSummary[port].character[slot] == PLAYER_MARIA) {
+        func_801B2608("　", textId + 2);
+#endif
     } else if (g_SaveSummary[port].kind[slot] & SAVE_FLAG_CLEAR) {
         func_801B2608("Clear", textId + 2);
     } else if (g_SaveSummary[port].kind[slot] & SAVE_FLAG_REPLAY) {

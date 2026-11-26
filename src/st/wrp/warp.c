@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "wrp.h"
+#if defined(PLATFORM_PSYZ) && defined(ENABLE_SATURN_STAGES)
+#include "../../pc/pc.h"
+#endif
 
 #if TARGET == TARGET_PSP
 extern s32 E_ID(SMALL_ROCKS);
@@ -200,7 +203,11 @@ void EntityWarpRoom(Entity* self) {
         if (pick != -1) {
             self->flags &= ~FLAG_UNK_10000;
         }
-        if (pick >= LEN(WarpRoomCoords)) { // a room this build lacks
+        if (pick >= LEN(WarpRoomCoords)
+#ifdef ENABLE_SATURN_STAGES
+            || (pick == SATURN_SIXTH_ROOM && !SaturnStageHere(STAGE_ID_SATURN_WARP))
+#endif
+        ) { // a room this install lacks
             pick = -2;
             g_PauseAllowed = true; // as the cancel path of PortMenu_WarpPick
             g_Player.demo_timer = 0;
@@ -270,12 +277,24 @@ void EntityWarpRoom(Entity* self) {
                 move_room = 0;
             }
             if (g_CastleFlags[WRP_UNLOCKS] & (1 << move_room)) {
+#if defined(PLATFORM_PSYZ) && defined(ENABLE_SATURN_STAGES)
+                if (move_room == SATURN_SIXTH_ROOM &&
+                    !SaturnStageHere(STAGE_ID_SATURN_WARP)) {
+                    continue;
+                }
+#endif
                 break;
             }
         }
         DestinationWarpRoom = move_room;
 #ifdef ENABLE_SATURN_STAGES
         if (move_room == SATURN_SIXTH_ROOM) {
+#ifdef PLATFORM_PSYZ
+            if (!SaturnStageHere(STAGE_ID_SATURN_WARP)) {
+                self->step = 5;
+                break;
+            }
+#endif
             // an ordinary stage change: the next frame loads the stage
             D_8006C374 = SATURN_SIXTH_ROOM_TELEPORT;
             g_GameStep = Play_PrepareNextStage;
