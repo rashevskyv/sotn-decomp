@@ -31,6 +31,15 @@ bool Io_DataPresent(void) {
     return f != NULL;
 }
 
+bool Io_FileExists(const char* filename) {
+    char resolved[1024];
+    FILE* f = OpenFileRead(filename, resolved, sizeof(resolved));
+    if (f) {
+        fclose(f);
+    }
+    return f != NULL;
+}
+
 struct FileAsStringCbParams {
     bool (*callback)(const struct FileAsString*);
     void* param;

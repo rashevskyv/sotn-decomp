@@ -726,6 +726,12 @@ void PrintFileSelectPlaceName(s32 port, s32 slot, s32 y) {
     volatile u32 pad; // !FAKE:
 
     s32 stage = g_SaveSummary[port].stage[slot];
+#ifdef PLATFORM_PSYZ
+    // a save of a fuller install: the inverted Saturn stages are past the table
+    if (stage < 0 || stage >= LEN(stage_names)) {
+        stage = LEN(stage_names) - 1;
+    }
+#endif
     // SEL_AREA (table 12) rows: 2 * stage + line
     DrawString8x8(
         (u8*)LANG_ROW(12, stage * 2, (const char*)stage_names[stage].line1),

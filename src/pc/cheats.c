@@ -105,6 +105,10 @@ static void FillInventory(void) {
     }
     for (i = 0; i < NUM_HAND_ORDER; i++) { // the PS1's and the Saturn's
         u8 id = g_Status.equipHandOrder[i];
+        // without the Saturn's stages these four are clones of a PS1 item
+        if (IS_SATURN_HAND_ITEM(id) && !Saturn_Installed()) {
+            continue;
+        }
         if (g_Status.equipHandCount[id] < 50) {
             g_Status.equipHandCount[id] = 50;
         }

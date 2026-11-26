@@ -684,6 +684,10 @@ void StoreSaveData(SaveData* save, s32 block, s32 cardIcon) {
     dst->rng = g_randomNext;
 }
 
+#ifdef PLATFORM_PSYZ
+void Save_FitInstall(void); // src/pc/sim_pc.c
+#endif
+
 s32 ApplySaveData(SaveData* save) {
     s32 i;
     u32 prevCompletionFlags1;
@@ -718,6 +722,9 @@ s32 ApplySaveData(SaveData* save) {
     g_RoomCount = savePtr->info.nRoomsExplored;
     g_Tilemap.left = savePtr->info.roomX;
     g_Tilemap.top = savePtr->info.roomY;
+#ifdef PLATFORM_PSYZ
+    Save_FitInstall(); // a Saturn stage or Maria this install lacks
+#endif
 
 #ifdef PLATFORM_PSYZ
     Status_FromPs1(&g_Status, srcStatus, savePtr + 1);

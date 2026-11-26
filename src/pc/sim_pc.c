@@ -524,6 +524,76 @@ const char* SaturnStageOverlay(int stageId) {
     }
 }
 
+// A Saturn stage works when its converted files (data/ST/<STAGE>/F_STAGE.BIN)
+// are there. A build without ENABLE_SATURN_STAGES has neither the module nor
+// the files.
+static bool SaturnStageHere(int stageId) {
+#ifdef ENABLE_SATURN_STAGES
+    char path[96];
+    char* p;
+    snprintf(path, sizeof(path), SOTN_DATA_DIR "/ST/%s/F_STAGE.BIN",
+             SaturnStageOverlay(stageId));
+    for (p = path + sizeof(SOTN_DATA_DIR "/ST/") - 1; *p && *p != '/'; p++) {
+        *p = (char)toupper((unsigned char)*p);
+    }
+    return Io_FileExists(path);
+#else
+    (void)stageId;
+    return false;
+#endif
+}
+
+// Does this install hold the Saturn's stages? Without them nothing drops the
+// Saturn's hand items (ITEM_ASTRAL_DAGGER..): they would be PS1 clones.
+bool Saturn_Installed(void) {
+    return SaturnStageHere(STAGE_ID_SATURN_15) ||
+           SaturnStageHere(STAGE_ID_SATURN_16);
+}
+
+// A save of a fuller install (save_mgr.h ApplySaveData, after it set the
+// stage, the room and the hero). A Saturn stage this install lacks would load
+// no module (a title or a dead room), and the stage tables stop at 0x4B. The
+// player goes to the PS1 save room next to it on the map instead: the
+// Entrance (the Garden door and the sixth warp room, map cells 3,44 and 2,45)
+// or the Marble Gallery (the Prison door), and the copies of them in the
+// inverted castle. Maria without her data plays Alucard.
+void Save_FitInstall(void) {
+    static const struct {
+        u8 saturn, stage, left, top;
+    } save_rooms[] = {
+        {STAGE_ID_SATURN_15, STAGE_NP3, 3, 42},
+        {STAGE_ID_SATURN_WARP, STAGE_NP3, 3, 42},
+        {STAGE_ID_SATURN_16, STAGE_NO0, 31, 27},
+        {STAGE_ID_REVERSE_SATURN_15, STAGE_RNO3, 60, 21},
+        {STAGE_ID_REVERSE_SATURN_16, STAGE_RNO0, 32, 36},
+    };
+    int i;
+
+    if (SaturnStageOverlay(g_StageId) != NULL && !SaturnStageHere(g_StageId)) {
+        for (i = 0; i < LEN(save_rooms); i++) {
+            if (save_rooms[i].saturn == g_StageId) {
+                WARNF("save in Saturn stage %02X, not installed: back to "
+                      "stage %02X cell %d,%d",
+                      g_StageId, save_rooms[i].stage, save_rooms[i].left,
+                      save_rooms[i].top);
+                g_StageId = (Stages)save_rooms[i].stage;
+                g_Tilemap.left = save_rooms[i].left;
+                g_Tilemap.top = save_rooms[i].top;
+                break;
+            }
+        }
+    }
+#ifndef USE_PLAYER_MARIA
+    if (g_CheatSaveChar == PLAYER_MARIA) {
+        WARNF("save of Maria, not built: Alucard plays");
+        g_CheatSaveChar = PLAYER_ALUCARD;
+        if (g_PlayableCharacter == PLAYER_MARIA) {
+            g_PlayableCharacter = PLAYER_ALUCARD;
+        }
+    }
+#endif
+}
+
 static bool StageOwnsAssets(void) {
     if (SaturnStageOverlay(g_StageId) != NULL) {
         return true;
